@@ -49,24 +49,12 @@ try {
   const configPath = path.join(rootDir, "firebase-applet-config.json");
   if (fs.existsSync(configPath)) {
     const cfg = JSON.parse(fs.readFileSync(configPath, "utf8"));
-    if (cfg.projectId && (!process.env.FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID.includes("gen-lang-client"))) {
-      process.env.FIREBASE_PROJECT_ID = cfg.projectId;
-    }
-    if (cfg.apiKey && (!process.env.FIREBASE_API_KEY || process.env.FIREBASE_API_KEY.includes("AIzaSyA_g2ek4z"))) {
-      process.env.FIREBASE_API_KEY = cfg.apiKey;
-    }
-    if (cfg.authDomain && (!process.env.FIREBASE_AUTH_DOMAIN || process.env.FIREBASE_AUTH_DOMAIN.includes("gen-lang-client"))) {
-      process.env.FIREBASE_AUTH_DOMAIN = cfg.authDomain;
-    }
-    if (cfg.firestoreDatabaseId && (!process.env.FIREBASE_DATABASE_ID || process.env.FIREBASE_DATABASE_ID.includes("da9a52de"))) {
-      process.env.FIREBASE_DATABASE_ID = cfg.firestoreDatabaseId;
-    }
-    if (cfg.storageBucket && (!process.env.FIREBASE_STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET.includes("gen-lang-client"))) {
-      process.env.FIREBASE_STORAGE_BUCKET = cfg.storageBucket;
-    }
-    if (cfg.appId && (!process.env.FIREBASE_APP_ID || process.env.FIREBASE_APP_ID.includes("420914651308"))) {
-      process.env.FIREBASE_APP_ID = cfg.appId;
-    }
+    if (cfg.projectId) process.env.FIREBASE_PROJECT_ID = cfg.projectId;
+    if (cfg.apiKey) process.env.FIREBASE_API_KEY = cfg.apiKey;
+    if (cfg.authDomain) process.env.FIREBASE_AUTH_DOMAIN = cfg.authDomain;
+    if (cfg.firestoreDatabaseId) process.env.FIREBASE_DATABASE_ID = cfg.firestoreDatabaseId;
+    if (cfg.storageBucket) process.env.FIREBASE_STORAGE_BUCKET = cfg.storageBucket;
+    if (cfg.appId) process.env.FIREBASE_APP_ID = cfg.appId;
   }
 } catch (e) {
   logger.warn("Could not auto-hydrate Firebase environment variables", e.message);

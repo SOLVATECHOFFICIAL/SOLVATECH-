@@ -1283,6 +1283,7 @@
       import {
         getFirestore,
         initializeFirestore,
+        setLogLevel,
         doc,
         setDoc,
         getDoc,
@@ -1295,13 +1296,13 @@
       const $ = (id) => document.getElementById(id);
       
       const FIREBASE_CONFIG = {
-        projectId: "glass-intelligence-253bd",
-        appId: "1:91117675798:web:97ae27becca017177a5c37",
-        apiKey: "AIzaSyAmZp-Prdc74empcjYFv9PdFLagiN-to2c",
-        authDomain: "glass-intelligence-253bd.firebaseapp.com",
-        firestoreDatabaseId: "ai-studio-remixwhatsappbot-d845e0aa-da32-4907-811f-9be97b2c6851",
-        storageBucket: "glass-intelligence-253bd.firebasestorage.app",
-        messagingSenderId: "91117675798",
+        projectId: "gen-lang-client-0324946831",
+        appId: "1:420914651308:web:ae4cb5d7632401c1a83f09",
+        apiKey: "AIzaSyA_g2ek4ziXSE9m4VD5-5PfKpKJjAobYFg",
+        authDomain: "gen-lang-client-0324946831.firebaseapp.com",
+        firestoreDatabaseId: "ai-studio-whatsappbot-da9a52de-41e7-4365-a5b4-8aec9332642c",
+        storageBucket: "gen-lang-client-0324946831.firebasestorage.app",
+        messagingSenderId: "420914651308",
       };
 
       const FALLBACK_PRODUCTION_BACKEND = "https://web-production-c6f21.up.railway.app";
@@ -2486,16 +2487,22 @@
       let auth = null;
       let db = null;
       try {
+        try { setLogLevel("error"); } catch {}
         const app = initializeApp(FIREBASE_CONFIG);
         auth = getAuth(app);
         try {
           const dbId = FIREBASE_CONFIG.firestoreDatabaseId || "(default)";
-          db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true }, dbId);
+          db = initializeFirestore(app, { experimentalForceLongPolling: true }, dbId);
         } catch {
           try {
-            db = getFirestore(app, FIREBASE_CONFIG.firestoreDatabaseId || "(default)");
+            const dbId = FIREBASE_CONFIG.firestoreDatabaseId || "(default)";
+            db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true }, dbId);
           } catch {
-            db = getFirestore(app);
+            try {
+              db = getFirestore(app, FIREBASE_CONFIG.firestoreDatabaseId || "(default)");
+            } catch {
+              db = getFirestore(app);
+            }
           }
         }
 
