@@ -981,10 +981,26 @@ app.use((request, response, next) => {
     return response.status(404).json({ error: "API endpoint not found.", code: "ENDPOINT_NOT_FOUND" });
   }
   const rootIndexHtml = path.join(rootDir, "index.html");
-  if (fs.existsSync(rootIndexHtml)) {
-    return response.sendFile(rootIndexHtml);
+  const htmlFile = fs.existsSync(rootIndexHtml) ? rootIndexHtml : path.join(publicDir, "index.html");
+
+  const host = request.headers["x-forwarded-host"] || request.headers.host;
+  const proto = request.headers["x-forwarded-proto"] || (request.secure ? "https" : "https");
+
+  if (host && fs.existsSync(htmlFile)) {
+    try {
+      const rawHtml = fs.readFileSync(htmlFile, "utf8");
+      const currentOrigin = `${proto}://${host}`;
+      const customizedHtml = rawHtml
+        .replace(/https:\/\/solvatech\.name\.ng\/og-image\.png/g, `${currentOrigin}/og-image.png`)
+        .replace(/https:\/\/solvatech\.name\.ng\/og-image\.jpg/g, `${currentOrigin}/og-image.jpg`)
+        .replace(/https:\/\/solvatech\.name\.ng\//g, `${currentOrigin}/`);
+      return response.type("html").send(customizedHtml);
+    } catch {
+      return response.sendFile(htmlFile);
+    }
   }
-  response.sendFile(path.join(publicDir, "index.html"));
+
+  return response.sendFile(htmlFile);
 });
 
 app.use((error, _request, response, _next) => {
