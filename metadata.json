@@ -1,0 +1,8 @@
+{
+  "name": "Remix WHATSAPP-BOT-",
+  "description": "Imported from GitHub",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,0 +1,66 @@
+/* =========================================================================
+   SOLVATECH BOT v2.1 — PAIRING ENHANCEMENTS & LIGHT TRANSITIONS
+   Crisp light micro-interactions, responsive compact elements
+   ========================================================================= */
+
+/* Spinners & Button Loading */
+.button-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.button-loading i {
+  width: 13px;
+  height: 13px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: solvatech-spin 0.65s linear infinite;
+}
+
+@keyframes solvatech-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Staggered Element Entrance on Dashboard Reveal */
+.dashboard-view:not(.hidden) > * {
+  animation: fadeInStagger 0.25s ease forwards;
+}
+
+@keyframes fadeInStagger {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Attention pulse glow for license highlight */
+.highlight-target {
+  animation: pulseHighlightLight 1.5s ease-in-out 3;
+  border-color: #10b981 !important;
+}
+
+@keyframes pulseHighlightLight {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.25);
+  }
+}
+
+/* Mobile Responsiveness Tweaks */
+@media (max-width: 640px) {
+  .license-form-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .get-key-btn, .license-btn {
+    width: 100%;
+    text-align: center;
+  }
+  
+  .referral-metrics-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}

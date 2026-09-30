@@ -1,0 +1,1011 @@
+import "dotenv/config";
+import express from "express";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { PORT } from "./lib/config.js";
+import { logger } from "./lib/logger.js";
+import { getWhatsAppController, restoreAllSessions, auditActiveSessions, getAllWhatsAppStatuses } from "./lib/whatsapp.js";
+import { getLockedNumberForUid, getAllNumberLocks, unlinkNumberFromUser, unlinkPhoneNumber } from "./lib/number-lock.js";
+import { requireAuth, requireAdmin, createPreviewToken, getFirebaseServerFirestore } from "./lib/auth.js";
+import { getUserPreferences, setUserPreferences } from "./lib/database.js";
+import {
+  createLicenseRecord,
+  listAllLicenses,
+  redeemLicenseCode,
+  getUserLicenseStatus,
+  listAllUsersWithLicenses,
+  toggleUserUnlimitedStatus,
+  grantUserCustomDays,
+  deleteLicenseKey,
+  purgeExpiredOrUnusedKeys,
+  getGlobalRailwayConfig,
+  setGlobalRailwayConfig,
+  ADMIN_EMAIL,
+} from "./lib/license.js";
+import {
+  ensureUserReferralData,
+  getReferralStats,
+  claimReferralReward,
+  getAdminReferralAudit,
+  getOfficialLicensePrice,
+} from "./lib/referral.js";
+
+process.on("uncaughtException", (error) => {
+  logger.error("Process uncaught exception handled gracefully", error?.stack || error?.message);
+});
+
+process.on("unhandledRejection", (reason) => {
+  const msg = reason instanceof Error ? (reason.stack || reason.message) : String(reason);
+  logger.error("Process unhandled rejection handled gracefully", msg);
+});
+
+const app = express();
+const rootDir = path.dirname(fileURLToPath(import.meta.url));
+const publicDir = path.join(rootDir, "public");
+
+// Ensure all Railway/Firebase environment variables are hydrated from configuration
+try {
+  const configPath = path.join(rootDir, "firebase-applet-config.json");
+  if (fs.existsSync(configPath)) {
+    const cfg = JSON.parse(fs.readFileSync(configPath, "utf8"));
+    if (!process.env.FIREBASE_PROJECT_ID && cfg.projectId) process.env.FIREBASE_PROJECT_ID = cfg.projectId;
+    if (!process.env.FIREBASE_API_KEY && cfg.apiKey) process.env.FIREBASE_API_KEY = cfg.apiKey;
+    if (!process.env.FIREBASE_AUTH_DOMAIN && cfg.authDomain) process.env.FIREBASE_AUTH_DOMAIN = cfg.authDomain;
+    if (!process.env.FIREBASE_DATABASE_ID && cfg.firestoreDatabaseId) process.env.FIREBASE_DATABASE_ID = cfg.firestoreDatabaseId;
+    if (!process.env.FIREBASE_STORAGE_BUCKET && cfg.storageBucket) process.env.FIREBASE_STORAGE_BUCKET = cfg.storageBucket;
+    if (!process.env.FIREBASE_APP_ID && cfg.appId) process.env.FIREBASE_APP_ID = cfg.appId;
+  }
+} catch (e) {
+  logger.warn("Could not auto-hydrate Firebase environment variables", e.message);
+}
+
+const apiPrefix = String(process.env.BOT_API_PREFIX || "/bot-api").replace(/\/$/, "");
+
+// Explicit CORS configuration for Railway, GitHub Pages frontend, custom domains, and local development
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+  } else {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+  }
+
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, Origin, x-user-id, Cache-Control, Pragma");
+
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204);
+  }
+  next();
+});
+
+app.disable("x-powered-by");
+app.use(express.json({ limit: "32kb" }));
+
+const staticOptions = {
+  extensions: ["html"],
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith("sw.js")) {
+      res.setHeader("Service-Worker-Allowed", "/");
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    } else if (filePath.endsWith(".webmanifest") || filePath.endsWith("manifest.json")) {
+      res.setHeader("Content-Type", "application/manifest+json; charset=utf-8");
+      res.setHeader("Cache-Control", "public, max-age=3600");
+    }
+  }
+};
+
+app.use(express.static(rootDir, staticOptions));
+app.use(express.static(publicDir, staticOptions));
+
+/**
+ * ARCHITECTURAL NOTE - STORAGE ON RAILWAY & PRODUCTION:
+ * ======================================================
+ * Currently, WhatsApp authentication keys and session state are stored in the local
+ * filesystem directory (`sessions/<safeUserId>`) via Baileys multi-file auth state,
+ * and group settings in `data/group-settings-<safeUserId>.json`.
+ *
+ * Ephemeral container platforms like Railway rebuild/restart containers, which resets
+ * local filesystem storage unless a persistent Railway Volume is mounted to `./sessions`
+ * and `./data`, or session state is synced to Cloud Firestore / database.
+ *
+ * For this phase, session directory isolation is strictly keyed to the verified Firebase UID.
+ */
+
+function getFirebaseClientConfig() {
+  try {
+    const configPath = path.join(rootDir, "firebase-applet-config.json");
+    if (fs.existsSync(configPath)) {
+      const parsed = JSON.parse(fs.readFileSync(configPath, "utf8"));
+      return {
+        apiKey: parsed.apiKey,
+        authDomain: parsed.authDomain,
+        projectId: parsed.projectId,
+        storageBucket: parsed.storageBucket,
+        messagingSenderId: parsed.messagingSenderId,
+        appId: parsed.appId,
+        firestoreDatabaseId: parsed.firestoreDatabaseId || "(default)",
+      };
+    }
+  } catch (error) {
+    logger.warn("Could not read firebase-applet-config.json", error.message);
+  }
+  return null;
+}
+
+app.get("/health", (_req, res) => res.json({ status: "ok" }));
+app.get("/healthz", (_req, res) => res.json({ status: "ok" }));
+
+const prefixes = Array.from(new Set([apiPrefix, "/api", "/bot-api"]));
+
+for (const p of prefixes) {
+  // Public Health & Firebase Config endpoints
+  app.get(`${p}/health`, (_request, response) => {
+    response.json({ status: "ok" });
+  });
+
+  app.get(`${p}/firebase-config`, (_request, response) => {
+    const config = getFirebaseClientConfig();
+    if (!config) {
+      return response.status(500).json({ error: "Firebase configuration is not available on the server." });
+    }
+    response.json(config);
+  });
+
+  // Studio Preview / Development Session Provider
+  // Used when testing in environments whose dynamic domain is not yet allowlisted in Firebase Console.
+  app.post(`${p}/auth/preview-session`, (_request, response) => {
+    const user = {
+      uid: "admin_awoyinfasolomon1",
+      email: ADMIN_EMAIL,
+      displayName: "Solomon Awoyinfa (Admin)",
+      photoURL: "./solva.webp",
+    };
+    const token = createPreviewToken(user);
+    response.json({
+      token,
+      user,
+      mode: "preview",
+      message: "Studio preview session established successfully.",
+    });
+  });
+
+  // Protected Routes: Require valid Firebase Auth Bearer token
+  // The verified Firebase UID is authoritative and determines the WhatsApp session.
+  // Any client-supplied body.userId, query.userId, or header x-user-id is strictly ignored.
+  app.get(`${p}/status`, requireAuth, async (request, response) => {
+    const safeUserId = request.safeUserId;
+    const verifiedUid = request.verifiedUid;
+    const userEmail = request.auth.email;
+    const controller = getWhatsAppController(safeUserId, { verifiedUid, userEmail });
+    
+    const [lockedNumber, license] = await Promise.all([
+      getLockedNumberForUid(verifiedUid),
+      getUserLicenseStatus(verifiedUid, userEmail),
+    ]);
+
+    const currentStatus = controller.getStatus();
+    if (
+      license?.hasActiveLicense &&
+      (currentStatus.status === "disconnected" || currentStatus.status === "idle") &&
+      controller.hasSavedSession()
+    ) {
+      controller.ensureConnected().catch(() => {});
+    }
+
+    const latestStatus = controller.getStatus();
+    const preferences = await getUserPreferences(safeUserId);
+    response.json({
+      ...latestStatus,
+      phoneNumber: latestStatus.botNumber || lockedNumber || "",
+      lockedNumber,
+      license,
+      preferences,
+      userId: verifiedUid,
+      user: {
+        uid: request.auth.uid,
+        email: request.auth.email,
+        displayName: request.auth.displayName,
+        photoURL: request.auth.photoURL,
+      },
+    });
+  });
+
+  app.get(`${p}/user/preferences`, requireAuth, async (request, response) => {
+    const safeUserId = request.safeUserId;
+    const prefs = await getUserPreferences(safeUserId);
+    response.json({ ok: true, preferences: prefs, userId: request.verifiedUid });
+  });
+
+  app.post(`${p}/user/preferences`, requireAuth, async (request, response) => {
+    const safeUserId = request.safeUserId;
+    const patch = request.body || {};
+    const updated = await setUserPreferences(safeUserId, patch);
+    response.json({ ok: true, preferences: updated, userId: request.verifiedUid });
+  });
+
+  app.post(`${p}/reconnect`, requireAuth, async (request, response) => {
+    const safeUserId = request.safeUserId;
+    const verifiedUid = request.verifiedUid;
+    const userEmail = request.auth.email;
+    const controller = getWhatsAppController(safeUserId, { verifiedUid, userEmail });
+    try {
+      await controller.start();
+      response.json({ ok: true, ...controller.getStatus(), userId: verifiedUid });
+    } catch (error) {
+      response.status(500).json({ error: error.message || "Reconnect failed.", userId: verifiedUid });
+    }
+  });
+
+  app.post(`${p}/clear-cache`, requireAuth, async (request, response) => {
+    const safeUserId = request.safeUserId;
+    const verifiedUid = request.verifiedUid;
+    const controller = getWhatsAppController(safeUserId, { verifiedUid, userEmail: request.auth.email });
+    try {
+      await controller.disconnect();
+      response.json({ ok: true, status: "idle", message: "Session cache cleared.", userId: verifiedUid });
+    } catch (error) {
+      response.status(500).json({ error: error.message || "Could not clear cache.", userId: verifiedUid });
+    }
+  });
+
+  app.get(`${p}/user/profile`, requireAuth, (request, response) => {
+    response.json({
+      uid: request.auth.uid,
+      email: request.auth.email,
+      displayName: request.auth.displayName,
+      photoURL: request.auth.photoURL,
+    });
+  });
+
+  app.post(`${p}/pair`, requireAuth, async (request, response) => {
+    const safeUserId = request.safeUserId;
+    const verifiedUid = request.verifiedUid;
+    const userEmail = request.auth.email;
+
+    try {
+      // License enforcement: Admin (awoyinfasolomon1@gmail.com) has automatic unlimited active status.
+      // Normal users must have an active, non-expired license.
+      const licenseStatus = await getUserLicenseStatus(verifiedUid, userEmail);
+      if (!licenseStatus.hasActiveLicense) {
+        return response.status(403).json({
+          error: "Active license required. Please enter and redeem a valid SOLVATECH activation code in your dashboard before pairing your WhatsApp account.",
+          code: "LICENSE_REQUIRED",
+          userId: verifiedUid,
+        });
+      }
+
+      const controller = getWhatsAppController(safeUserId, { verifiedUid, userEmail });
+      const result = await controller.requestPairingCode(request.body?.number);
+      response.json({
+        code: result.code,
+        pairingCode: result.code,
+        expiresAt: result.expiresAt,
+        pairingNumber: result.phone,
+        userId: verifiedUid,
+      });
+    } catch (error) {
+      logger.error(`Pairing request failed for verified user ${verifiedUid}`, error.stack || error.message);
+      const statusCode = error.code === "NUMBER_LOCKED_TO_ANOTHER_ACCOUNT" || error.code === "ACCOUNT_LOCKED_TO_DIFFERENT_NUMBER" ? 403 : 400;
+      response.status(statusCode).json({
+        error: error.message || "Pairing code could not be generated.",
+        code: error.code || "PAIRING_FAILED",
+        statusCode: error?.output?.statusCode ?? error?.statusCode ?? null,
+        userId: verifiedUid,
+      });
+    }
+  });
+
+  app.post(`${p}/disconnect`, requireAuth, async (request, response) => {
+    const safeUserId = request.safeUserId;
+    const verifiedUid = request.verifiedUid;
+    const controller = getWhatsAppController(safeUserId, { verifiedUid, userEmail: request.auth.email });
+    try {
+      await controller.disconnect();
+      response.json({ ok: true, status: "idle", userId: verifiedUid });
+    } catch (error) {
+      logger.error(`Disconnect failed for verified user ${verifiedUid}`, error.stack || error.message);
+      response.status(500).json({ error: "The WhatsApp session could not be cleared.", userId: verifiedUid });
+    }
+  });
+
+  app.post(`${p}/number/unlink`, requireAuth, async (request, response) => {
+    try {
+      const verifiedUid = request.verifiedUid;
+      const targetPhone = request.body?.phoneNumber || "";
+      const result = await unlinkNumberFromUser(verifiedUid, targetPhone);
+      response.json({ ok: true, ...result, message: "Number successfully unlinked from account." });
+    } catch (err) {
+      logger.error("Unlink number failed", err.stack || err.message);
+      response.status(500).json({ error: "Failed to unlink number." });
+    }
+  });
+
+  app.post(`${p}/number/release`, requireAuth, async (request, response) => {
+    try {
+      const targetPhone = request.body?.phoneNumber || request.body?.number || "";
+      if (!targetPhone) {
+        return response.status(400).json({ error: "Please provide a phone number to release." });
+      }
+      const result = await unlinkPhoneNumber(targetPhone);
+      response.json({ ok: true, ...result, message: `Number (+${result.phone || targetPhone}) released successfully.` });
+    } catch (err) {
+      logger.error("Release phone number failed", err.stack || err.message);
+      response.status(500).json({ error: "Failed to release number lock." });
+    }
+  });
+
+  app.post(`${p}/unpair`, requireAuth, async (request, response) => {
+    const safeUserId = request.safeUserId;
+    const verifiedUid = request.verifiedUid;
+    const controller = getWhatsAppController(safeUserId, { verifiedUid, userEmail: request.auth.email });
+    try {
+      await controller.disconnect();
+      await unlinkNumberFromUser(verifiedUid);
+      response.json({ ok: true, status: "idle", message: "WhatsApp session disconnected and phone number unlinked.", userId: verifiedUid });
+    } catch (error) {
+      logger.error(`Unpair failed for verified user ${verifiedUid}`, error.stack || error.message);
+      response.status(500).json({ error: "Could not unpair session.", userId: verifiedUid });
+    }
+  });
+
+  // --------------------------------------------------------------------------
+  // USER LICENSE ROUTES (Authenticated)
+  // --------------------------------------------------------------------------
+  app.get(`${p}/license/status`, requireAuth, async (request, response) => {
+    try {
+      const verifiedUid = request.verifiedUid;
+      const userEmail = request.auth.email;
+      const status = await getUserLicenseStatus(verifiedUid, userEmail);
+      response.json({
+        ...status,
+        userId: verifiedUid,
+        userEmail: request.auth.email,
+        isAdmin: request.auth.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase(),
+      });
+    } catch (error) {
+      logger.error("Failed to retrieve license status", error.stack || error.message);
+      response.status(500).json({ error: "Could not fetch license status." });
+    }
+  });
+
+  app.post(`${p}/license/redeem`, requireAuth, async (request, response) => {
+    try {
+      const code = request.body?.code;
+      const candidateRef = request.body?.ref || request.query?.ref || "";
+      if (!code) {
+        return response.status(400).json({ error: "Please enter a valid license code." });
+      }
+
+      // Verified user from authoritative Firebase token - NOT request body
+      const verifiedUser = {
+        uid: request.verifiedUid,
+        email: request.auth.email,
+      };
+
+      // If user came in through a referral link or has a preserved referral code, ensure permanent attribution in Firebase before redemption
+      if (candidateRef) {
+        try {
+          await ensureUserReferralData(
+            request.verifiedUid,
+            request.auth.email,
+            candidateRef,
+            request.headers.authorization
+          );
+        } catch (refErr) {
+          logger.warn("Pre-redemption referral attribution notice", refErr.message);
+        }
+      }
+
+      const result = await redeemLicenseCode(code, verifiedUser, request.headers.authorization);
+
+      // Auto-reconnect existing saved session if present and valid
+      const controller = getWhatsAppController(request.safeUserId, {
+        verifiedUid: request.verifiedUid,
+        userEmail: request.auth.email,
+      });
+      if (controller.hasSavedSession() && !controller.isConnected()) {
+        logger.info(`Auto-reconnecting WhatsApp session for user ${request.verifiedUid} after license redemption`);
+        controller.start().catch((err) => {
+          logger.warn("Auto-reconnect after license redemption notice", err.message);
+        });
+      }
+
+      response.json(result);
+    } catch (error) {
+      logger.warn(`License redemption rejected for user ${request.verifiedUid}: ${error.message}`);
+      const statusCode = error.code === "LICENSE_NOT_FOUND" ? 404 : error.code === "LICENSE_ALREADY_USED" ? 409 : 400;
+      response.status(statusCode).json({
+        error: error.message || "License redemption failed.",
+        code: error.code || "REDEMPTION_FAILED",
+      });
+    }
+  });
+
+  // --------------------------------------------------------------------------
+  // REFERRAL SYSTEM ROUTES (Permanent Firebase Source of Truth)
+  // --------------------------------------------------------------------------
+  app.get(`${p}/referral/me`, requireAuth, async (request, response) => {
+    try {
+      const candidateCode = request.query?.ref || "";
+      await ensureUserReferralData(
+        request.verifiedUid,
+        request.auth.email,
+        candidateCode,
+        request.headers.authorization
+      );
+      const stats = await getReferralStats(request.verifiedUid);
+      response.json({
+        success: true,
+        ...stats,
+      });
+    } catch (error) {
+      logger.error("Get referral stats error", error.stack || error.message);
+      response.status(500).json({ error: "Failed to load referral details." });
+    }
+  });
+
+  app.post(`${p}/referral/attribute`, requireAuth, async (request, response) => {
+    try {
+      const candidateCode = request.body?.code || request.body?.ref || request.query?.ref || "";
+      if (!candidateCode) {
+        return response.status(400).json({ error: "Referral code is required." });
+      }
+      await ensureUserReferralData(
+        request.verifiedUid,
+        request.auth.email,
+        candidateCode,
+        request.headers.authorization
+      );
+      const stats = await getReferralStats(request.verifiedUid);
+      response.json({
+        success: true,
+        message: "Referral attribution processed.",
+        ...stats,
+      });
+    } catch (error) {
+      logger.error("Attribute referral error", error.stack || error.message);
+      response.status(500).json({ error: "Failed to attribute referral code." });
+    }
+  });
+
+  app.post(`${p}/referral/claim`, requireAuth, async (request, response) => {
+    try {
+      const result = await claimReferralReward(
+        request.verifiedUid,
+        request.auth.email,
+        request.headers.authorization
+      );
+      response.json(result);
+    } catch (error) {
+      logger.warn(`Referral claim failed for user ${request.verifiedUid}: ${error.message}`);
+      const statusCode = error.code === "NO_REWARD_AVAILABLE" ? 400 : 500;
+      response.status(statusCode).json({
+        error: error.message || "Failed to claim referral reward.",
+        code: error.code || "CLAIM_FAILED",
+      });
+    }
+  });
+
+  // --------------------------------------------------------------------------
+  // ADMIN LICENSE & REFERRAL AUDIT ROUTES (Strictly Admin Email: awoyinfasolomon1@gmail.com)
+  // --------------------------------------------------------------------------
+  app.get(`${p}/admin/overview`, requireAuth, requireAdmin, async (_request, response) => {
+    try {
+      const [licenses, numberLocks, referralAudit, whatsappList] = await Promise.all([
+        listAllLicenses(),
+        getAllNumberLocks(),
+        getAdminReferralAudit(),
+        Promise.resolve(getAllWhatsAppStatuses()),
+      ]);
+
+      const db = getFirebaseServerFirestore();
+      const firestoreUsers = {};
+      if (db) {
+        try {
+          const { collection, getDocs } = await import("firebase/firestore");
+          const [usersSnap, userLicensesSnap] = await Promise.all([
+            getDocs(collection(db, "users")).catch(() => ({ forEach: () => {} })),
+            getDocs(collection(db, "user_licenses")).catch(() => ({ forEach: () => {} })),
+          ]);
+
+          usersSnap.forEach((d) => {
+            if (d.data()) firestoreUsers[d.id] = { ...(firestoreUsers[d.id] || {}), ...d.data(), uid: d.id };
+          });
+          userLicensesSnap.forEach((d) => {
+            if (d.data()) firestoreUsers[d.id] = { ...(firestoreUsers[d.id] || {}), activeLicense: d.data(), uid: d.id };
+          });
+        } catch (err) {
+          logger.debug("Admin comprehensive Firestore scan notice", err.message);
+        }
+      }
+
+      const locksByUid = {};
+      for (const [phone, lock] of Object.entries(numberLocks || {})) {
+        if (lock && lock.uid) {
+          locksByUid[lock.uid] = phone;
+        }
+      }
+
+      const wsByUid = {};
+      for (const ws of (whatsappList || [])) {
+        if (ws && ws.verifiedUid) {
+          wsByUid[ws.verifiedUid] = ws;
+        }
+      }
+
+      const referrersByUid = {};
+      for (const ref of (referralAudit?.referrers || [])) {
+        if (ref && ref.uid) {
+          referrersByUid[ref.uid] = ref;
+        }
+      }
+
+      const now = Date.now();
+      const FORTY_EIGHT_HOURS_MS = 48 * 60 * 60 * 1000;
+
+      let totalRevenueNgn = 0;
+      let activeCount = 0;
+      let expiringSoonCount = 0;
+      let expiredCount = 0;
+      let unusedCount = 0;
+      let usedCount = 0;
+      let lifetimeCount = 0;
+
+      const enrichedLicenses = licenses.map((lic) => {
+        const isUsed = lic.status === "used" || Boolean(lic.redeemedByUid);
+        const durationDays = Number(lic.durationDays) || 1;
+        const priceNgn = getOfficialLicensePrice(durationDays);
+        const isLifetime = durationDays >= 36500 || lic.durationDays === "Unlimited";
+
+        let calculatedStatus = "unused";
+        let remainingMs = null;
+
+        if (isUsed) {
+          usedCount++;
+          if (lic.expiresAt) {
+            const expiryMs = new Date(lic.expiresAt).getTime();
+            remainingMs = expiryMs - now;
+            if (isLifetime) {
+              calculatedStatus = "lifetime";
+              lifetimeCount++;
+            } else if (remainingMs > 0) {
+              if (remainingMs <= FORTY_EIGHT_HOURS_MS) {
+                calculatedStatus = "expiring_soon";
+                expiringSoonCount++;
+                activeCount++;
+              } else {
+                calculatedStatus = "active";
+                activeCount++;
+              }
+            } else {
+              calculatedStatus = "expired";
+              expiredCount++;
+            }
+          } else if (isLifetime) {
+            calculatedStatus = "lifetime";
+            lifetimeCount++;
+          } else {
+            calculatedStatus = "active";
+            activeCount++;
+          }
+
+          if (priceNgn > 0) {
+            totalRevenueNgn += priceNgn;
+          }
+        } else {
+          unusedCount++;
+          calculatedStatus = "unused";
+        }
+
+        const redeemedUid = lic.redeemedByUid || "";
+        const phone = locksByUid[redeemedUid] || "";
+        const fsUser = firestoreUsers[redeemedUid] || {};
+
+        return {
+          ...lic,
+          priceNgn,
+          isUsed,
+          computedStatus: calculatedStatus,
+          remainingMs,
+          whatsappNumber: phone,
+          customerEmail: lic.redeemedByEmail || fsUser.email || "",
+          customerName: fsUser.displayName || "",
+        };
+      });
+
+      const customersMap = {};
+
+      for (const [uid, uData] of Object.entries(firestoreUsers)) {
+        customersMap[uid] = {
+          uid,
+          email: uData.email || "",
+          displayName: uData.displayName || "",
+          photoURL: uData.photoURL || "",
+          createdAt: uData.createdAt || uData.joinedAt || null,
+          activeLicense: uData.activeLicense || null,
+        };
+      }
+
+      for (const lic of enrichedLicenses) {
+        if (lic.redeemedByUid) {
+          const uid = lic.redeemedByUid;
+          if (!customersMap[uid]) {
+            customersMap[uid] = {
+              uid,
+              email: lic.redeemedByEmail || "",
+              displayName: lic.customerName || "",
+              createdAt: lic.redeemedAt || lic.createdAt || null,
+            };
+          }
+          if (!customersMap[uid].activeLicense || new Date(lic.expiresAt || 0) > new Date(customersMap[uid].activeLicense.expiresAt || 0)) {
+            customersMap[uid].activeLicense = {
+              code: lic.code,
+              durationDays: lic.durationDays,
+              expiresAt: lic.expiresAt,
+              redeemedAt: lic.redeemedAt,
+              status: lic.computedStatus,
+            };
+          }
+        }
+      }
+
+      for (const ref of (referralAudit?.referrers || [])) {
+        if (!customersMap[ref.uid]) {
+          customersMap[ref.uid] = {
+            uid: ref.uid,
+            email: ref.email || "",
+            displayName: "",
+            createdAt: null,
+          };
+        }
+      }
+
+      const customersList = Object.values(customersMap).map((cust) => {
+        const phone = locksByUid[cust.uid] || "";
+        const ws = wsByUid[cust.uid] || null;
+        const refInfo = referrersByUid[cust.uid] || null;
+
+        let licenseStatus = "none";
+        let remainingMs = null;
+        let expiresAt = null;
+
+        if (cust.uid === "admin" || cust.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+          licenseStatus = "lifetime";
+        } else if (cust.activeLicense && cust.activeLicense.expiresAt) {
+          expiresAt = cust.activeLicense.expiresAt;
+          const expiryMs = new Date(expiresAt).getTime();
+          remainingMs = expiryMs - now;
+          if (remainingMs > 0) {
+            licenseStatus = remainingMs <= FORTY_EIGHT_HOURS_MS ? "expiring_soon" : "active";
+          } else {
+            licenseStatus = "expired";
+          }
+        }
+
+        return {
+          ...cust,
+          phoneNumber: phone,
+          whatsappStatus: ws ? ws.status : phone ? "disconnected" : "never_paired",
+          botNumber: ws?.botNumber || phone || "",
+          connectedAt: ws?.connectedAt || null,
+          licenseStatus,
+          remainingMs,
+          expiresAt,
+          referralCode: refInfo?.referralCode || "",
+          qualifyingSalesNgn: refInfo?.qualifyingSalesNgn || 0,
+          earnedDaysTotal: refInfo?.earnedDaysTotal || 0,
+          claimedDaysTotal: refInfo?.claimedDaysTotal || 0,
+          availableDays: refInfo?.availableDays || 0,
+          referredCount: refInfo?.referredCount || 0,
+        };
+      }).sort((a, b) => (b.activeLicense ? 1 : 0) - (a.activeLicense ? 1 : 0));
+
+      const activityEvents = [];
+
+      for (const lic of licenses) {
+        if (lic.createdAt) {
+          activityEvents.push({
+            id: `lic_create_${lic.code}`,
+            type: "LICENSE_GENERATED",
+            title: `License Generated (${lic.durationDays} Days)`,
+            description: `Code ${lic.code} created`,
+            timestamp: lic.createdAt,
+            user: lic.createdBy || "Admin",
+            meta: { code: lic.code, duration: lic.durationDays },
+          });
+        }
+        if (lic.redeemedAt && lic.redeemedByUid) {
+          activityEvents.push({
+            id: `lic_redeem_${lic.code}`,
+            type: "LICENSE_REDEEMED",
+            title: `License Redeemed (${lic.durationDays} Days)`,
+            description: `Code ${lic.code} activated by ${lic.redeemedByEmail || lic.redeemedByUid}`,
+            timestamp: lic.redeemedAt,
+            user: lic.redeemedByEmail || lic.redeemedByUid,
+            meta: { code: lic.code, expiresAt: lic.expiresAt },
+          });
+        }
+      }
+
+      for (const pur of (referralAudit?.recentPurchases || [])) {
+        if (pur.createdAt) {
+          activityEvents.push({
+            id: `ref_pur_${pur.purchaseId || Math.random()}`,
+            type: "REFERRAL_PURCHASE",
+            title: `Qualifying Purchase Recorded`,
+            description: `₦${Number(pur.amountNgn || 0).toLocaleString()} credited for referrer ${pur.referrerCode || pur.referrerUid}`,
+            timestamp: pur.createdAt,
+            user: pur.buyerEmail || pur.buyerUid || "Customer",
+            meta: { amountNgn: pur.amountNgn, referrer: pur.referrerCode },
+          });
+        }
+      }
+
+      activityEvents.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+      let connectedWhatsApp = 0;
+      let disconnectedWhatsApp = 0;
+      for (const ws of (whatsappList || [])) {
+        if (ws.status === "connected") connectedWhatsApp++;
+        else disconnectedWhatsApp++;
+      }
+
+      response.json({
+        success: true,
+        overview: {
+          totalUsers: customersList.length,
+          activeLicenses: activeCount,
+          expiringSoon: expiringSoonCount,
+          expiredLicenses: expiredCount,
+          lifetimeLicenses: lifetimeCount,
+          unusedKeys: unusedCount,
+          usedKeys: usedCount,
+          totalRevenueNgn,
+          connectedWhatsApp,
+          disconnectedWhatsApp,
+          totalReferrals: referralAudit?.summary?.totalReferredCustomers || 0,
+          totalReferrers: referralAudit?.summary?.totalReferrers || 0,
+          totalQualifyingSalesNgn: referralAudit?.summary?.totalQualifyingSalesNgn || 0,
+          rewardsEarnedDays: referralAudit?.summary?.totalRewardsEarnedDays || 0,
+          rewardsClaimedDays: referralAudit?.summary?.totalRewardsClaimedDays || 0,
+          rewardsAvailableDays: referralAudit?.summary?.totalRewardsAvailableDays || 0,
+        },
+        licenses: enrichedLicenses,
+        customers: customersList,
+        referrals: referralAudit,
+        whatsappSessions: whatsappList,
+        recentActivity: activityEvents.slice(0, 50),
+        systemHealth: {
+          uptimeSeconds: Math.floor(process.uptime()),
+          serverTime: new Date().toISOString(),
+          nodeVersion: process.version,
+          platform: process.platform,
+          memory: process.memoryUsage(),
+          status: "operational",
+        },
+        adminEmail: ADMIN_EMAIL,
+      });
+    } catch (error) {
+      logger.error("Admin overview aggregate error", error.stack || error.message);
+      response.status(500).json({ error: "Failed to generate admin overview data." });
+    }
+  });
+
+  app.get(`${p}/admin/referrals`, requireAuth, requireAdmin, async (_request, response) => {
+    try {
+      const audit = await getAdminReferralAudit();
+      response.json({
+        success: true,
+        ...audit,
+      });
+    } catch (error) {
+      logger.error("Admin referral audit error", error.stack || error.message);
+      response.status(500).json({ error: "Failed to list referral audit data." });
+    }
+  });
+
+  app.get(`${p}/admin/licenses`, requireAuth, requireAdmin, async (_request, response) => {
+    try {
+      const licenses = await listAllLicenses();
+      response.json({
+        licenses,
+        total: licenses.length,
+        admin: ADMIN_EMAIL,
+        serverTime: new Date().toISOString(),
+      });
+    } catch (error) {
+      logger.error("Admin list licenses error", error.stack || error.message);
+      response.status(500).json({ error: "Failed to list licenses." });
+    }
+  });
+
+  app.get(`${p}/admin/backend-url`, requireAuth, requireAdmin, async (_request, response) => {
+    try {
+      let railwayUrl = process.env.RAILWAY_URL || "";
+      const db = getFirebaseServerFirestore();
+      if (db) {
+        try {
+          const { doc, getDoc } = await import("firebase/firestore");
+          const snap = await getDoc(doc(db, "system_config", "backend"));
+          if (snap.exists() && snap.data()?.railwayUrl) {
+            railwayUrl = snap.data().railwayUrl;
+          }
+        } catch (e) {
+          logger.debug("Firestore backend-url read notice", e.message);
+        }
+      }
+      response.json({ success: true, railwayUrl });
+    } catch (error) {
+      response.status(500).json({ error: "Failed to get backend URL." });
+    }
+  });
+
+  app.post(`${p}/admin/backend-url`, requireAuth, requireAdmin, async (request, response) => {
+    try {
+      const url = String(request.body?.railwayUrl || request.body?.url || "").trim();
+      process.env.RAILWAY_URL = url;
+      const db = getFirebaseServerFirestore();
+      if (db) {
+        try {
+          const { doc, setDoc } = await import("firebase/firestore");
+          await setDoc(doc(db, "system_config", "backend"), {
+            railwayUrl: url,
+            updatedAt: new Date().toISOString(),
+            updatedBy: request.auth.email || "admin",
+          }, { merge: true });
+          logger.info(`Admin updated system Railway backend URL in Firestore: ${url}`);
+        } catch (e) {
+          logger.warn("Could not save backend URL to Firestore", e.message);
+        }
+      }
+      response.json({ success: true, railwayUrl: url, message: "Railway backend URL successfully saved to Firestore." });
+    } catch (error) {
+      response.status(500).json({ error: error.message || "Failed to update backend URL." });
+    }
+  });
+
+  app.post(`${p}/admin/licenses/generate`, requireAuth, requireAdmin, async (request, response) => {
+    try {
+      const days = request.body?.days;
+      if (!days || (days !== "Unlimited" && (isNaN(Number(days)) || Number(days) <= 0))) {
+        return response.status(400).json({ error: "Valid duration in days is required (1-365 or Unlimited)." });
+      }
+
+      const created = await createLicenseRecord(days === "Unlimited" ? 36500 : days, request.auth.email, request.headers.authorization);
+      logger.info(`Admin generated new ${days}-day license: ${created.code}`);
+      response.json({
+        success: true,
+        license: created,
+        message: `Successfully generated ${days}-day license code.`,
+      });
+    } catch (error) {
+      logger.error("Admin generate license error", error.stack || error.message);
+      response.status(400).json({ error: error.message || "Failed to generate license." });
+    }
+  });
+
+  // Admin: List all registered users and their licenses
+  app.get(`${p}/admin/users`, requireAuth, requireAdmin, async (_request, response) => {
+    try {
+      const users = await listAllUsersWithLicenses();
+      response.json({ success: true, users, count: users.length });
+    } catch (error) {
+      logger.error("Admin list users error", error.stack || error.message);
+      response.status(500).json({ error: "Failed to list users." });
+    }
+  });
+
+  // Admin: Toggle Unlimited License for a specific user
+  app.post(`${p}/admin/users/unlimited`, requireAuth, requireAdmin, async (request, response) => {
+    try {
+      const { uid, isUnlimited } = request.body || {};
+      if (!uid) {
+        return response.status(400).json({ error: "User UID is required." });
+      }
+      const result = await toggleUserUnlimitedStatus(uid, isUnlimited, request.auth.email, request.headers.authorization);
+      response.json({ success: true, ...result, message: `Unlimited status ${isUnlimited ? "activated" : "deactivated"} for user.` });
+    } catch (error) {
+      logger.error("Admin toggle unlimited error", error.stack || error.message);
+      response.status(500).json({ error: error.message || "Failed to toggle unlimited status." });
+    }
+  });
+
+  // Admin: Grant custom days to a user
+  app.post(`${p}/admin/users/grant-days`, requireAuth, requireAdmin, async (request, response) => {
+    try {
+      const { uid, days, email } = request.body || {};
+      if (!uid || !days) {
+        return response.status(400).json({ error: "User UID and days count are required." });
+      }
+      const result = await grantUserCustomDays(uid, days, email, request.headers.authorization);
+      response.json({ success: true, ...result, message: `Successfully granted ${days} days to user.` });
+    } catch (error) {
+      logger.error("Admin grant days error", error.stack || error.message);
+      response.status(500).json({ error: error.message || "Failed to grant days." });
+    }
+  });
+
+  // Admin: Recycling Bin - Delete single license key
+  app.post(`${p}/admin/licenses/delete`, requireAuth, requireAdmin, async (request, response) => {
+    try {
+      const { code } = request.body || {};
+      if (!code) {
+        return response.status(400).json({ error: "License code is required." });
+      }
+      const result = await deleteLicenseKey(code, request.headers.authorization);
+      response.json({ success: true, ...result, message: `License code ${code} deleted.` });
+    } catch (error) {
+      logger.error("Admin delete license error", error.stack || error.message);
+      response.status(500).json({ error: error.message || "Failed to delete license." });
+    }
+  });
+
+  // Admin: Recycling Bin - Purge expired or unused keys
+  app.post(`${p}/admin/licenses/purge`, requireAuth, requireAdmin, async (request, response) => {
+    try {
+      const { filterType } = request.body || {};
+      const result = await purgeExpiredOrUnusedKeys(filterType || "all", request.headers.authorization);
+      response.json({ success: true, ...result, message: `Recycling bin purged ${result.count} keys successfully.` });
+    } catch (error) {
+      logger.error("Admin purge licenses error", error.stack || error.message);
+      response.status(500).json({ error: error.message || "Failed to purge keys." });
+    }
+  });
+
+  // System: Global Railway Backend URL (Public/Authenticated)
+  app.get(`${p}/system/railway-config`, async (_request, response) => {
+    try {
+      const cfg = await getGlobalRailwayConfig();
+      response.json({ success: true, ...cfg });
+    } catch (error) {
+      response.json({ success: true, railwayUrl: "" });
+    }
+  });
+
+  app.post(`${p}/admin/railway-config`, requireAuth, requireAdmin, async (request, response) => {
+    try {
+      const { railwayUrl } = request.body || {};
+      const result = await setGlobalRailwayConfig(railwayUrl, request.headers.authorization);
+      response.json({ success: true, ...result, message: "Global Railway URL configured successfully for all users." });
+    } catch (error) {
+      response.status(500).json({ error: error.message || "Failed to update Railway configuration." });
+    }
+  });
+}
+
+app.use((request, response, next) => {
+  if (prefixes.some((p) => request.path.startsWith(`${p}/`))) {
+    return response.status(404).json({ error: "API endpoint not found.", code: "ENDPOINT_NOT_FOUND" });
+  }
+  const rootIndexHtml = path.join(rootDir, "index.html");
+  if (fs.existsSync(rootIndexHtml)) {
+    return response.sendFile(rootIndexHtml);
+  }
+  response.sendFile(path.join(publicDir, "index.html"));
+});
+
+app.use((error, _request, response, _next) => {
+  logger.error("Unhandled web error", error.stack || error.message);
+  response.status(500).json({ error: "Internal server error." });
+});
+
+app.listen(PORT, "0.0.0.0", () => {
+  logger.info("SOLVATECH BOT web server listening", String(PORT));
+  restoreAllSessions().catch((error) => {
+    logger.warn("Auto-restore session error", error.message);
+  });
+  // Audit active WhatsApp sessions every 30 seconds for license expiry
+  setInterval(() => {
+    auditActiveSessions().catch((err) => {
+      logger.debug("Background license audit notice", err.message);
+    });
+  }, 30000).unref();
+
+  // Continuous 25s Global Heartbeat to ensure Railway / background process never drops socket
+  setInterval(() => {
+    restoreAllSessions().catch(() => {});
+  }, 25000).unref();
+});

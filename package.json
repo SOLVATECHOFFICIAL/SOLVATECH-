@@ -1,0 +1,28 @@
+{
+  "name": "@workspace/solvatech-bot",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "dev": "node index.js",
+    "build": "node -e \"console.log('SOLVATECH BOT production build ready')\"",
+    "start": "node index.js",
+    "serve": "node index.js",
+    "typecheck": "node --check index.js && for file in lib/*.js commands/*.js; do node --check \"$file\"; done",
+    "lint": "node --check index.js && for file in lib/*.js commands/*.js; do node --check \"$file\"; done"
+  },
+  "dependencies": {
+    "@google/genai": "^2.22.0",
+    "@whiskeysockets/baileys": "7.0.0-rc14",
+    "axios": "^1.8.4",
+    "dotenv": "^16.4.7",
+    "express": "^5.2.1",
+    "firebase": "^12.19.0",
+    "pino": "^9.14.0",
+    "sharp": "^0.34.1",
+    "tesseract.js": "^7.0.0"
+  }
+}

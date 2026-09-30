@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: solvatech-bot
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /bot-api/status
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: BOT_DATA_DIR
+        value: /opt/render/project/src/runtime
+    disk:
+      name: solvatech-bot-runtime
+      mountPath: /opt/render/project/src/runtime
+      sizeGB: 1

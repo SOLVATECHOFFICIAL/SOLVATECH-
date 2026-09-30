@@ -1,0 +1,15 @@
+# Nixpacks build configuration for Railway
+[phases.setup]
+nixPkgs = ["ffmpeg"]
+
+[variables]
+NODE_ENV = "production"
+BOT_DATA_DIR = "/app/runtime"
+BOT_API_PREFIX = "/bot-api"
+FIREBASE_PROJECT_ID = "gen-lang-client-0324946831"
+FIREBASE_API_KEY = "AIzaSyA_g2ek4ziXSE9m4VD5-5PfKpKJjAobYFg"
+FIREBASE_AUTH_DOMAIN = "gen-lang-client-0324946831.firebaseapp.com"
+FIREBASE_DATABASE_ID = "ai-studio-whatsappbot-da9a52de-41e7-4365-a5b4-8aec9332642c"
+FIREBASE_STORAGE_BUCKET = "gen-lang-client-0324946831.firebasestorage.app"
+FIREBASE_APP_ID = "1:420914651308:web:ae4cb5d7632401c1a83f09"
+

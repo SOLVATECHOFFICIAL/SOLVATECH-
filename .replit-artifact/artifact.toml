@@ -1,0 +1,25 @@
+kind = "web"
+previewPath = "/"
+title = "SOLVATECH BOT"
+description = "A WhatsApp Multi-Device pairing console and group moderation bot with four administrator-controlled anti protections."
+version = "1.0.0"
+id = "artifacts/solvatech-bot"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/", "/bot-api" ]
+localPort = 26240
+
+[services.development]
+run = "pnpm --filter @workspace/solvatech-bot run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/solvatech-bot", "run", "build" ]
+
+[services.production.run]
+args = ["node", "artifacts/solvatech-bot/index.js"]
+
+[services.env]
+PORT = "26240"
+BASE_PATH = "/"

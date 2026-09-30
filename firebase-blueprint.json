@@ -1,0 +1,200 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile with authentication and referral attribution data",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique Firebase Auth UID" },
+        "email": { "type": "string", "description": "User email address" },
+        "displayName": { "type": "string", "description": "User display name" },
+        "photoURL": { "type": "string", "description": "Google avatar URL" },
+        "createdAt": { "type": "string", "description": "ISO timestamp of account creation" },
+        "lastLoginAt": { "type": "string", "description": "ISO timestamp of last login" },
+        "referralCode": { "type": "string", "description": "Permanent referral code" },
+        "referredBy": { "type": "string", "description": "UID of referrer" },
+        "referredAt": { "type": "string", "description": "ISO timestamp when referred" },
+        "qualifyingSalesNgn": { "type": "number", "description": "Total qualifying referral sales in NGN" },
+        "claimedDaysTotal": { "type": "number", "description": "Total claimed referral reward days" }
+      }
+    },
+    "License": {
+      "title": "License",
+      "description": "Admin generated license key record",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string", "description": "Cryptographic unique license code" },
+        "durationDays": { "type": "number", "description": "Duration in days" },
+        "createdAt": { "type": "string", "description": "ISO timestamp when created by admin" },
+        "createdBy": { "type": "string", "description": "Admin email who created the license" },
+        "status": { "type": "string", "description": "unused or used" },
+        "redeemedByUid": { "type": "string", "description": "Verified UID of redeemer" },
+        "redeemedByEmail": { "type": "string", "description": "Email of redeemer" },
+        "redeemedAt": { "type": "string", "description": "ISO timestamp when redeemed" },
+        "expiresAt": { "type": "string", "description": "ISO timestamp of expiry" }
+      }
+    },
+    "UserLicense": {
+      "title": "UserLicense",
+      "description": "Active license record assigned to a user",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Verified UID of license holder" },
+        "email": { "type": "string", "description": "Account email" },
+        "lastLicenseCode": { "type": "string", "description": "Last redeemed license code" },
+        "durationDays": { "type": "number", "description": "Duration in days" },
+        "redeemedAt": { "type": "string", "description": "ISO timestamp when redeemed" },
+        "expiresAt": { "type": "string", "description": "ISO timestamp when license expires" },
+        "status": { "type": "string", "description": "active or expired" }
+      }
+    },
+    "GroupSettings": {
+      "title": "GroupSettings",
+      "description": "WhatsApp group configurations per user account",
+      "type": "object",
+      "properties": {
+        "safeUserId": { "type": "string", "description": "User identifier" },
+        "settings": { "type": "object", "description": "Group settings map by groupId" }
+      }
+    },
+    "WhatsAppSession": {
+      "title": "WhatsAppSession",
+      "description": "Baileys WhatsApp session state and credentials",
+      "type": "object",
+      "properties": {
+        "updatedAt": { "type": "string", "description": "ISO timestamp of last update" },
+        "fileCount": { "type": "number", "description": "Number of session files" },
+        "files": { "type": "object", "description": "Map of filename to JSON content" }
+      }
+    },
+    "NumberLock": {
+      "title": "NumberLock",
+      "description": "Permanent lock mapping WhatsApp phone numbers to UIDs",
+      "type": "object",
+      "properties": {
+        "phoneNumber": { "type": "string", "description": "Cleaned WhatsApp phone number" },
+        "uid": { "type": "string", "description": "Locked user UID" },
+        "userEmail": { "type": "string", "description": "Locked user email" },
+        "lockedAt": { "type": "string", "description": "ISO timestamp when locked" }
+      }
+    },
+    "UserNumberLock": {
+      "title": "UserNumberLock",
+      "description": "Permanent lock mapping UIDs to WhatsApp phone numbers",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Locked user UID" },
+        "phoneNumber": { "type": "string", "description": "Cleaned WhatsApp phone number" },
+        "lockedAt": { "type": "string", "description": "ISO timestamp when locked" }
+      }
+    },
+    "ReferralPurchase": {
+      "title": "ReferralPurchase",
+      "description": "Purchase transaction record for referral rewards attribution",
+      "type": "object",
+      "properties": {
+        "purchaseId": { "type": "string", "description": "Unique transaction/purchase ID" },
+        "buyerUid": { "type": "string", "description": "Buyer user UID" },
+        "buyerEmail": { "type": "string", "description": "Buyer email address" },
+        "referrerUid": { "type": "string", "description": "Referrer user UID" },
+        "licenseCode": { "type": "string", "description": "Redeemed license code" },
+        "durationDays": { "type": "number", "description": "Duration in days" },
+        "amountNgn": { "type": "number", "description": "Purchase price in NGN" },
+        "isQualifying": { "type": "boolean", "description": "Whether purchase qualifies for referral sales" },
+        "createdAt": { "type": "string", "description": "ISO timestamp of transaction" }
+      }
+    },
+    "ReferralReward": {
+      "title": "ReferralReward",
+      "description": "Earned referral reward threshold record",
+      "type": "object",
+      "properties": {
+        "rewardId": { "type": "string", "description": "Unique reward identifier" },
+        "referrerUid": { "type": "string", "description": "Referrer user UID" },
+        "thresholdNgn": { "type": "number", "description": "Qualifying sales threshold reached in NGN" },
+        "freeDays": { "type": "number", "description": "Free days generated by this threshold" },
+        "createdAt": { "type": "string", "description": "ISO timestamp when threshold was earned" },
+        "status": { "type": "string", "description": "earned or claimed" },
+        "claimedAt": { "type": "string", "description": "ISO timestamp when claimed" },
+        "claimId": { "type": "string", "description": "Associated claim ID" }
+      }
+    },
+    "ReferralClaim": {
+      "title": "ReferralClaim",
+      "description": "Claim record of redeemed free days",
+      "type": "object",
+      "properties": {
+        "claimId": { "type": "string", "description": "Unique claim transaction ID" },
+        "userUid": { "type": "string", "description": "User UID receiving the free days" },
+        "userEmail": { "type": "string", "description": "User account email" },
+        "daysAwarded": { "type": "number", "description": "Number of free days awarded" },
+        "claimedAt": { "type": "string", "description": "ISO timestamp of claim" },
+        "previousExpiresAt": { "type": "string", "description": "Expiry timestamp before claim" },
+        "newExpiresAt": { "type": "string", "description": "Expiry timestamp after claim" },
+        "status": { "type": "string", "description": "completed status" }
+      }
+    },
+    "DeletedMessage": {
+      "title": "DeletedMessage",
+      "description": "Metadata of deleted messages for DDD recovery",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique deleted message record ID" },
+        "userId": { "type": "string", "description": "User account ID" },
+        "remoteJid": { "type": "string", "description": "WhatsApp chat JID" },
+        "sender": { "type": "string", "description": "Sender JID" },
+        "text": { "type": "string", "description": "Text content of deleted message" },
+        "mediaType": { "type": "string", "description": "Type of media if applicable" },
+        "mediaStoragePath": { "type": "string", "description": "Firebase Storage path if large media attachment" },
+        "deletedAt": { "type": "number", "description": "Timestamp of deletion" },
+        "originalTimestamp": { "type": "number", "description": "Timestamp of original message" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profiles and referral attributes"
+    },
+    "/licenses/{code}": {
+      "schema": "License",
+      "description": "Cryptographic license keys"
+    },
+    "/user_licenses/{userId}": {
+      "schema": "UserLicense",
+      "description": "Active user license activations"
+    },
+    "/group_settings/{userId}": {
+      "schema": "GroupSettings",
+      "description": "Group configurations per user account"
+    },
+    "/whatsapp_sessions/{userId}": {
+      "schema": "WhatsAppSession",
+      "description": "Baileys WhatsApp session state"
+    },
+    "/number_locks/{phoneNumber}": {
+      "schema": "NumberLock",
+      "description": "WhatsApp phone number locks"
+    },
+    "/user_number_locks/{userId}": {
+      "schema": "UserNumberLock",
+      "description": "User UID number locks"
+    },
+    "/referral_purchases/{purchaseId}": {
+      "schema": "ReferralPurchase",
+      "description": "Referral purchase records"
+    },
+    "/referral_rewards/{rewardId}": {
+      "schema": "ReferralReward",
+      "description": "Earned referral rewards"
+    },
+    "/referral_claims/{claimId}": {
+      "schema": "ReferralClaim",
+      "description": "Claimed referral reward free days"
+    },
+    "/deleted_messages/{recordId}": {
+      "schema": "DeletedMessage",
+      "description": "Deleted message metadata for recovery"
+    }
+  }
+}
