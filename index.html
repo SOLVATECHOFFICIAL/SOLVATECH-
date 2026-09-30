@@ -1940,6 +1940,15 @@
         }
         try {
           if (typeof currentUser.getIdToken === "function") {
+            if (!forceRefresh && typeof currentUser.getIdTokenResult === "function") {
+              try {
+                const tokenResult = await currentUser.getIdTokenResult(false);
+                const expTime = new Date(tokenResult.expirationTime).getTime();
+                if (Date.now() >= expTime - 120000) {
+                  forceRefresh = true;
+                }
+              } catch {}
+            }
             const token = await currentUser.getIdToken(forceRefresh);
             if (token) return token;
           }
@@ -1952,8 +1961,8 @@
         }
       }
 
-      async function getAuthHeader() {
-        const token = await getValidIdToken(false);
+      async function getAuthHeader(force = false) {
+        const token = await getValidIdToken(force);
         return token ? `Bearer ${token}` : null;
       }
 
