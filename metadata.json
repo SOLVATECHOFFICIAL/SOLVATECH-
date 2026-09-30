@@ -1,6 +1,6 @@
 {
-  "name": "Remix WHATSAPP-BOT-",
-  "description": "Imported from GitHub",
+  "name": "SOLVATECH BOT",
+  "description": "Secure SOLVATECH WhatsApp Bot Management Platform",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
