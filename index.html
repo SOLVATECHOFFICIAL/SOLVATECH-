@@ -583,7 +583,7 @@
               <span>🔑 Generate Key</span>
             </button>
             <button type="button" class="admin-subnav-btn" data-subtab="railway" id="admin-subtab-btn-railway">
-              <span>🚂 Railway & Secrets</span>
+              <span>🚂 Railway URL</span>
             </button>
             <button type="button" class="admin-subnav-btn" data-subtab="recycling" id="admin-subtab-btn-recycling">
               <span>🗑️ Recycling Bin</span>
@@ -966,69 +966,6 @@
             </div>
           </div>
 
-          <!-- SUBTAB 3: CUSTOMERS DIRECTORY VIEW -->
-          <div id="admin-view-customers" class="admin-subview hidden">
-            <!-- Controls Bar: Search & Filter Chips -->
-            <div class="admin-controls-bar">
-              <div class="admin-search-wrap">
-                <svg class="admin-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                <input id="admin-search-customers" type="text" class="admin-search-input" placeholder="Search customer email, name, UID, phone number, ref code..." />
-              </div>
-              <div class="admin-filter-chips">
-                <button type="button" class="admin-chip-btn active" data-filter-customer="all">ALL (<span id="count-cust-all">0</span>)</button>
-                <button type="button" class="admin-chip-btn" data-filter-customer="active">ACTIVE LICENSE (<span id="count-cust-active">0</span>)</button>
-                <button type="button" class="admin-chip-btn" data-filter-customer="expired">EXPIRED (<span id="count-cust-expired">0</span>)</button>
-                <button type="button" class="admin-chip-btn" data-filter-customer="nolicense">NO LICENSE (<span id="count-cust-nolicense">0</span>)</button>
-                <button type="button" class="admin-chip-btn" data-filter-customer="connected">WHATSAPP CONNECTED (<span id="count-cust-connected">0</span>)</button>
-              </div>
-            </div>
-
-            <!-- Customers Directory Table & Mobile Cards Container -->
-            <div class="admin-table-container">
-              <div class="admin-table-header-row">
-                <h3 class="admin-table-title">Customer Accounts & Profiles</h3>
-                <div class="admin-table-actions">
-                  <button id="admin-refresh-customers-btn" type="button" class="admin-preset-btn" style="padding: 5px 12px; font-size: 11px;">
-                    ↻ Refresh
-                  </button>
-                </div>
-              </div>
-
-              <!-- Desktop Full Customers Table -->
-              <div class="admin-table-scroll">
-                <table class="admin-master-table">
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>Customer Profile</th>
-                      <th>UID</th>
-                      <th>WhatsApp Number</th>
-                      <th>WhatsApp Status</th>
-                      <th>Active License</th>
-                      <th>License Status</th>
-                      <th>Remaining Time</th>
-                      <th>Expiry Date</th>
-                      <th>Referral Code</th>
-                      <th>Referred By</th>
-                      <th>Qualifying Sales</th>
-                      <th>Rewards</th>
-                    </tr>
-                  </thead>
-                  <tbody id="admin-customers-tbody">
-                    <tr>
-                      <td colspan="13" style="text-align: center; color: var(--muted); padding: 24px;">Loading customers directory...</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              <!-- Mobile Responsive Customer Cards List -->
-              <div id="admin-customers-cards" class="admin-cards-list">
-                <div style="text-align: center; color: var(--muted); padding: 20px;">Loading customer profiles...</div>
-              </div>
-            </div>
-          </div>
-
           <!-- SUBTAB 4: EXPIRING WATCHLIST VIEW -->
           <div id="admin-view-expiring" class="admin-subview hidden">
             <div class="surface" style="padding: 20px; border-radius: 8px; border: 1px solid var(--admin-card-border); margin-bottom: 20px; background: #fffdf5; border-color: #fef3c7;">
@@ -1271,141 +1208,6 @@
               </div>
 
               <div id="admin-railway-alert" class="hidden" style="margin-top: 12px; padding: 10px 14px; border-radius: 6px; font-size: 12px;"></div>
-            </div>
-
-            <!-- 1-Click Copy All Secrets for Railway RAW Editor -->
-            <div class="railway-card">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
-                <div>
-                  <h3 style="font-size: 14px; font-weight: 800; color: var(--ink); margin: 0;">📋 Railway Environment Variables (1-Click Paste)</h3>
-                  <p style="font-size: 12px; color: var(--muted); margin: 4px 0 0;">
-                    In your Railway Service → <strong>Variables</strong> tab → click <strong>RAW Editor</strong> → paste this block:
-                  </p>
-                </div>
-                <button type="button" id="admin-copy-all-railway-btn" class="railway-action-btn" style="background: #0284c7;">
-                  📋 Copy All for Railway RAW Editor
-                </button>
-              </div>
-
-              <pre id="admin-railway-raw-code" class="railway-raw-block">FIREBASE_PROJECT_ID=glass-intelligence-253bd
-FIREBASE_API_KEY=AIzaSyAmZp-Prdc74empcjYFv9PdFLagiN-to2c
-FIREBASE_AUTH_DOMAIN=glass-intelligence-253bd.firebaseapp.com
-FIREBASE_DATABASE_ID=ai-studio-remixwhatsappbot-d845e0aa-da32-4907-811f-9be97b2c6851
-FIREBASE_STORAGE_BUCKET=glass-intelligence-253bd.firebasestorage.app
-FIREBASE_APP_ID=1:91117675798:web:97ae27becca017177a5c37
-BOT_API_PREFIX=/bot-api
-BOT_DATA_DIR=/app/runtime
-PORT=8000</pre>
-            </div>
-
-            <!-- All 6 Secret Keys Table with Individual Copy Buttons -->
-            <div class="railway-card">
-              <h3 style="font-size: 14px; font-weight: 800; color: var(--ink); margin: 0 0 4px;">
-                🔐 All 6 Railway Secret Keys & Variables
-              </h3>
-              <p style="font-size: 12px; color: var(--muted); margin: 0 0 14px;">
-                All credentials configured for Firebase Firestore, Authentication, and WhatsApp session persistence:
-              </p>
-
-              <div class="admin-table-scroll">
-                <table class="railway-secrets-table">
-                  <thead>
-                    <tr>
-                      <th style="width: 25%;">Variable Name</th>
-                      <th style="width: 45%;">Value</th>
-                      <th style="width: 15%;">Purpose</th>
-                      <th style="width: 15%;">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td><strong>FIREBASE_PROJECT_ID</strong></td>
-                      <td><code class="railway-key-code">glass-intelligence-253bd</code></td>
-                      <td>Firebase Project</td>
-                      <td><button type="button" class="railway-copy-btn" data-copy="glass-intelligence-253bd">Copy</button></td>
-                    </tr>
-                    <tr>
-                      <td><strong>FIREBASE_API_KEY</strong></td>
-                      <td><code class="railway-key-code">AIzaSyAmZp-Prdc74empcjYFv9PdFLagiN-to2c</code></td>
-                      <td>Firebase Web Key</td>
-                      <td><button type="button" class="railway-copy-btn" data-copy="AIzaSyAmZp-Prdc74empcjYFv9PdFLagiN-to2c">Copy</button></td>
-                    </tr>
-                    <tr>
-                      <td><strong>FIREBASE_AUTH_DOMAIN</strong></td>
-                      <td><code class="railway-key-code">glass-intelligence-253bd.firebaseapp.com</code></td>
-                      <td>Auth Domain</td>
-                      <td><button type="button" class="railway-copy-btn" data-copy="glass-intelligence-253bd.firebaseapp.com">Copy</button></td>
-                    </tr>
-                    <tr>
-                      <td><strong>FIREBASE_DATABASE_ID</strong></td>
-                      <td><code class="railway-key-code">ai-studio-remixwhatsappbot-d845e0aa-da32-4907-811f-9be97b2c6851</code></td>
-                      <td>Firestore Database</td>
-                      <td><button type="button" class="railway-copy-btn" data-copy="ai-studio-remixwhatsappbot-d845e0aa-da32-4907-811f-9be97b2c6851">Copy</button></td>
-                    </tr>
-                    <tr>
-                      <td><strong>FIREBASE_STORAGE_BUCKET</strong></td>
-                      <td><code class="railway-key-code">glass-intelligence-253bd.firebasestorage.app</code></td>
-                      <td>Storage Bucket</td>
-                      <td><button type="button" class="railway-copy-btn" data-copy="glass-intelligence-253bd.firebasestorage.app">Copy</button></td>
-                    </tr>
-                    <tr>
-                      <td><strong>FIREBASE_APP_ID</strong></td>
-                      <td><code class="railway-key-code">1:91117675798:web:97ae27becca017177a5c37</code></td>
-                      <td>Client App ID</td>
-                      <td><button type="button" class="railway-copy-btn" data-copy="1:91117675798:web:97ae27becca017177a5c37">Copy</button></td>
-                    </tr>
-                    <tr>
-                      <td><strong>BOT_DATA_DIR</strong></td>
-                      <td><code class="railway-key-code">/app/runtime</code></td>
-                      <td>Persistent Storage</td>
-                      <td><button type="button" class="railway-copy-btn" data-copy="/app/runtime">Copy</button></td>
-                    </tr>
-                    <tr>
-                      <td><strong>BOT_API_PREFIX</strong></td>
-                      <td><code class="railway-key-code">/bot-api</code></td>
-                      <td>API Endpoint Prefix</td>
-                      <td><button type="button" class="railway-copy-btn" data-copy="/bot-api">Copy</button></td>
-                    </tr>
-                    <tr>
-                      <td><strong>PORT</strong></td>
-                      <td><code class="railway-key-code">8000</code></td>
-                      <td>HTTP Listen Port</td>
-                      <td><button type="button" class="railway-copy-btn" data-copy="8000">Copy</button></td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <!-- Simple 4-Step Guide Card -->
-            <div class="railway-card">
-              <h3 style="font-size: 14px; font-weight: 800; color: var(--ink); margin: 0 0 12px;">
-                🚀 Quick Railway Deployment Guide (4 Simple Moves)
-              </h3>
-              <div class="railway-step-card">
-                <div class="railway-step-num">1</div>
-                <div class="railway-step-text">
-                  <strong>Create Railway Service:</strong> In Railway.app, create a new service connected to your GitHub repository (<code>SOLVATECHOFFICIAL/solvatech-bot</code>).
-                </div>
-              </div>
-              <div class="railway-step-card">
-                <div class="railway-step-num">2</div>
-                <div class="railway-step-text">
-                  <strong>Paste Variables in RAW Editor:</strong> Click the <strong>"Copy All for Railway RAW Editor"</strong> button above. In Railway, open the <strong>Variables</strong> tab, click <strong>RAW Editor</strong>, paste everything, and click <strong>Save</strong>.
-                </div>
-              </div>
-              <div class="railway-step-card">
-                <div class="railway-step-num">3</div>
-                <div class="railway-step-text">
-                  <strong>Generate Railway Domain:</strong> In Railway service <strong>Settings</strong> → <strong>Networking</strong>, click <strong>Generate Domain</strong> (or copy your Railway URL).
-                </div>
-              </div>
-              <div class="railway-step-card">
-                <div class="railway-step-num">4</div>
-                <div class="railway-step-text">
-                  <strong>Link in this Console:</strong> Paste your Railway domain into the <strong>Active Railway Backend URL</strong> field above and click <strong>"Save & Link Backend"</strong>. Your frontend is instantly connected and synced to Firestore!
-                </div>
-              </div>
             </div>
           </div>
         </section>
@@ -1665,49 +1467,6 @@ PORT=8000</pre>
       function initRailwayManager() {
         syncRailwayInputs();
         testBackendHealth();
-
-        async function copyContent(text, btn) {
-          try {
-            await navigator.clipboard.writeText(text);
-          } catch (e) {
-            const ta = document.createElement("textarea");
-            ta.value = text;
-            ta.style.position = "fixed";
-            ta.style.opacity = "0";
-            document.body.appendChild(ta);
-            ta.select();
-            document.execCommand("copy");
-            document.body.removeChild(ta);
-          }
-          if (btn) {
-            const originalText = btn.textContent;
-            btn.textContent = "✓ Copied!";
-            btn.classList.add("copied");
-            setTimeout(() => {
-              btn.textContent = originalText;
-              btn.classList.remove("copied");
-            }, 2000);
-          }
-        }
-
-        document.querySelectorAll(".railway-copy-btn[data-copy]").forEach((btn) => {
-          btn.addEventListener("click", () => copyContent(btn.dataset.copy, btn));
-        });
-
-        const rawCodeText = `FIREBASE_PROJECT_ID=gen-lang-client-0324946831
-FIREBASE_API_KEY=AIzaSyA_g2ek4ziXSE9m4VD5-5PfKpKJjAobYFg
-FIREBASE_AUTH_DOMAIN=gen-lang-client-0324946831.firebaseapp.com
-FIREBASE_DATABASE_ID=ai-studio-whatsappbot-da9a52de-41e7-4365-a5b4-8aec9332642c
-FIREBASE_STORAGE_BUCKET=gen-lang-client-0324946831.firebasestorage.app
-FIREBASE_APP_ID=1:420914651308:web:ae4cb5d7632401c1a83f09
-BOT_API_PREFIX=/bot-api
-BOT_DATA_DIR=/app/runtime
-PORT=8000`;
-
-        const adminCopyAllBtn = $("admin-copy-all-railway-btn");
-        if (adminCopyAllBtn) {
-          adminCopyAllBtn.addEventListener("click", () => copyContent(rawCodeText, adminCopyAllBtn));
-        }
 
         const adminSaveBtn = $("admin-railway-save-btn");
         const adminPingBtn = $("admin-railway-ping-btn");

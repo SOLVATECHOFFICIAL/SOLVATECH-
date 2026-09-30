@@ -5,6 +5,10 @@ const settingByCommand = {
   antilink: "antiLink",
   antibot: "antiBot",
   antistatus: "antiStatus",
+  welcome: "welcome",
+  autowelcome: "welcome",
+  goodbye: "goodbye",
+  autogoodbye: "goodbye",
 };
 
 const settingByName = {
@@ -14,15 +18,22 @@ const settingByName = {
   antibot: "antiBot",
   status: "antiStatus",
   antistatus: "antiStatus",
+  welcome: "welcome",
+  autowelcome: "welcome",
+  goodbye: "goodbye",
+  autogoodbye: "goodbye",
 };
 
 export default async function anti({ sock, chatId, sender, senderJids, senderIsLinkedAccount, args = [], command, reply, userId = "default" }) {
-  await requireAdmin(sock, chatId, sender, true, senderJids, senderIsLinkedAccount);
   const commandSetting = settingByCommand[command];
   const first = String(args[0] || "").toLowerCase();
   const second = String(args[1] || "").toLowerCase();
   const setting = commandSetting || settingByName[first] || "antiLink";
   const value = commandSetting ? first : settingByName[first] ? second : first;
+
+  // For welcome/goodbye, bot does not strictly need to be group admin
+  const botRequired = !["welcome", "goodbye"].includes(setting);
+  await requireAdmin(sock, chatId, sender, botRequired, senderJids, senderIsLinkedAccount);
 
   if (!["on", "off"].includes(value)) {
     const current = await getGroupSettings(chatId, userId);
@@ -32,6 +43,8 @@ export default async function anti({ sock, chatId, sender, senderJids, senderIsL
       `┃ 🔗 *Antilink:* ${current.antiLink ? "🟢 *ON*" : "🔴 *OFF*"}`,
       `┃ 🤖 *Antibot:* ${current.antiBot ? "🟢 *ON*" : "🔴 *OFF*"}`,
       `┃ 📢 *Antistatus (Status Mention):* ${current.antiStatus !== false ? "🟢 *ON*" : "🔴 *OFF*"}`,
+      `┃ 🎉 *Welcome Greeting:* ${current.welcome ? "🟢 *ON*" : "🔴 *OFF*"}`,
+      `┃ 👋 *Goodbye Farewell:* ${current.goodbye ? "🟢 *ON*" : "🔴 *OFF*"}`,
       `┃ ⚠️ *Unified Warning Threshold:* *${current.warningLimit || 3}* strikes`,
       "",
       "╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯",
@@ -40,6 +53,8 @@ export default async function anti({ sock, chatId, sender, senderJids, senderIsL
       "│ • *.antilink on/off* — Auto-delete external links & warn",
       "│ • *.antibot on/off* — Auto-delete unauthorized bot messages & warn",
       "│ • *.antistatus on/off* — Auto-delete status mentions & warn",
+      "│ • *.welcome on/off* — Auto-greet new members upon joining",
+      "│ • *.goodbye on/off* — Auto-farewell members upon leaving",
       "│ • *.warns limit <1-10>* — Change threshold before removal",
       "╰───────────────────────────",
     ].join("\n"));
@@ -51,6 +66,8 @@ export default async function anti({ sock, chatId, sender, senderJids, senderIsL
     antiLink: "Antilink Protection",
     antiBot: "Antibot Protection",
     antiStatus: "Antistatus Protection (Status Mentions)",
+    welcome: "Auto Welcome Greeting",
+    goodbye: "Auto Goodbye Farewell",
   };
   const name = labelNames[setting] || setting;
   await reply(`✅ *${name}:* ${enabled ? "🟢 *ENABLED (ON)*" : "🔴 *DISABLED (OFF)*"}\n_Configuration permanently saved to Firebase Firestore._`);

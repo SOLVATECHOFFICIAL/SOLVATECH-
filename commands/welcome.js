@@ -11,7 +11,7 @@ export default async function welcome({
   reply,
   userId = "default",
 }) {
-  await requireAdmin(sock, chatId, sender, true, senderJids, senderIsLinkedAccount);
+  await requireAdmin(sock, chatId, sender, false, senderJids, senderIsLinkedAccount);
 
   const value = String(args[0] || "").toLowerCase();
   if (!["on", "off"].includes(value)) {
