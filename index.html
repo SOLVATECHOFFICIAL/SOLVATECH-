@@ -1364,12 +1364,8 @@
       }
 
       const FALLBACK_PRODUCTION_BACKEND = "https://web-production-c6f21.up.railway.app";
-      const isSelfHosted = window.location.hostname.includes("railway.app") ||
-                           window.location.hostname === "localhost" ||
-                           window.location.hostname === "127.0.0.1" ||
-                           window.location.hostname.includes("run.app") ||
-                           window.location.hostname.includes("googleusercontent.com");
-      const DEFAULT_BACKEND_URL = isSelfHosted ? window.location.origin : FALLBACK_PRODUCTION_BACKEND;
+      const isSelfHosted = !window.location.hostname.includes("github.io");
+      const DEFAULT_BACKEND_URL = window.location.origin;
       let customApiUrl = isSelfHosted ? "" : (localStorage.getItem("solvatech_backend_url") || "");
       if (isSelfHosted) {
         try { localStorage.removeItem("solvatech_backend_url"); } catch (e) {}
@@ -1886,18 +1882,48 @@
               btnForceRelease.textContent = "Releasing number lock...";
               try {
                 const authHeader = await getAuthHeader();
-                if (!authHeader) throw new Error("Authentication required.");
-                const res = await fetch(getApiUrl("/number/release"), {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json", "Authorization": authHeader },
-                  body: JSON.stringify({ number: extraData.phone, phoneNumber: extraData.phone })
-                });
-                const resData = await res.json();
-                if (!res.ok) throw new Error(resData.error || "Failed to release number.");
+                let released = false;
+                const cleanPhoneNum = String(extraData.phone || "").replace(/\D+/g, "");
+
+                // Try backend API first (both /bot-api and direct root)
+                try {
+                  const res = await fetch(getApiUrl("/number/release"), {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "Authorization": authHeader || "" },
+                    body: JSON.stringify({ number: extraData.phone, phoneNumber: extraData.phone })
+                  });
+                  if (res.ok) {
+                    released = true;
+                  }
+                } catch (apiErr) {
+                  console.warn("API release request error, falling back to Firestore", apiErr);
+                }
+
+                // If API was unavailable or returned non-ok, delete directly in Firestore
+                if (!released && db) {
+                  try {
+                    const lockDocRef = doc(db, "number_locks", cleanPhoneNum);
+                    const snap = await getDoc(lockDocRef).catch(() => null);
+                    const lockedUid = snap?.exists() ? snap.data()?.uid : null;
+                    await deleteDoc(lockDocRef).catch(() => {});
+                    if (lockedUid) {
+                      await deleteDoc(doc(db, "user_number_locks", lockedUid)).catch(() => {});
+                    }
+                    if (currentUser?.uid) {
+                      await deleteDoc(doc(db, "user_number_locks", currentUser.uid)).catch(() => {});
+                    }
+                    released = true;
+                  } catch (fsErr) {
+                    console.warn("Direct Firestore release failed", fsErr);
+                  }
+                }
+
+                if (!released) throw new Error("Could not release number lock. Please check your internet connection.");
+
                 errorText.textContent = `✓ Number (+${extraData.phone}) released successfully! You can now pair.`;
                 btnForceRelease.classList.add("hidden");
                 refresh();
-                if (form) form.requestSubmit();
+                if (form) setTimeout(() => form.requestSubmit(), 500);
               } catch (err) {
                 errorText.textContent = `Release error: ${err.message}`;
               } finally {
@@ -1915,14 +1941,38 @@
               btnForceUnlinkMyAcc.textContent = "Unlinking account...";
               try {
                 const authHeader = await getAuthHeader();
-                if (!authHeader) throw new Error("Authentication required.");
-                const res = await fetch(getApiUrl("/number/unlink"), {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json", "Authorization": authHeader },
-                  body: JSON.stringify({})
-                });
-                const resData = await res.json();
-                if (!res.ok) throw new Error(resData.error || "Failed to unlink account.");
+                let unlinked = false;
+
+                try {
+                  const res = await fetch(getApiUrl("/number/unlink"), {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "Authorization": authHeader || "" },
+                    body: JSON.stringify({})
+                  });
+                  if (res.ok) {
+                    unlinked = true;
+                  }
+                } catch (apiErr) {
+                  console.warn("API unlink request error, falling back to Firestore", apiErr);
+                }
+
+                if (!unlinked && db && currentUser?.uid) {
+                  try {
+                    const uSnap = await getDoc(doc(db, "user_number_locks", currentUser.uid)).catch(() => null);
+                    const phoneToFree = uSnap?.exists() ? uSnap.data()?.phoneNumber : null;
+                    await deleteDoc(doc(db, "user_number_locks", currentUser.uid)).catch(() => {});
+                    if (phoneToFree) {
+                      const cleanP = String(phoneToFree).replace(/\D+/g, "");
+                      await deleteDoc(doc(db, "number_locks", cleanP)).catch(() => {});
+                    }
+                    unlinked = true;
+                  } catch (fsErr) {
+                    console.warn("Direct Firestore unlink failed", fsErr);
+                  }
+                }
+
+                if (!unlinked) throw new Error("Could not unlink account. Please check your internet connection.");
+
                 errorText.textContent = "✓ Account unlinked successfully! You can now pair any phone number.";
                 btnForceUnlinkMyAcc.classList.add("hidden");
                 refresh();
