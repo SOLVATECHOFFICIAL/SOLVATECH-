@@ -495,11 +495,12 @@ for (const p of prefixes) {
   // --------------------------------------------------------------------------
   app.get(`${p}/admin/overview`, requireAuth, requireAdmin, async (_request, response) => {
     try {
-      const [licenses, numberLocks, referralAudit, whatsappList] = await Promise.all([
+      const [licenses, numberLocks, referralAudit, whatsappList, fullUserRecords] = await Promise.all([
         listAllLicenses(),
         getAllNumberLocks(),
         getAdminReferralAudit(),
         Promise.resolve(getAllWhatsAppStatuses()),
+        listAllUsersWithLicenses(),
       ]);
 
       const db = getFirebaseServerFirestore();
@@ -548,12 +549,10 @@ for (const p of prefixes) {
       const FORTY_EIGHT_HOURS_MS = 48 * 60 * 60 * 1000;
 
       let totalRevenueNgn = 0;
-      let activeCount = 0;
       let expiringSoonCount = 0;
       let expiredCount = 0;
       let unusedCount = 0;
       let usedCount = 0;
-      let lifetimeCount = 0;
 
       const enrichedLicenses = licenses.map((lic) => {
         const isUsed = lic.status === "used" || Boolean(lic.redeemedByUid);
@@ -571,15 +570,12 @@ for (const p of prefixes) {
             remainingMs = expiryMs - now;
             if (isLifetime) {
               calculatedStatus = "lifetime";
-              lifetimeCount++;
             } else if (remainingMs > 0) {
               if (remainingMs <= FORTY_EIGHT_HOURS_MS) {
                 calculatedStatus = "expiring_soon";
                 expiringSoonCount++;
-                activeCount++;
               } else {
                 calculatedStatus = "active";
-                activeCount++;
               }
             } else {
               calculatedStatus = "expired";
@@ -587,10 +583,8 @@ for (const p of prefixes) {
             }
           } else if (isLifetime) {
             calculatedStatus = "lifetime";
-            lifetimeCount++;
           } else {
             calculatedStatus = "active";
-            activeCount++;
           }
 
           if (priceNgn > 0) {
@@ -619,17 +613,46 @@ for (const p of prefixes) {
 
       const customersMap = {};
 
-      for (const [uid, uData] of Object.entries(firestoreUsers)) {
-        customersMap[uid] = {
-          uid,
-          email: uData.email || "",
-          displayName: uData.displayName || "",
-          photoURL: uData.photoURL || "",
-          createdAt: uData.createdAt || uData.joinedAt || null,
-          activeLicense: uData.activeLicense || null,
+      // 1. Seed with full authoritative user records (includes in-memory & unlimited users)
+      for (const u of (fullUserRecords || [])) {
+        customersMap[u.uid] = {
+          uid: u.uid,
+          email: u.email && u.email !== "—" ? u.email : "",
+          displayName: u.displayName || "",
+          phoneNumber: u.phoneNumber && u.phoneNumber !== "—" ? u.phoneNumber : "",
+          createdAt: u.createdAt || null,
+          lastLoginAt: u.lastLoginAt || null,
+          isUnlimited: Boolean(u.isUnlimited),
+          isAdmin: Boolean(u.isAdmin),
+          licenseStatus: u.isUnlimited ? "lifetime" : (u.status || "none"),
+          durationDays: u.durationDays,
+          expiresAt: u.expiresAt,
+          preservedNotice: u.preservedNotice || "",
+          savedNormalDays: u.savedNormalDays || null,
+          activeLicense: {
+            durationDays: u.durationDays,
+            expiresAt: u.expiresAt,
+            isUnlimited: Boolean(u.isUnlimited),
+            status: u.status,
+          },
         };
       }
 
+      // 2. Merge Firestore users
+      for (const [uid, uData] of Object.entries(firestoreUsers)) {
+        const existing = customersMap[uid] || { uid };
+        customersMap[uid] = {
+          ...existing,
+          email: uData.email || existing.email || "",
+          displayName: uData.displayName || existing.displayName || "",
+          photoURL: uData.photoURL || existing.photoURL || "",
+          createdAt: uData.createdAt || uData.joinedAt || existing.createdAt || null,
+          isUnlimited: Boolean(existing.isUnlimited || uData.isUnlimited || uData.activeLicense?.isUnlimited),
+          activeLicense: existing.activeLicense || uData.activeLicense || null,
+        };
+      }
+
+      // 3. Merge redeemed licenses
       for (const lic of enrichedLicenses) {
         if (lic.redeemedByUid) {
           const uid = lic.redeemedByUid;
@@ -665,18 +688,43 @@ for (const p of prefixes) {
       }
 
       const customersList = Object.values(customersMap).map((cust) => {
-        const phone = locksByUid[cust.uid] || "";
+        const phone = locksByUid[cust.uid] || cust.phoneNumber || "";
         const ws = wsByUid[cust.uid] || null;
         const refInfo = referrersByUid[cust.uid] || null;
 
+        const isOwnerAdmin = Boolean(
+          cust.isAdmin ||
+          cust.uid === "admin" ||
+          isAdminEmail(cust.email) ||
+          isAdminEmail(cust.uid)
+        );
+        const lic = cust.activeLicense || {};
+        const isUnlimited = Boolean(
+          isOwnerAdmin ||
+          cust.isUnlimited ||
+          cust.licenseStatus === "lifetime" ||
+          cust.licenseStatus === "unlimited" ||
+          lic.isUnlimited ||
+          lic.durationDays === "Unlimited" ||
+          cust.durationDays === "Unlimited" ||
+          Number(lic.durationDays) >= 9999 ||
+          Number(cust.durationDays) >= 9999
+        );
+
         let licenseStatus = "none";
         let remainingMs = null;
-        let expiresAt = null;
+        let expiresAt = lic.expiresAt || cust.expiresAt || null;
 
-        if (cust.uid === "admin" || cust.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+        let preservedNotice = cust.preservedNotice || lic.preservedNotice || "";
+        const savedDays = cust.savedNormalDays || lic.savedNormalDays || (lic.savedRemainingMs ? Math.ceil(lic.savedRemainingMs / 86400000) : null);
+        if (savedDays && savedDays > 0 && !preservedNotice) {
+          preservedNotice = `Preserved: ${savedDays} normal days left`;
+        }
+
+        if (isUnlimited) {
           licenseStatus = "lifetime";
-        } else if (cust.activeLicense && cust.activeLicense.expiresAt) {
-          expiresAt = cust.activeLicense.expiresAt;
+          remainingMs = 3153600000000;
+        } else if (expiresAt) {
           const expiryMs = new Date(expiresAt).getTime();
           remainingMs = expiryMs - now;
           if (remainingMs > 0) {
@@ -688,21 +736,29 @@ for (const p of prefixes) {
 
         return {
           ...cust,
+          isUnlimited,
+          isAdmin: isOwnerAdmin,
           phoneNumber: phone,
           whatsappStatus: ws ? ws.status : phone ? "disconnected" : "never_paired",
           botNumber: ws?.botNumber || phone || "",
           connectedAt: ws?.connectedAt || null,
           licenseStatus,
+          status: isUnlimited ? "unlimited" : licenseStatus,
           remainingMs,
           expiresAt,
-          referralCode: refInfo?.referralCode || "",
+          preservedNotice,
+          savedNormalDays: savedDays || null,
+          referralCode: refInfo?.referralCode || cust.referralCode || "",
           qualifyingSalesNgn: refInfo?.qualifyingSalesNgn || 0,
           earnedDaysTotal: refInfo?.earnedDaysTotal || 0,
           claimedDaysTotal: refInfo?.claimedDaysTotal || 0,
           availableDays: refInfo?.availableDays || 0,
           referredCount: refInfo?.referredCount || 0,
         };
-      }).sort((a, b) => (b.activeLicense ? 1 : 0) - (a.activeLicense ? 1 : 0));
+      }).sort((a, b) => (b.isAdmin ? 1 : 0) - (a.isAdmin ? 1 : 0));
+
+      const lifetimeCount = customersList.filter((c) => c.isUnlimited).length;
+      const activeCount = customersList.filter((c) => c.isUnlimited || c.licenseStatus === "active" || c.licenseStatus === "expiring_soon").length;
 
       const activityEvents = [];
 
@@ -1024,20 +1080,30 @@ app.use((error, _request, response, _next) => {
   response.status(500).json({ error: "Internal server error." });
 });
 
-app.listen(PORT, "0.0.0.0", () => {
-  logger.info("SOLVATECH BOT web server listening", String(PORT));
+const PRIMARY_PORT = PORT;
+const SECONDARY_PORT = PRIMARY_PORT === 8000 ? 3000 : 8000;
+
+const server = app.listen(PRIMARY_PORT, "0.0.0.0", () => {
+  logger.info("SOLVATECH BOT primary web server listening on port", String(PRIMARY_PORT));
   restoreAllSessions().catch((error) => {
     logger.warn("Auto-restore session error", error.message);
   });
-  // Audit active WhatsApp sessions every 30 seconds for license expiry
+  // Audit active WhatsApp sessions every 30 seconds for license expiry and smooth reconnection
   setInterval(() => {
     auditActiveSessions().catch((err) => {
       logger.debug("Background license audit notice", err.message);
     });
   }, 30000).unref();
-
-  // Continuous 25s Global Heartbeat to ensure Railway / background process never drops socket
-  setInterval(() => {
-    restoreAllSessions().catch(() => {});
-  }, 25000).unref();
 });
+
+// Also bind secondary port so both port 3000 and port 8000 work seamlessly
+try {
+  const secondaryServer = app.listen(SECONDARY_PORT, "0.0.0.0", () => {
+    logger.info("SOLVATECH BOT secondary web server also listening on port", String(SECONDARY_PORT));
+  });
+  secondaryServer.on("error", (err) => {
+    logger.debug(`Secondary port ${SECONDARY_PORT} note: ${err.message}`);
+  });
+} catch (err) {
+  logger.debug(`Could not start secondary server on port ${SECONDARY_PORT}: ${err.message}`);
+}

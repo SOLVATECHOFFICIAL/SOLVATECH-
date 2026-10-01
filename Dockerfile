@@ -16,7 +16,7 @@ RUN mkdir -p /app/runtime/sessions /app/runtime/data /app/runtime/logs
 ENV NODE_ENV=production
 ENV BOT_DATA_DIR=/app/runtime
 ENV BOT_API_PREFIX=/bot-api
-ENV PORT=8000
+ENV PORT=3000
 ENV FIREBASE_PROJECT_ID=glass-intelligence-253bd
 ENV FIREBASE_API_KEY=AIzaSyAmZp-Prdc74empcjYFv9PdFLagiN-to2c
 ENV FIREBASE_AUTH_DOMAIN=glass-intelligence-253bd.firebaseapp.com
@@ -24,6 +24,6 @@ ENV FIREBASE_DATABASE_ID=ai-studio-remixwhatsappbot-d845e0aa-da32-4907-811f-9be9
 ENV FIREBASE_STORAGE_BUCKET=glass-intelligence-253bd.firebasestorage.app
 ENV FIREBASE_APP_ID=1:91117675798:web:97ae27becca017177a5c37
 
-EXPOSE 3000
+EXPOSE 3000 8000
 
 CMD ["npm", "start"]

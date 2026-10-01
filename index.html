@@ -68,23 +68,37 @@
     <link rel="stylesheet" href="./style.css" />
     <link rel="stylesheet" href="./pairing-enhancements.css" />
     <link rel="stylesheet" href="./admin-dashboard.css" />
+    <style>
+      /* Immediate render guard: Prevent any unstyled splash or giant image flash on load / refresh */
+      #pwa-splash, .pwa-splash {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+      }
+      img {
+        max-width: 100%;
+        height: auto;
+      }
+      .solva-brand-logo {
+        width: 32px !important;
+        height: 32px !important;
+        object-fit: contain;
+      }
+      .solva-avatar-img {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover;
+      }
+      .hero-image {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover;
+      }
+    </style>
   </head>
   <body>
     <div class="grain"></div>
-
-    <!-- PWA Splash Screen -->
-    <div id="pwa-splash" class="pwa-splash" aria-hidden="true">
-      <div class="pwa-splash-inner">
-        <div class="pwa-splash-logo-wrap">
-          <img src="./solva.webp" alt="SOLVATECH BOT" class="pwa-splash-logo" />
-        </div>
-        <div class="pwa-splash-title">SOLVATECH BOT</div>
-        <div class="pwa-splash-subtitle">Secure WhatsApp Automation</div>
-        <div class="pwa-splash-loader">
-          <span class="pwa-splash-spinner"></span>
-        </div>
-      </div>
-    </div>
 
     <!-- PWA Update Available Banner -->
     <div id="pwa-update-banner" class="pwa-update-banner hidden" role="status">
@@ -3510,7 +3524,7 @@
 
         if (adminModalTitle) adminModalTitle.textContent = `Customer Profile: ${cust.email || cust.uid}`;
         if (adminModalBody) {
-          const isLifetime = cust.uid === "admin" || cust.licenseStatus === "lifetime";
+          const isLifetime = isLifetimeCustomer(cust);
           const countdownText = cust.expiresAt ? formatAdminCountdown(cust.remainingMs, isLifetime, cust.expiresAt) : (cust.hasActiveLicense ? "Active" : "No Active License");
           const phone = cust.phoneNumber || cust.lockedPhoneNumber || cust.connectedPhoneNumber || "";
           const waLink = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(`Hello ${cust.displayName || ''}! This is Solvatech Bot Support regarding your account.`)}` : null;
@@ -3970,6 +3984,23 @@
         }
       }
 
+      function isLifetimeCustomer(cust) {
+        if (!cust) return false;
+        return Boolean(
+          cust.uid === "admin" ||
+          cust.isAdmin ||
+          cust.isUnlimited ||
+          cust.licenseStatus === "lifetime" ||
+          cust.licenseStatus === "unlimited" ||
+          cust.status === "unlimited" ||
+          cust.activeLicense?.isUnlimited ||
+          cust.activeLicense?.durationDays === "Unlimited" ||
+          cust.durationDays === "Unlimited" ||
+          Number(cust.activeLicense?.durationDays) >= 9999 ||
+          Number(cust.durationDays) >= 9999
+        );
+      }
+
       // Render Customers Directory Table (Subtab 1 - Main Users Tab)
       function renderCustomersTable() {
         if (!adminOverviewData) return;
@@ -3977,10 +4008,10 @@
 
         // Count chips
         const cAll = allCustomers.length;
-        const cActive = allCustomers.filter((c) => c.licenseStatus === "active" || c.hasActiveLicense || c.licenseStatus === "lifetime").length;
-        const cUnlimited = allCustomers.filter((c) => c.uid === "admin" || c.licenseStatus === "lifetime" || c.isUnlimited || c.activeLicense?.durationDays >= 9999).length;
-        const cExpired = allCustomers.filter((c) => c.licenseStatus === "expired").length;
-        const cNoLicense = allCustomers.filter((c) => !c.hasActiveLicense && c.licenseStatus !== "expired" && c.licenseStatus !== "active" && c.licenseStatus !== "lifetime").length;
+        const cActive = allCustomers.filter((c) => c.licenseStatus === "active" || c.hasActiveLicense || isLifetimeCustomer(c)).length;
+        const cUnlimited = allCustomers.filter((c) => isLifetimeCustomer(c)).length;
+        const cExpired = allCustomers.filter((c) => c.licenseStatus === "expired" && !isLifetimeCustomer(c)).length;
+        const cNoLicense = allCustomers.filter((c) => !c.hasActiveLicense && !isLifetimeCustomer(c) && c.licenseStatus !== "expired" && c.licenseStatus !== "active" && c.licenseStatus !== "lifetime").length;
         const cConnected = allCustomers.filter((c) => c.whatsappConnected || c.whatsappStatus === "connected").length;
 
         const elCAll = document.getElementById("count-cust-all");
@@ -3998,9 +4029,9 @@
 
         // Filter list
         let filtered = allCustomers.filter((cust) => {
-          const isLifetime = cust.uid === "admin" || cust.licenseStatus === "lifetime" || cust.isUnlimited || cust.activeLicense?.durationDays >= 9999;
+          const isLifetime = isLifetimeCustomer(cust);
           const isActive = cust.licenseStatus === "active" || cust.hasActiveLicense || isLifetime;
-          const isExpired = cust.licenseStatus === "expired";
+          const isExpired = cust.licenseStatus === "expired" && !isLifetime;
           const isConnected = cust.whatsappConnected || cust.whatsappStatus === "connected";
 
           if (adminCustomerFilter === "active" && !isActive) return false;
@@ -4045,7 +4076,7 @@
                 ? `<span class="admin-badge badge-connected"><span class="badge-dot"></span>CONNECTED</span>` 
                 : `<span class="admin-badge badge-disconnected"><span class="badge-dot"></span>${(cust.whatsappStatus || "DISCONNECTED").toUpperCase()}</span>`;
 
-              const isLifetime = cust.uid === "admin" || cust.licenseStatus === "lifetime" || cust.isUnlimited || cust.activeLicense?.durationDays >= 9999;
+              const isLifetime = isLifetimeCustomer(cust);
               let licBadge = `<span class="admin-badge badge-neutral"><span class="badge-dot"></span>NO LICENSE</span>`;
               if (isLifetime) {
                 licBadge = `<span class="admin-badge badge-lifetime"><span class="badge-dot"></span>UNLIMITED</span>`;
@@ -4075,7 +4106,7 @@
                     <div>${phoneDisplay}</div>
                     <div style="margin-top: 3px;">${waBadge}</div>
                   </td>
-                  <td><span class="code-pill" style="font-size:11px; font-weight:700;">${cust.activeLicense?.code || cust.activeLicenseCode || "None"}</span></td>
+                  <td><span class="code-pill" style="font-size:11px; font-weight:700;">${cust.activeLicense?.code || cust.activeLicenseCode || (isLifetime ? "UNLIMITED" : "None")}</span></td>
                   <td>${licBadge}</td>
                   <td>
                     <strong style="color:${isLifetime ? '#0f766e' : (cust.remainingMs > 0 ? 'var(--teal)' : '#b91c1c')};" data-admin-expiry="${isLifetime ? '' : (cust.expiresAt || '')}">${remainingStr}</strong>
@@ -4111,7 +4142,7 @@
             cardsEl.innerHTML = `<div style="text-align: center; color: var(--muted); padding: 20px;">No customers found.</div>`;
           } else {
             cardsEl.innerHTML = filtered.map((cust) => {
-              const isLifetime = cust.uid === "admin" || cust.licenseStatus === "lifetime" || cust.isUnlimited || cust.activeLicense?.durationDays >= 9999;
+              const isLifetime = isLifetimeCustomer(cust);
               const waConnected = cust.whatsappConnected || cust.whatsappStatus === "connected";
               const waBadge = waConnected ? `<span class="admin-badge badge-connected"><span class="badge-dot"></span>CONNECTED</span>` : `<span class="admin-badge badge-disconnected"><span class="badge-dot"></span>OFFLINE</span>`;
               const remainingStr = isLifetime ? "LIFETIME UNLIMITED" : (cust.expiresAt ? formatAdminCountdown(cust.remainingMs, false, cust.expiresAt) : (cust.hasActiveLicense ? "Active" : "No License"));
@@ -4125,7 +4156,7 @@
                   </div>
                   <div class="admin-card-grid-meta">
                     <div><span class="admin-card-label">WhatsApp:</span> <span>${phone ? `+${phone}` : "Not linked"}</span></div>
-                    <div><span class="admin-card-label">License:</span> <span>${cust.activeLicense?.code || cust.activeLicenseCode || "None"} (<strong data-admin-expiry="${isLifetime ? '' : (cust.expiresAt || '')}">${remainingStr}</strong>)</span></div>
+                    <div><span class="admin-card-label">License:</span> <span>${cust.activeLicense?.code || cust.activeLicenseCode || (isLifetime ? "UNLIMITED" : "None")} (<strong data-admin-expiry="${isLifetime ? '' : (cust.expiresAt || '')}">${remainingStr}</strong>)</span></div>
                   </div>
                   <div style="margin-top: 8px; display: flex; gap: 6px; justify-content: flex-end;" onclick="event.stopPropagation();">
                     ${isLifetime ? `
@@ -5053,25 +5084,14 @@
       // SOLVATECH BOT - PROGRESSIVE WEB APP (PWA) CONTROLLER
       // =========================================================================
 
-      // 1. Splash Screen Smooth Dismissal
+      // 1. Splash Screen Dismissal
       function dismissSplashScreen() {
         const splash = document.getElementById("pwa-splash");
-        if (!splash || splash.classList.contains("fade-out")) return;
-        splash.classList.add("fade-out");
-        setTimeout(() => {
+        if (splash) {
           splash.style.display = "none";
-        }, 460);
+        }
       }
-
-      // Automatically dismiss splash screen after a crisp duration
-      if (document.readyState === "complete") {
-        setTimeout(dismissSplashScreen, 650);
-      } else {
-        window.addEventListener("load", () => {
-          setTimeout(dismissSplashScreen, 650);
-        });
-      }
-      setTimeout(dismissSplashScreen, 1200); // Fail-safe timer
+      dismissSplashScreen();
 
       // 2. Service Worker Registration & Update Notification
       let swRegistration = null;
