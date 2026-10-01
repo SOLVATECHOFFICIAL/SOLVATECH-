@@ -134,6 +134,31 @@
         "status": { "type": "string", "description": "completed status" }
       }
     },
+    "GroupRules": {
+      "title": "GroupRules",
+      "description": "Permanent WhatsApp group rules preserved by group JID across sessions",
+      "type": "object",
+      "properties": {
+        "groupId": { "type": "string", "description": "WhatsApp Group JID" },
+        "welcome": { "type": "boolean", "description": "Auto-welcome toggle" },
+        "goodbye": { "type": "boolean", "description": "Auto-goodbye toggle" },
+        "antiLink": { "type": "boolean", "description": "Anti-link toggle" },
+        "antiBot": { "type": "boolean", "description": "Anti-bot toggle" },
+        "antiStatus": { "type": "boolean", "description": "Anti-status toggle" },
+        "warningLimit": { "type": "number", "description": "Warning threshold" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp when last modified" }
+      }
+    },
+    "SystemConfig": {
+      "title": "SystemConfig",
+      "description": "System configuration such as backend Railway production URL",
+      "type": "object",
+      "properties": {
+        "railwayUrl": { "type": "string", "description": "Active backend service URL" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp of update" },
+        "updatedBy": { "type": "string", "description": "Admin email who set the URL" }
+      }
+    },
     "DeletedMessage": {
       "title": "DeletedMessage",
       "description": "Metadata of deleted messages for DDD recovery",
@@ -195,6 +220,14 @@
     "/deleted_messages/{recordId}": {
       "schema": "DeletedMessage",
       "description": "Deleted message metadata for recovery"
+    },
+    "/group_rules/{groupId}": {
+      "schema": "GroupRules",
+      "description": "Permanent group rules keyed by WhatsApp group JID"
+    },
+    "/system_config/{configId}": {
+      "schema": "SystemConfig",
+      "description": "Global system configuration"
     }
   }
 }
