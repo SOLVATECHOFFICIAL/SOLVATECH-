@@ -1142,19 +1142,17 @@ app.use((error, _request, response, _next) => {
   response.status(500).json({ error: "Internal server error." });
 });
 
-const PORTS_TO_LISTEN = Array.from(new Set([3000, 8000, PORT ? Number(PORT) : null].filter(Boolean)));
+const listenPort = Number(process.env.PORT) || 3000;
 
-for (const listenPort of PORTS_TO_LISTEN) {
-  try {
-    const s = app.listen(listenPort, "0.0.0.0", () => {
-      logger.info(`SOLVATECH BOT web server listening on port ${listenPort} (0.0.0.0)`);
-    });
-    s.on("error", (err) => {
-      logger.warn(`Port ${listenPort} note: ${err.message}`);
-    });
-  } catch (err) {
-    logger.warn(`Could not start server on port ${listenPort}: ${err.message}`);
-  }
+try {
+  const s = app.listen(listenPort, "0.0.0.0", () => {
+    logger.info(`SOLVATECH BOT web server listening on port ${listenPort} (0.0.0.0)`);
+  });
+  s.on("error", (err) => {
+    logger.warn(`Port ${listenPort} note: ${err.message}`);
+  });
+} catch (err) {
+  logger.warn(`Could not start server on port ${listenPort}: ${err.message}`);
 }
 
 // Background auto-restore & license audits
