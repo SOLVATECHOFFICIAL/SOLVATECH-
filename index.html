@@ -1399,11 +1399,12 @@
         return ADMIN_EMAILS.includes(email.trim().toLowerCase());
       }
 
-      const FALLBACK_PRODUCTION_BACKEND = "https://web-production-c6f21.up.railway.app";
+      const FALLBACK_PRODUCTION_BACKEND = "https://web-production-1f4c4.up.railway.app";
       let customApiUrl = localStorage.getItem("solvatech_backend_url") || FALLBACK_PRODUCTION_BACKEND;
       if (customApiUrl && (
         customApiUrl.includes("3c1de8") ||
         customApiUrl.includes("215ab") ||
+        customApiUrl.includes("c6f21") ||
         customApiUrl.includes("localhost:5000")
       )) {
         try { localStorage.removeItem("solvatech_backend_url"); } catch (e) {}
@@ -1411,6 +1412,14 @@
       }
 
       function getActiveBackendUrl() {
+        if (window.location && window.location.origin && (
+          window.location.hostname.includes("railway.app") ||
+          window.location.hostname.includes("run.app") ||
+          window.location.hostname === "localhost" ||
+          window.location.hostname === "127.0.0.1"
+        )) {
+          return window.location.origin.replace(/\/$/, "");
+        }
         return (customApiUrl || FALLBACK_PRODUCTION_BACKEND).replace(/\/$/, "");
       }
 
@@ -1438,6 +1447,9 @@
             remoteUrl = railwaySnap.data()?.url || railwaySnap.data()?.railwayUrl || "";
           }
           remoteUrl = String(remoteUrl || "").trim().replace(/\/+$/, "");
+          if (remoteUrl.includes("c6f21") || remoteUrl.includes("3c1de8") || remoteUrl.includes("215ab")) {
+            remoteUrl = FALLBACK_PRODUCTION_BACKEND;
+          }
           if (remoteUrl && remoteUrl.startsWith("http")) {
             if (remoteUrl !== customApiUrl) {
               customApiUrl = remoteUrl;
