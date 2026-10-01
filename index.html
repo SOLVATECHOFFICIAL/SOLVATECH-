@@ -2575,7 +2575,16 @@
       let auth = null;
       let db = null;
       try {
-        try { setLogLevel("error"); } catch {}
+        const origConsoleError = console.error;
+        console.error = function(...args) {
+          const text = args.map(a => typeof a === "string" ? a : (a?.message || "")).join(" ");
+          if (text.includes("Disconnecting idle stream") || text.includes("Timed out waiting for new targets")) {
+            return;
+          }
+          origConsoleError.apply(console, args);
+        };
+
+        try { setLogLevel("silent"); } catch {}
         const app = initializeApp(FIREBASE_CONFIG);
         auth = getAuth(app);
         try {
@@ -3655,6 +3664,82 @@
               const serverMs = new Date(data.serverTime || data.systemHealth?.serverTime).getTime();
               cachedServerOffset = serverMs - Date.now();
             }
+
+            // Direct sync with project gen-lang-client-0324946831 Firestore to keep all users fully intact
+            if (db) {
+              try {
+                const [fsUsersSnap, fsLicensesSnap] = await Promise.all([
+                  getDocs(collection(db, "users")).catch(() => null),
+                  getDocs(collection(db, "user_licenses")).catch(() => null),
+                ]);
+
+                const existingCustMap = new Map();
+                (adminOverviewData.customers || []).forEach((c) => {
+                  if (c.uid) existingCustMap.set(c.uid, c);
+                  if (c.email) existingCustMap.set(c.email.toLowerCase(), c);
+                });
+
+                if (fsUsersSnap && !fsUsersSnap.empty) {
+                  fsUsersSnap.forEach((d) => {
+                    const u = d.data() || {};
+                    const uEmail = (u.email || "").toLowerCase();
+                    const existing = existingCustMap.get(d.id) || (uEmail ? existingCustMap.get(uEmail) : null);
+                    const isUnl = Boolean(existing?.isUnlimited || u.isUnlimited || u.activeLicense?.isUnlimited || u.durationDays === "Unlimited");
+                    const merged = {
+                      ...(existing || {}),
+                      uid: d.id,
+                      email: u.email || existing?.email || "",
+                      displayName: u.displayName || existing?.displayName || u.email?.split("@")[0] || "User",
+                      photoURL: u.photoURL || existing?.photoURL || "",
+                      createdAt: u.createdAt || existing?.createdAt || null,
+                      isUnlimited: isUnl,
+                      activeLicense: u.activeLicense || existing?.activeLicense || null,
+                      licenseStatus: isUnl ? "lifetime" : (existing?.licenseStatus || "active"),
+                      status: isUnl ? "unlimited" : (existing?.status || "active"),
+                    };
+                    existingCustMap.set(d.id, merged);
+                    if (uEmail) existingCustMap.set(uEmail, merged);
+                  });
+                }
+
+                if (fsLicensesSnap && !fsLicensesSnap.empty) {
+                  fsLicensesSnap.forEach((d) => {
+                    const lic = d.data() || {};
+                    const uid = d.id;
+                    const licEmail = (lic.email || "").toLowerCase();
+                    const existing = existingCustMap.get(uid) || (licEmail ? existingCustMap.get(licEmail) : null);
+                    const isUnl = Boolean(existing?.isUnlimited || lic.isUnlimited || lic.durationDays === "Unlimited");
+                    const merged = {
+                      ...(existing || {}),
+                      uid: existing?.uid || uid,
+                      email: lic.email || existing?.email || "",
+                      displayName: existing?.displayName || lic.email?.split("@")[0] || "User",
+                      activeLicense: lic,
+                      isUnlimited: isUnl,
+                      licenseStatus: isUnl ? "lifetime" : (existing?.licenseStatus || "active"),
+                      status: isUnl ? "unlimited" : (existing?.status || "active"),
+                      expiresAt: lic.expiresAt || existing?.expiresAt || null,
+                      durationDays: isUnl ? "Unlimited" : (lic.durationDays || existing?.durationDays || 0),
+                    };
+                    existingCustMap.set(merged.uid, merged);
+                    if (licEmail) existingCustMap.set(licEmail, merged);
+                  });
+                }
+
+                const uniqueCustomers = [];
+                const seenUids = new Set();
+                for (const cust of existingCustMap.values()) {
+                  if (cust.uid && !seenUids.has(cust.uid)) {
+                    seenUids.add(cust.uid);
+                    uniqueCustomers.push(cust);
+                  }
+                }
+                adminOverviewData.customers = uniqueCustomers;
+              } catch (fsErr) {
+                console.debug("Firestore direct customer sync note:", fsErr?.message);
+              }
+            }
+
             if (lastSyncEl) {
               lastSyncEl.textContent = `Synced: ${new Date().toLocaleTimeString()}`;
             }
@@ -4037,7 +4122,15 @@
 
       // Render Customers Directory Table (Subtab 1 - Main Users Tab)
       function renderCustomersTable() {
-        if (!adminOverviewData) return;
+        const tbody = document.getElementById("admin-customers-tbody");
+        const cardsEl = document.getElementById("admin-customers-cards");
+
+        if (!adminOverviewData) {
+          if (tbody) tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--muted); padding: 24px;">🔄 Syncing customer records from gen-lang-client-0324946831...</td></tr>`;
+          if (cardsEl) cardsEl.innerHTML = `<div style="text-align: center; color: var(--muted); padding: 20px;">🔄 Syncing customer records...</div>`;
+          return;
+        }
+
         const allCustomers = adminOverviewData.customers || [];
 
         // Count chips

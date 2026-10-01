@@ -32,6 +32,15 @@ import {
   getOfficialLicensePrice,
 } from "./lib/referral.js";
 
+const origConsoleError = console.error;
+console.error = (...args) => {
+  const text = args.map((a) => (typeof a === "string" ? a : a?.message || "")).join(" ");
+  if (text.includes("Disconnecting idle stream") || text.includes("Timed out waiting for new targets")) {
+    return;
+  }
+  origConsoleError.apply(console, args);
+};
+
 process.on("uncaughtException", (error) => {
   logger.error("Process uncaught exception handled gracefully", error?.stack || error?.message);
 });
@@ -495,12 +504,13 @@ for (const p of prefixes) {
   // --------------------------------------------------------------------------
   app.get(`${p}/admin/overview`, requireAuth, requireAdmin, async (_request, response) => {
     try {
+      const authToken = _request.headers.authorization || null;
       const [licenses, numberLocks, referralAudit, whatsappList, fullUserRecords] = await Promise.all([
-        listAllLicenses(),
+        listAllLicenses(authToken),
         getAllNumberLocks(),
-        getAdminReferralAudit(),
+        getAdminReferralAudit(authToken),
         Promise.resolve(getAllWhatsAppStatuses()),
-        listAllUsersWithLicenses(),
+        listAllUsersWithLicenses(authToken),
       ]);
 
       const db = getFirebaseServerFirestore();
@@ -954,7 +964,7 @@ for (const p of prefixes) {
   // Admin: List all registered users and their licenses
   app.get(`${p}/admin/users`, requireAuth, requireAdmin, async (_request, response) => {
     try {
-      const users = await listAllUsersWithLicenses();
+      const users = await listAllUsersWithLicenses(_request.headers.authorization || null);
       response.json({ success: true, users, count: users.length });
     } catch (error) {
       logger.error("Admin list users error", error.stack || error.message);

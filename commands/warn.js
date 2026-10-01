@@ -48,25 +48,26 @@ export default async function warn({
   const reason = args.filter((a) => !a.startsWith("@")).join(" ").trim() || "Violation of group rules";
   const result = await addWarning(chatId, targetJid, userId, reason);
 
-  const mentions = [...new Set([targetJid, resolved.mentionJid].filter(Boolean))];
+  const adminClean = sender.split("@")[0].split(":")[0];
+  const mentions = [...new Set([targetJid, sender, resolved.mentionJid].filter(Boolean))];
 
   if (result.exceeded) {
     try {
       await sock.groupParticipantsUpdate(chatId, [targetJid], "remove");
       return reply(
-        `🚨 *Warning Threshold Exceeded:* @${targetClean} reached *${result.count}/${result.limit}* warnings and has been removed from the group.\n_Reason: ${reason}_`,
+        `🚨 *Warning Threshold Exceeded:* @${targetClean} reached *${result.count}/${result.limit}* warnings and has been removed from the group.\n_Action enforced on behalf of Admin: @${adminClean}_\n_Reason: ${reason}_`,
         { mentions }
       );
     } catch (err) {
       return reply(
-        `⚠️ @${targetClean} reached *${result.count}/${result.limit}* warnings. (Bot could not remove: ${err.message})`,
+        `⚠️ @${targetClean} reached *${result.count}/${result.limit}* warnings. (Bot could not remove: ${err.message})\n_Issued on behalf of Admin: @${adminClean}_`,
         { mentions }
       );
     }
   }
 
   return reply(
-    `⚠️ *Warning Issued:* @${targetClean} has been warned (*${result.count}/${result.limit}*).\n_Reason: ${reason}_\n_Reaching ${result.limit} warnings will result in removal._`,
+    `👮‍♂️ *Admin Warning Issued:* @${targetClean} has been warned (*${result.count}/${result.limit}*).\n_Issued by Admin: @${adminClean}_\n_Reason: ${reason}_\n_Reaching ${result.limit} warnings will result in removal from the group._`,
     { mentions }
   );
 }
