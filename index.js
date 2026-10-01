@@ -664,13 +664,20 @@ for (const p of prefixes) {
               createdAt: lic.redeemedAt || lic.createdAt || null,
             };
           }
-          if (!customersMap[uid].activeLicense || new Date(lic.expiresAt || 0) > new Date(customersMap[uid].activeLicense.expiresAt || 0)) {
+          const wasAlreadyUnlimited = Boolean(
+            customersMap[uid].isUnlimited ||
+            customersMap[uid].activeLicense?.isUnlimited ||
+            customersMap[uid].durationDays === "Unlimited"
+          );
+
+          if (!customersMap[uid].activeLicense || (!wasAlreadyUnlimited && new Date(lic.expiresAt || 0) > new Date(customersMap[uid].activeLicense.expiresAt || 0))) {
             customersMap[uid].activeLicense = {
               code: lic.code,
-              durationDays: lic.durationDays,
-              expiresAt: lic.expiresAt,
+              durationDays: wasAlreadyUnlimited ? "Unlimited" : lic.durationDays,
+              expiresAt: wasAlreadyUnlimited ? (customersMap[uid].activeLicense?.expiresAt || lic.expiresAt) : lic.expiresAt,
               redeemedAt: lic.redeemedAt,
-              status: lic.computedStatus,
+              status: wasAlreadyUnlimited ? "lifetime" : lic.computedStatus,
+              isUnlimited: wasAlreadyUnlimited,
             };
           }
         }
@@ -1080,30 +1087,28 @@ app.use((error, _request, response, _next) => {
   response.status(500).json({ error: "Internal server error." });
 });
 
-const PRIMARY_PORT = PORT;
-const SECONDARY_PORT = PRIMARY_PORT === 8000 ? 3000 : 8000;
+const PORTS_TO_LISTEN = Array.from(new Set([3000, 8000, PORT ? Number(PORT) : null].filter(Boolean)));
 
-const server = app.listen(PRIMARY_PORT, "0.0.0.0", () => {
-  logger.info("SOLVATECH BOT primary web server listening on port", String(PRIMARY_PORT));
-  restoreAllSessions().catch((error) => {
-    logger.warn("Auto-restore session error", error.message);
-  });
-  // Audit active WhatsApp sessions every 30 seconds for license expiry and smooth reconnection
-  setInterval(() => {
-    auditActiveSessions().catch((err) => {
-      logger.debug("Background license audit notice", err.message);
+for (const listenPort of PORTS_TO_LISTEN) {
+  try {
+    const s = app.listen(listenPort, "0.0.0.0", () => {
+      logger.info(`SOLVATECH BOT web server listening on port ${listenPort} (0.0.0.0)`);
     });
-  }, 30000).unref();
+    s.on("error", (err) => {
+      logger.warn(`Port ${listenPort} note: ${err.message}`);
+    });
+  } catch (err) {
+    logger.warn(`Could not start server on port ${listenPort}: ${err.message}`);
+  }
+}
+
+// Background auto-restore & license audits
+restoreAllSessions().catch((error) => {
+  logger.warn("Auto-restore session error", error.message);
 });
 
-// Also bind secondary port so both port 3000 and port 8000 work seamlessly
-try {
-  const secondaryServer = app.listen(SECONDARY_PORT, "0.0.0.0", () => {
-    logger.info("SOLVATECH BOT secondary web server also listening on port", String(SECONDARY_PORT));
+setInterval(() => {
+  auditActiveSessions().catch((err) => {
+    logger.debug("Background license audit notice", err.message);
   });
-  secondaryServer.on("error", (err) => {
-    logger.debug(`Secondary port ${SECONDARY_PORT} note: ${err.message}`);
-  });
-} catch (err) {
-  logger.debug(`Could not start secondary server on port ${SECONDARY_PORT}: ${err.message}`);
-}
+}, 30000).unref();

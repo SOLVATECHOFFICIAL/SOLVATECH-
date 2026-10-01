@@ -68,6 +68,18 @@
     <link rel="stylesheet" href="./style.css" />
     <link rel="stylesheet" href="./pairing-enhancements.css" />
     <link rel="stylesheet" href="./admin-dashboard.css" />
+    <script>
+      (function() {
+        try {
+          const hasToken = localStorage.getItem("solvatech_user_token") || 
+                           localStorage.getItem("solvatech_preview_token") || 
+                           sessionStorage.getItem("solvatech_preview_token");
+          if (hasToken) {
+            document.documentElement.classList.add("auth-pre-active");
+          }
+        } catch {}
+      })();
+    </script>
     <style>
       /* Immediate render guard: Prevent any unstyled splash or giant image flash on load / refresh */
       #pwa-splash, .pwa-splash {
@@ -90,10 +102,32 @@
         height: 100% !important;
         object-fit: cover;
       }
+      .hero-image-wrap {
+        width: 80px !important;
+        height: 80px !important;
+        max-width: 80px !important;
+        max-height: 80px !important;
+        overflow: hidden !important;
+        border-radius: 16px !important;
+        flex-shrink: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+      }
       .hero-image {
-        width: 100% !important;
-        height: 100% !important;
-        object-fit: cover;
+        width: 80px !important;
+        height: 80px !important;
+        max-width: 80px !important;
+        max-height: 80px !important;
+        object-fit: cover !important;
+        border-radius: 14px !important;
+        display: block !important;
+      }
+      html.auth-pre-active #auth-view {
+        display: none !important;
+      }
+      html.auth-pre-active #dashboard-view {
+        display: block !important;
       }
     </style>
   </head>
@@ -1322,8 +1356,8 @@
         messagingSenderId: "420914651308",
       };
 
-      const ADMIN_EMAILS = ["awoyinfasolomon1@gmail.com", "solomontech00@gmail.com"];
-      const ADMIN_EMAIL = "awoyinfasolomon1@gmail.com";
+      const ADMIN_EMAILS = ["awoyinfasolomon1@gmail.com", "solomontech00@gmail.com", "king1solomon3t@gmail.com"];
+      const ADMIN_EMAIL = "king1solomon3t@gmail.com";
       function isUserAdminEmail(email) {
         if (!email || typeof email !== "string") return false;
         return ADMIN_EMAILS.includes(email.trim().toLowerCase());
@@ -3585,7 +3619,7 @@
 
       // Primary Admin Data Fetcher
       async function loadAdminOverview() {
-        if (!currentUser || currentUser.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) return;
+        if (!currentUser || !isUserAdminEmail(currentUser.email)) return;
 
         const lastSyncEl = document.getElementById("admin-last-sync-time");
         if (lastSyncEl) lastSyncEl.textContent = "Syncing with cloud...";
@@ -4998,7 +5032,7 @@
 
       // 3. Admin Referral Audit Loader
       async function loadAdminReferrals() {
-        if (!currentUser || currentUser.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) return;
+        if (!currentUser || !isUserAdminEmail(currentUser.email)) return;
 
         try {
           let authHeader = await getAuthHeader();
