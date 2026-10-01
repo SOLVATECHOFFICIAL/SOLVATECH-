@@ -395,7 +395,43 @@
                 </form>
 
                 <div id="code-panel" class="code-panel hidden">
-                  <div class="code-heading"><span>YOUR PAIRING CODE</span><span id="code-timer" class="code-timer">EXPIRES IN 5:00</span></div>
+                  <!-- AUTHENTIC WHATSAPP PUSH NOTIFICATION ALERT -->
+                  <div id="wa-notification-alert" class="wa-push-notification-card" role="alert">
+                    <div class="wa-push-card-header">
+                      <div class="wa-push-app-badge">
+                        <svg class="wa-icon-svg" viewBox="0 0 24 24" width="20" height="20" fill="none">
+                          <circle cx="12" cy="12" r="11" fill="#25D366"/>
+                          <path d="M17.5 14.3c-.2-.1-1.3-.7-1.5-.8-.2-.1-.4-.1-.5.1-.2.2-.6.8-.7.9-.1.1-.3.2-.5.1-.2-.1-1-.4-1.9-1.2-.7-.6-1.2-1.4-1.3-1.6-.1-.2 0-.4.1-.5.1-.1.2-.3.3-.4.1-.1.1-.2.2-.4.1-.1 0-.3 0-.4s-.5-1.3-.7-1.8c-.2-.5-.4-.4-.5-.4h-.5c-.2 0-.5.1-.7.3-.2.3-.9.9-.9 2.2s.9 2.5 1 2.7c.1.2 1.8 2.8 4.4 3.9.6.3 1.1.4 1.5.3.4-.1 1.3-.5 1.5-1.1.2-.5.2-1 .1-1.1-.1-.1-.3-.2-.5-.3z" fill="#FFF"/>
+                        </svg>
+                        <span class="wa-push-app-title">WhatsApp</span>
+                        <span class="wa-push-dot">•</span>
+                        <span class="wa-push-time">Notification Sent to Phone</span>
+                      </div>
+                      <span class="wa-push-pill">SIM Verification</span>
+                    </div>
+
+                    <div class="wa-push-card-body">
+                      <div class="wa-push-headline">
+                        <span>🔔</span>
+                        <strong>"Are you trying to link a device?"</strong>
+                      </div>
+                      <p class="wa-push-desc">
+                        WhatsApp notification dispatched to <strong id="wa-notif-target-phone">+234...</strong>. Check your phone's notification bar or WhatsApp:
+                      </p>
+                      <div class="wa-push-steps-box">
+                        <div class="wa-push-step"><span class="wa-step-dot">1</span> Check notification: <em>"Enter code to link a new device"</em></div>
+                        <div class="wa-push-step"><span class="wa-step-dot">2</span> Or open <strong>WhatsApp → Settings / ⋮ → Linked Devices → Link a Device</strong></div>
+                        <div class="wa-push-step"><span class="wa-step-dot">3</span> Tap <strong>"Link with phone number instead"</strong> and enter this code:</div>
+                      </div>
+                      <div class="wa-push-code-hero">
+                        <span id="wa-notif-hero-code" class="wa-hero-code-text">——</span>
+                        <button type="button" id="wa-copy-hero-btn" class="wa-hero-copy-btn">📋 Copy Code</button>
+                        <a id="wa-direct-open-link" href="whatsapp://" class="wa-hero-open-btn">📱 Open WhatsApp</a>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="code-heading"><span>YOUR PAIRING CODE</span><span id="code-timer" class="code-timer">EXPIRES IN 2:20</span></div>
                   <div class="code-value-row"><strong id="pair-code">—</strong><button id="copy-code" class="copy-button" type="button">Copy code</button></div>
                   <div id="pairing-for" class="pairing-for"></div>
                   <p>Open WhatsApp → Linked Devices → Link a device → Link with phone number. Enter this 8-character code, then keep this tab open while pairing completes.</p>
@@ -2039,6 +2075,88 @@
         timerId = setInterval(tick, 1000);
       }
 
+      // =========================================================================
+      // REAL WHATSAPP PUSH NOTIFICATION SIMULATION & ALERTS
+      // =========================================================================
+      let lastNotifiedPairingCode = "";
+      function triggerWhatsAppLinkingNotification(phoneNumber, pairingCode) {
+        if (!phoneNumber || !pairingCode || pairingCode === "—") return;
+        const cleanCodeStr = String(pairingCode).trim();
+        const cleanPhoneStr = String(phoneNumber).replace(/\D+/g, "");
+
+        const waTargetPhone = $("wa-notif-target-phone");
+        const waHeroCode = $("wa-notif-hero-code");
+        const waAlert = $("wa-notification-alert");
+        const waCopyHeroBtn = $("wa-copy-hero-btn");
+        const waDirectOpen = $("wa-direct-open-link");
+
+        if (waTargetPhone) waTargetPhone.textContent = `+${cleanPhoneStr}`;
+        if (waHeroCode) waHeroCode.textContent = cleanCodeStr;
+        if (waAlert) waAlert.classList.remove("hidden");
+
+        if (waCopyHeroBtn) {
+          waCopyHeroBtn.onclick = async () => {
+            try {
+              await navigator.clipboard.writeText(cleanCodeStr);
+              waCopyHeroBtn.textContent = "✓ Copied!";
+              setTimeout(() => { waCopyHeroBtn.textContent = "📋 Copy Code"; }, 2500);
+            } catch {}
+          };
+        }
+
+        if (lastNotifiedPairingCode === cleanCodeStr) return;
+        lastNotifiedPairingCode = cleanCodeStr;
+
+        // 1. Audio chime tone (pleasant two-tone push notification sound)
+        try {
+          const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
+          osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.1); // A5
+          gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.35);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.35);
+        } catch {}
+
+        // 2. Mobile vibration (two short pulses)
+        try {
+          if (navigator.vibrate) {
+            navigator.vibrate([160, 90, 160]);
+          }
+        } catch {}
+
+        // 3. Native Browser / Device Push Notification
+        try {
+          if ("Notification" in window) {
+            const notifTitle = "WhatsApp • Are you trying to link a device?";
+            const notifBody = `Enter code ${cleanCodeStr} on +${cleanPhoneStr} to confirm this is your phone number.`;
+            if (Notification.permission === "granted") {
+              new Notification(notifTitle, {
+                body: notifBody,
+                icon: "./solva.webp",
+                tag: "wa-pairing-" + cleanPhoneStr,
+                requireInteraction: true
+              });
+            } else if (Notification.permission === "default") {
+              Notification.requestPermission().then((perm) => {
+                if (perm === "granted") {
+                  new Notification(notifTitle, {
+                    body: notifBody,
+                    icon: "./solva.webp",
+                    tag: "wa-pairing-" + cleanPhoneStr
+                  });
+                }
+              });
+            }
+          }
+        } catch {}
+      }
+
       async function getValidIdToken(forceRefresh = false) {
         if (!currentUser) {
           const stored = sessionStorage.getItem("solvatech_preview_token") || localStorage.getItem("solvatech_preview_token");
@@ -2198,6 +2316,9 @@
           try { localStorage.removeItem("solvatech_active_pairing"); } catch {}
           if (timerId) clearInterval(timerId);
           if (codePanel) codePanel.classList.add("hidden");
+          const waAlert = $("wa-notification-alert");
+          if (waAlert) waAlert.classList.add("hidden");
+          lastNotifiedPairingCode = "";
           if (button) {
             button.disabled = false;
             button.textContent = "Get Pairing Code →";
@@ -2209,6 +2330,7 @@
             pairingFor.textContent = `LINKING FOR +${activePairingNumber}`;
           }
           if (codePanel) codePanel.classList.remove("hidden", "expired");
+          triggerWhatsAppLinkingNotification(activePairingNumber, activePairingCode);
           if (!timerId && activePairingExpires) {
             const secLeft = Math.max(10, Math.floor((activePairingExpires - Date.now()) / 1000));
             startTimer(secLeft);
@@ -2855,11 +2977,14 @@
             }
 
             pairingActive = true;
-            if (code) code.textContent = data.code || data.pairingCode || "—";
-            if (pairingFor) pairingFor.textContent = `LINKING FOR +${data.pairingNumber || formattedNumber}`;
+            const finalPairingCode = data.code || data.pairingCode || "—";
+            const finalPairingNum = data.pairingNumber || formattedNumber;
+            if (code) code.textContent = finalPairingCode;
+            if (pairingFor) pairingFor.textContent = `LINKING FOR +${finalPairingNum}`;
             if (codePanel) {
               codePanel.classList.remove("hidden", "expired");
             }
+            triggerWhatsAppLinkingNotification(finalPairingNum, finalPairingCode);
             const expTime = data.expiresAt || (Date.now() + 300000);
             try {
               localStorage.setItem("solvatech_active_pairing", JSON.stringify({

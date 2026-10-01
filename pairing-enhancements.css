@@ -64,3 +64,181 @@
     grid-template-columns: 1fr 1fr;
   }
 }
+
+/* =========================================================================
+   AUTHENTIC WHATSAPP PUSH NOTIFICATION SIMULATION CARD
+   ========================================================================= */
+.wa-push-notification-card {
+  margin-top: 14px;
+  margin-bottom: 12px;
+  background: linear-gradient(135deg, rgba(37, 211, 102, 0.08) 0%, rgba(18, 140, 126, 0.04) 100%);
+  border: 1.5px solid rgba(37, 211, 102, 0.4);
+  border-radius: 14px;
+  padding: 14px 16px;
+  box-shadow: 0 4px 16px -2px rgba(37, 211, 102, 0.15), 0 2px 6px rgba(0, 0, 0, 0.05);
+  animation: waNotificationSlideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transition: all 0.2s ease;
+}
+
+@keyframes waNotificationSlideDown {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.wa-push-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.wa-push-app-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #128c7e;
+}
+
+.wa-push-dot {
+  opacity: 0.5;
+  font-size: 12px;
+}
+
+.wa-push-time {
+  font-size: 11px;
+  font-weight: 500;
+  color: #059669;
+  background: rgba(16, 185, 129, 0.15);
+  padding: 2px 7px;
+  border-radius: 999px;
+  animation: waPulseGreen 2s infinite ease-in-out;
+}
+
+@keyframes waPulseGreen {
+  0%, 100% { opacity: 0.9; }
+  50% { opacity: 0.55; }
+}
+
+.wa-push-pill {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(37, 211, 102, 0.2);
+  color: #047857;
+  border: 1px solid rgba(37, 211, 102, 0.3);
+}
+
+.wa-push-headline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 6px;
+}
+
+.wa-push-desc {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: #334155;
+  margin-bottom: 10px;
+}
+
+.wa-push-steps-box {
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px dashed rgba(37, 211, 102, 0.45);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: #1e293b;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.wa-push-step {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.wa-step-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: #25d366;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.wa-push-code-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: #0f172a;
+  border-radius: 10px;
+  padding: 8px 12px;
+  flex-wrap: wrap;
+}
+
+.wa-hero-code-text {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: #25d366;
+}
+
+.wa-hero-copy-btn, .wa-hero-open-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 11px;
+  border-radius: 7px;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.wa-hero-copy-btn {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+.wa-hero-copy-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.wa-hero-open-btn {
+  background: #25d366;
+  color: #0b141a;
+}
+
+.wa-hero-open-btn:hover {
+  background: #20bd5a;
+  transform: translateY(-1px);
+}
