@@ -1356,8 +1356,8 @@
         messagingSenderId: "420914651308",
       };
 
-      const ADMIN_EMAILS = ["awoyinfasolomon1@gmail.com", "solomontech00@gmail.com", "king1solomon3t@gmail.com", "relaxj550@gmail.com"];
-      const ADMIN_EMAIL = "king1solomon3t@gmail.com";
+      const ADMIN_EMAILS = ["awoyinfasolomon1@gmail.com"];
+      const ADMIN_EMAIL = "awoyinfasolomon1@gmail.com";
       function isUserAdminEmail(email) {
         if (!email || typeof email !== "string") return false;
         return ADMIN_EMAILS.includes(email.trim().toLowerCase());
@@ -1416,6 +1416,7 @@
       // =========================================================================
       // DYNAMIC GLOBAL PRODUCTION BACKEND (STORED IN FIRESTORE FOR EVERYONE GLOBALLY)
       // =========================================================================
+      let backendUnsubscribe = null;
       async function fetchBackendUrlFromFirestore() {
         if (!db) return;
         try {
@@ -1441,6 +1442,24 @@
               syncRailwayInputs();
               testBackendHealth(false);
             }
+          }
+
+          // Real-time listener: all users on solvatech.name.ng immediately pick up any admin changes in the background
+          if (!backendUnsubscribe && typeof onSnapshot === "function") {
+            backendUnsubscribe = onSnapshot(doc(db, "system_config", "backend"), (snap) => {
+              if (snap.exists()) {
+                const liveUrl = String(snap.data()?.railwayUrl || snap.data()?.url || "").trim().replace(/\/+$/, "");
+                if (liveUrl && liveUrl.startsWith("http") && liveUrl !== customApiUrl) {
+                  console.log("[Global Backend Sync] Updated to new admin backend:", liveUrl);
+                  customApiUrl = liveUrl;
+                  try { localStorage.setItem("solvatech_backend_url", liveUrl); } catch (e) {}
+                  syncRailwayInputs();
+                  testBackendHealth(false);
+                }
+              }
+            }, (err) => {
+              console.debug("Backend URL onSnapshot notice:", err.message);
+            });
           }
         } catch (err) {
           console.debug("Firestore backend URL lookup notice:", err.message);
@@ -3446,6 +3465,9 @@
           if (val === "custom") {
             if (adminCustomDaysWrap) adminCustomDaysWrap.classList.remove("hidden");
             selectedAdminDays = "custom";
+          } else if (val === "Unlimited" || val === "unlimited") {
+            if (adminCustomDaysWrap) adminCustomDaysWrap.classList.add("hidden");
+            selectedAdminDays = "Unlimited";
           } else {
             if (adminCustomDaysWrap) adminCustomDaysWrap.classList.add("hidden");
             selectedAdminDays = parseInt(val, 10);
@@ -3459,10 +3481,10 @@
           let days = selectedAdminDays;
           if (days === "custom") {
             days = parseInt(adminCustomDaysInput?.value, 10);
-            if (isNaN(days) || days <= 0 || days > 365) {
+            if (isNaN(days) || days <= 0 || days > 36500) {
               if (adminGenerateMsg) {
                 adminGenerateMsg.className = "license-msg error";
-                adminGenerateMsg.textContent = "Please enter valid custom days between 1 and 365.";
+                adminGenerateMsg.textContent = "Please enter valid custom days between 1 and 36,500.";
                 adminGenerateMsg.classList.remove("hidden");
               }
               return;
@@ -3842,7 +3864,15 @@
                     const u = d.data() || {};
                     const uEmail = (u.email || "").toLowerCase();
                     const existing = existingCustMap.get(d.id) || (uEmail ? existingCustMap.get(uEmail) : null);
-                    const isUnl = Boolean(existing?.isUnlimited || u.isUnlimited || u.activeLicense?.isUnlimited || u.durationDays === "Unlimited");
+                    let isUnl = false;
+                    if (u.isUnlimited === false || u.activeLicense?.isUnlimited === false) {
+                      isUnl = false;
+                    } else if (u.isUnlimited === true || u.activeLicense?.isUnlimited === true || u.durationDays === "Unlimited" || u.licenseStatus === "lifetime") {
+                      isUnl = true;
+                    } else {
+                      isUnl = Boolean(existing?.isUnlimited);
+                    }
+
                     const merged = {
                       ...(existing || {}),
                       uid: d.id,
@@ -3852,8 +3882,8 @@
                       createdAt: u.createdAt || existing?.createdAt || null,
                       isUnlimited: isUnl,
                       activeLicense: u.activeLicense || existing?.activeLicense || null,
-                      licenseStatus: isUnl ? "lifetime" : (existing?.licenseStatus || "active"),
-                      status: isUnl ? "unlimited" : (existing?.status || "active"),
+                      licenseStatus: isUnl ? "lifetime" : (u.licenseStatus || existing?.licenseStatus || "active"),
+                      status: isUnl ? "unlimited" : (u.status || existing?.status || "active"),
                     };
                     existingCustMap.set(d.id, merged);
                     if (uEmail) existingCustMap.set(uEmail, merged);
@@ -3866,7 +3896,15 @@
                     const uid = d.id;
                     const licEmail = (lic.email || "").toLowerCase();
                     const existing = existingCustMap.get(uid) || (licEmail ? existingCustMap.get(licEmail) : null);
-                    const isUnl = Boolean(existing?.isUnlimited || lic.isUnlimited || lic.durationDays === "Unlimited");
+                    let isUnl = false;
+                    if (lic.isUnlimited === false) {
+                      isUnl = false;
+                    } else if (lic.isUnlimited === true || lic.durationDays === "Unlimited" || lic.status === "unlimited") {
+                      isUnl = true;
+                    } else {
+                      isUnl = Boolean(existing?.isUnlimited);
+                    }
+
                     const merged = {
                       ...(existing || {}),
                       uid: existing?.uid || uid,
@@ -3874,8 +3912,8 @@
                       displayName: existing?.displayName || lic.email?.split("@")[0] || "User",
                       activeLicense: lic,
                       isUnlimited: isUnl,
-                      licenseStatus: isUnl ? "lifetime" : (existing?.licenseStatus || "active"),
-                      status: isUnl ? "unlimited" : (existing?.status || "active"),
+                      licenseStatus: isUnl ? "lifetime" : (lic.status === "active" ? "active" : (existing?.licenseStatus || "active")),
+                      status: isUnl ? "unlimited" : (lic.status || existing?.status || "active"),
                       expiresAt: lic.expiresAt || existing?.expiresAt || null,
                       durationDays: isUnl ? "Unlimited" : (lic.durationDays || existing?.durationDays || 0),
                     };
@@ -4542,6 +4580,29 @@
 
           const data = await safeFetchJson(res);
           if (!res.ok) throw new Error(data.error || "Failed to update user unlimited status.");
+
+          // Direct Firestore sync
+          if (db) {
+            try {
+              await Promise.all([
+                setDoc(doc(db, "user_licenses", uid), { isUnlimited: Boolean(isUnlimited), durationDays: isUnlimited ? "Unlimited" : 0 }, { merge: true }),
+                setDoc(doc(db, "users", uid), { isUnlimited: Boolean(isUnlimited), "activeLicense.isUnlimited": Boolean(isUnlimited) }, { merge: true }),
+              ]);
+            } catch (e) {}
+          }
+
+          // Immediate local state update
+          if (adminOverviewData && Array.isArray(adminOverviewData.customers)) {
+            const found = adminOverviewData.customers.find((c) => c.uid === uid);
+            if (found) {
+              found.isUnlimited = Boolean(isUnlimited);
+              if (found.activeLicense) found.activeLicense.isUnlimited = Boolean(isUnlimited);
+              found.licenseStatus = isUnlimited ? "lifetime" : "active";
+              found.status = isUnlimited ? "unlimited" : "active";
+            }
+            renderAdminDashboard();
+          }
+
           alert(`✓ Success: User unlimited status has been ${isUnlimited ? "ACTIVATED (Normal days safely preserved)" : "DEACTIVATED (Reverted to preserved normal days)"}!`);
           await loadAdminOverview();
         } catch (err) {

@@ -959,16 +959,17 @@ for (const p of prefixes) {
   app.post(`${p}/admin/licenses/generate`, requireAuth, requireAdmin, async (request, response) => {
     try {
       const days = request.body?.days;
-      if (!days || (days !== "Unlimited" && (isNaN(Number(days)) || Number(days) <= 0))) {
+      const isUnl = days === "Unlimited" || days === "unlimited" || String(days).toLowerCase() === "lifetime";
+      if (!days || (!isUnl && (isNaN(Number(days)) || Number(days) <= 0))) {
         return response.status(400).json({ error: "Valid duration in days is required (1-365 or Unlimited)." });
       }
 
-      const created = await createLicenseRecord(days === "Unlimited" ? 36500 : days, request.auth.email, request.headers.authorization);
-      logger.info(`Admin generated new ${days}-day license: ${created.code}`);
+      const created = await createLicenseRecord(isUnl ? "Unlimited" : days, request.auth.email, request.headers.authorization);
+      logger.info(`Admin generated new ${isUnl ? "Unlimited" : `${days}-day`} license: ${created.code}`);
       response.json({
         success: true,
         license: created,
-        message: `Successfully generated ${days}-day license code.`,
+        message: `Successfully generated ${isUnl ? "Unlimited Lifetime" : `${days}-day`} license code.`,
       });
     } catch (error) {
       logger.error("Admin generate license error", error.stack || error.message);

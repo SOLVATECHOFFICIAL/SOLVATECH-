@@ -17,12 +17,13 @@ ENV NODE_ENV=production
 ENV BOT_DATA_DIR=/app/runtime
 ENV BOT_API_PREFIX=/bot-api
 ENV PORT=3000
-ENV FIREBASE_PROJECT_ID=glass-intelligence-253bd
-ENV FIREBASE_API_KEY=AIzaSyAmZp-Prdc74empcjYFv9PdFLagiN-to2c
-ENV FIREBASE_AUTH_DOMAIN=glass-intelligence-253bd.firebaseapp.com
-ENV FIREBASE_DATABASE_ID=ai-studio-remixwhatsappbot-d845e0aa-da32-4907-811f-9be97b2c6851
-ENV FIREBASE_STORAGE_BUCKET=glass-intelligence-253bd.firebasestorage.app
-ENV FIREBASE_APP_ID=1:91117675798:web:97ae27becca017177a5c37
+ENV ADMIN_EMAIL=awoyinfasolomon1@gmail.com
+ENV FIREBASE_PROJECT_ID=gen-lang-client-0324946831
+ENV FIREBASE_API_KEY=AIzaSyA_g2ek4ziXSE9m4VD5-5PfKpKJjAobYFg
+ENV FIREBASE_AUTH_DOMAIN=gen-lang-client-0324946831.firebaseapp.com
+ENV FIREBASE_DATABASE_ID=ai-studio-whatsappbot-da9a52de-41e7-4365-a5b4-8aec9332642c
+ENV FIREBASE_STORAGE_BUCKET=gen-lang-client-0324946831.firebasestorage.app
+ENV FIREBASE_APP_ID=1:420914651308:web:ae4cb5d7632401c1a83f09
 
 EXPOSE 3000 8000
 
