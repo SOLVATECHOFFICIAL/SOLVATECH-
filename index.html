@@ -1400,48 +1400,50 @@
       }
 
       const FALLBACK_PRODUCTION_BACKEND = "https://web-production-c6f21.up.railway.app";
-      const isSelfHosted = !window.location.hostname.includes("github.io");
-      const DEFAULT_BACKEND_URL = window.location.origin;
-      let customApiUrl = isSelfHosted ? "" : (localStorage.getItem("solvatech_backend_url") || "");
-      if (isSelfHosted) {
-        try { localStorage.removeItem("solvatech_backend_url"); } catch (e) {}
-      } else if (customApiUrl && (
+      let customApiUrl = localStorage.getItem("solvatech_backend_url") || FALLBACK_PRODUCTION_BACKEND;
+      if (customApiUrl && (
         customApiUrl.includes("3c1de8") ||
         customApiUrl.includes("215ab") ||
-        customApiUrl.includes("localhost:5000") ||
-        customApiUrl.includes(window.location.hostname) ||
-        customApiUrl.includes("solvatech.name.ng") ||
-        customApiUrl.includes("github.io")
+        customApiUrl.includes("localhost:5000")
       )) {
         try { localStorage.removeItem("solvatech_backend_url"); } catch (e) {}
-        customApiUrl = "";
+        customApiUrl = FALLBACK_PRODUCTION_BACKEND;
       }
+
+      function getActiveBackendUrl() {
+        return (customApiUrl || FALLBACK_PRODUCTION_BACKEND).replace(/\/$/, "");
+      }
+
       function getApiUrl(endpoint) {
-        let baseUrl = (isSelfHosted ? window.location.origin : (customApiUrl || DEFAULT_BACKEND_URL)).replace(/\/$/, "");
+        let baseUrl = getActiveBackendUrl();
         const cleanEndpoint = endpoint.startsWith("/bot-api") ? endpoint.replace(/^\/bot-api/, "") : endpoint;
         return `${baseUrl}/bot-api${cleanEndpoint.startsWith("/") ? cleanEndpoint : "/" + cleanEndpoint}`;
       }
 
       // =========================================================================
-      // DYNAMIC BACKEND & SECRETS CONTROLLER (STORED IN FIRESTORE)
+      // DYNAMIC GLOBAL PRODUCTION BACKEND (STORED IN FIRESTORE FOR EVERYONE GLOBALLY)
       // =========================================================================
-      function getActiveBackendUrl() {
-        return (isSelfHosted ? window.location.origin : (customApiUrl || DEFAULT_BACKEND_URL)).replace(/\/$/, "");
-      }
-
       async function fetchBackendUrlFromFirestore() {
-        if (!db || isSelfHosted) return;
+        if (!db) return;
         try {
-          const snap = await getDoc(doc(db, "system_config", "backend"));
-          if (snap.exists() && snap.data()?.railwayUrl) {
-            const remoteUrl = snap.data().railwayUrl.replace(/\/+$/, "");
-            if (remoteUrl && remoteUrl.startsWith("http")) {
-              if (remoteUrl !== customApiUrl) {
-                customApiUrl = remoteUrl;
-                try { localStorage.setItem("solvatech_backend_url", remoteUrl); } catch (e) {}
-                syncRailwayInputs();
-                testBackendHealth(false);
-              }
+          const [backendSnap, railwaySnap] = await Promise.all([
+            getDoc(doc(db, "system_config", "backend")).catch(() => null),
+            getDoc(doc(db, "system_config", "railway")).catch(() => null)
+          ]);
+          let remoteUrl = "";
+          if (backendSnap && backendSnap.exists()) {
+            remoteUrl = backendSnap.data()?.railwayUrl || backendSnap.data()?.url || "";
+          }
+          if (!remoteUrl && railwaySnap && railwaySnap.exists()) {
+            remoteUrl = railwaySnap.data()?.url || railwaySnap.data()?.railwayUrl || "";
+          }
+          remoteUrl = String(remoteUrl || "").trim().replace(/\/+$/, "");
+          if (remoteUrl && remoteUrl.startsWith("http")) {
+            if (remoteUrl !== customApiUrl) {
+              customApiUrl = remoteUrl;
+              try { localStorage.setItem("solvatech_backend_url", remoteUrl); } catch (e) {}
+              syncRailwayInputs();
+              testBackendHealth(false);
             }
           }
         } catch (err) {
@@ -2783,6 +2785,7 @@
             localStorage.removeItem("solvatech_preview_token");
             localStorage.removeItem("solvatech_preview_user");
             renderAuthState(user);
+            fetchBackendUrlFromFirestore();
           } else {
             const previewToken = sessionStorage.getItem("solvatech_preview_token") || localStorage.getItem("solvatech_preview_token");
             const previewUserStr = sessionStorage.getItem("solvatech_preview_user") || localStorage.getItem("solvatech_preview_user");
