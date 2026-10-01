@@ -16,6 +16,7 @@ import {
   getUserLicenseStatus,
   listAllUsersWithLicenses,
   toggleUserUnlimitedStatus,
+  deleteUserFromSystem,
   addUnlimitedUserByEmail,
   grantUserCustomDays,
   deleteLicenseKey,
@@ -651,13 +652,14 @@ for (const p of prefixes) {
       // 2. Merge Firestore users
       for (const [uid, uData] of Object.entries(firestoreUsers)) {
         const existing = customersMap[uid] || { uid };
+        const isExplicitlyRevoked = existing.isUnlimited === false || uData.isUnlimited === false || uData.activeLicense?.isUnlimited === false;
         customersMap[uid] = {
           ...existing,
           email: uData.email || existing.email || "",
           displayName: uData.displayName || existing.displayName || "",
           photoURL: uData.photoURL || existing.photoURL || "",
           createdAt: uData.createdAt || uData.joinedAt || existing.createdAt || null,
-          isUnlimited: Boolean(existing.isUnlimited || uData.isUnlimited || uData.activeLicense?.isUnlimited),
+          isUnlimited: isExplicitlyRevoked ? false : Boolean(existing.isUnlimited || uData.isUnlimited || uData.activeLicense?.isUnlimited),
           activeLicense: existing.activeLicense || uData.activeLicense || null,
         };
       }
@@ -716,17 +718,15 @@ for (const p of prefixes) {
           isAdminEmail(cust.uid)
         );
         const lic = cust.activeLicense || {};
-        const isUnlimited = Boolean(
-          isOwnerAdmin ||
+        const isExplicitlyRevoked = cust.isUnlimited === false || lic.isUnlimited === false;
+        const isUnlimited = isOwnerAdmin || (!isExplicitlyRevoked && Boolean(
           cust.isUnlimited ||
+          lic.isUnlimited ||
           cust.licenseStatus === "lifetime" ||
           cust.licenseStatus === "unlimited" ||
-          lic.isUnlimited ||
-          lic.durationDays === "Unlimited" ||
-          cust.durationDays === "Unlimited" ||
-          Number(lic.durationDays) >= 9999 ||
-          Number(cust.durationDays) >= 9999
-        );
+          (lic.durationDays === "Unlimited" && lic.isUnlimited !== false) ||
+          (cust.durationDays === "Unlimited" && cust.isUnlimited !== false)
+        ));
 
         let licenseStatus = "none";
         let remainingMs = null;
@@ -984,6 +984,21 @@ for (const p of prefixes) {
     } catch (error) {
       logger.error("Admin toggle unlimited error", error.stack || error.message);
       response.status(500).json({ error: error.message || "Failed to toggle unlimited status." });
+    }
+  });
+
+  // Admin: Completely delete a user from customer / license lists
+  app.post(`${p}/admin/users/delete`, requireAuth, requireAdmin, async (request, response) => {
+    try {
+      const { uid } = request.body || {};
+      if (!uid) {
+        return response.status(400).json({ error: "User UID is required." });
+      }
+      const result = await deleteUserFromSystem(uid, request.auth.email, request.headers.authorization);
+      response.json({ success: true, ...result, message: "User completely removed from system." });
+    } catch (error) {
+      logger.error("Admin delete user error", error.stack || error.message);
+      response.status(500).json({ error: error.message || "Failed to delete user." });
     }
   });
 

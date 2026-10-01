@@ -1356,7 +1356,7 @@
         messagingSenderId: "420914651308",
       };
 
-      const ADMIN_EMAILS = ["awoyinfasolomon1@gmail.com", "solomontech00@gmail.com", "king1solomon3t@gmail.com"];
+      const ADMIN_EMAILS = ["awoyinfasolomon1@gmail.com", "solomontech00@gmail.com", "king1solomon3t@gmail.com", "relaxj550@gmail.com"];
       const ADMIN_EMAIL = "king1solomon3t@gmail.com";
       function isUserAdminEmail(email) {
         if (!email || typeof email !== "string") return false;
@@ -2746,7 +2746,7 @@
 
           if (button) {
             button.disabled = true;
-            button.innerHTML = '<span class="button-loading"><i></i>Opening socket…</span>';
+            button.innerHTML = '<span class="button-loading"><i></i>Connecting to WhatsApp gateway (waiting for Baileys pairing code)…</span>';
           }
 
           try {
@@ -4105,18 +4105,15 @@
 
       function isLifetimeCustomer(cust) {
         if (!cust) return false;
+        if (cust.uid === "admin" || cust.isAdmin) return true;
+        if (cust.isUnlimited === false || cust.activeLicense?.isUnlimited === false) return false;
         return Boolean(
-          cust.uid === "admin" ||
-          cust.isAdmin ||
           cust.isUnlimited ||
           cust.licenseStatus === "lifetime" ||
           cust.licenseStatus === "unlimited" ||
-          cust.status === "unlimited" ||
           cust.activeLicense?.isUnlimited ||
           cust.activeLicense?.durationDays === "Unlimited" ||
-          cust.durationDays === "Unlimited" ||
-          Number(cust.activeLicense?.durationDays) >= 9999 ||
-          Number(cust.durationDays) >= 9999
+          cust.durationDays === "Unlimited"
         );
       }
 
@@ -4253,6 +4250,9 @@
                       <button type="button" class="admin-action-btn" style="background:#f1f5f9; color:#334155; border-color:#cbd5e1;" onclick="adminGrantDaysPrompt('${cust.uid}', '${cust.email || ''}')">
                         ➕ Grant Days
                       </button>
+                      <button type="button" class="admin-action-btn" style="background:#fef2f2; color:#b91c1c; border-color:#fecaca;" onclick="adminDeleteUser('${cust.uid}', '${cust.email || ''}')" title="Completely remove customer record">
+                        🗑️ Remove
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -4385,7 +4385,42 @@
           const data = await safeFetchJson(res);
           if (!res.ok) throw new Error(data.error || "Failed to update user unlimited status.");
           alert(`✓ Success: User unlimited status has been ${isUnlimited ? "ACTIVATED (Normal days safely preserved)" : "DEACTIVATED (Reverted to preserved normal days)"}!`);
-          loadAdminOverview();
+          await loadAdminOverview();
+        } catch (err) {
+          alert(`Error: ${err.message}`);
+        }
+      };
+
+      // Admin Action: Delete User Completely
+      window.adminDeleteUser = async function(uid, email) {
+        const label = email && email !== "—" ? email : uid;
+        if (!confirm(`Are you sure you want to COMPLETELY REMOVE user ${label}?\nThis will remove unlimited status, unlink their phone, and purge license records.`)) return;
+        try {
+          let authHeader = await getAuthHeader();
+          if (!authHeader) throw new Error("Admin session expired.");
+
+          let res = await fetch(getApiUrl("/admin/users/delete"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": authHeader },
+            body: JSON.stringify({ uid }),
+          });
+
+          if (res.status === 401) {
+            const refreshed = await getValidIdToken(true);
+            if (refreshed) {
+              authHeader = `Bearer ${refreshed}`;
+              res = await fetch(getApiUrl("/admin/users/delete"), {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": authHeader },
+                body: JSON.stringify({ uid }),
+              });
+            }
+          }
+
+          const data = await safeFetchJson(res);
+          if (!res.ok) throw new Error(data.error || "Failed to remove user.");
+          alert(`✓ Success: User ${label} has been completely removed!`);
+          await loadAdminOverview();
         } catch (err) {
           alert(`Error: ${err.message}`);
         }
