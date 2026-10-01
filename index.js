@@ -16,6 +16,7 @@ import {
   getUserLicenseStatus,
   listAllUsersWithLicenses,
   toggleUserUnlimitedStatus,
+  addUnlimitedUserByEmail,
   grantUserCustomDays,
   deleteLicenseKey,
   purgeExpiredOrUnusedKeys,
@@ -910,6 +911,21 @@ for (const p of prefixes) {
     } catch (error) {
       logger.error("Admin toggle unlimited error", error.stack || error.message);
       response.status(500).json({ error: error.message || "Failed to toggle unlimited status." });
+    }
+  });
+
+  // Admin: Manually Add User to Unlimited by Email
+  app.post(`${p}/admin/users/unlimited-by-email`, requireAuth, requireAdmin, async (request, response) => {
+    try {
+      const { email } = request.body || {};
+      if (!email) {
+        return response.status(400).json({ error: "Email address is required." });
+      }
+      const result = await addUnlimitedUserByEmail(email, request.auth.email, request.headers.authorization);
+      response.json({ success: true, ...result, message: `Unlimited access granted to ${email}.` });
+    } catch (error) {
+      logger.error("Admin manual add unlimited by email error", error.stack || error.message);
+      response.status(500).json({ error: error.message || "Failed to add user to unlimited." });
     }
   });
 

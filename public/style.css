@@ -1148,40 +1148,47 @@ html, body {
    6-STEP REAL-TIME HANDSHAKE & CONNECTION SYNC TRACKER
    ========================================================================= */
 .handshake-sync-tracker {
-  margin-top: 10px;
+  margin-top: 12px;
   background: #ffffff;
   border: 1px solid #cbd5e1;
   border-radius: var(--radius-sm);
-  padding: 10px 12px;
+  padding: 12px 14px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   transition: all 0.3s ease;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .sync-tracker-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .sync-tracker-title {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 10px;
+  gap: 8px;
+  font-size: 11.5px;
   font-weight: 800;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   color: #0f172a;
   text-transform: uppercase;
 }
 
 .sync-pulse-dot {
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: #10b981;
   box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
   animation: syncPulseDot 1.6s infinite;
+  flex-shrink: 0;
 }
 
 @keyframes syncPulseDot {
@@ -1191,14 +1198,14 @@ html, body {
 }
 
 .sync-step-badge {
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 800;
   font-family: var(--font-mono);
   background: #f0fdf4;
   color: #059669;
   border: 1px solid #bbf7d0;
-  padding: 1px 7px;
-  border-radius: 10px;
+  padding: 2px 9px;
+  border-radius: 12px;
 }
 
 .sync-step-badge.synced {
@@ -1208,49 +1215,66 @@ html, body {
 }
 
 .sync-status-narrative {
-  font-size: 11px;
+  font-size: 12.5px;
   color: #334155;
-  margin: 2px 0 8px 0;
-  line-height: 1.35;
+  margin: 2px 0 10px 0;
+  line-height: 1.4;
   font-weight: 500;
+  word-break: break-word;
 }
 
 .sync-progress-bar-wrap {
   width: 100%;
-  height: 4px;
+  height: 6px;
   background: #f1f5f9;
-  border-radius: 4px;
+  border-radius: 6px;
   overflow: hidden;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .sync-progress-bar-fill {
   height: 100%;
   background: linear-gradient(90deg, #10b981 0%, #06b6d4 100%);
-  border-radius: 4px;
+  border-radius: 6px;
   transition: width 0.4s ease-in-out;
 }
 
 .sync-steps-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 5px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
-@media (min-width: 640px) {
+@media (min-width: 520px) {
   .sync-steps-grid {
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+}
+
+@media (min-width: 860px) {
+  .sync-steps-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 8px;
   }
 }
 
 .sync-step-item {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 8px;
   background: #f8fafc;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 4px 6px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  min-height: 48px;
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
   transition: all 0.2s ease;
 }
 
@@ -1266,15 +1290,15 @@ html, body {
 }
 
 .sync-step-marker {
-  width: 16px;
-  height: 16px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background: #e2e8f0;
   color: #64748b;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 800;
   flex-shrink: 0;
 }
@@ -1290,8 +1314,8 @@ html, body {
 }
 
 .step-pulse-dot {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   background: #ffffff;
   border-radius: 50%;
   animation: pulseDot 1s infinite alternate;
@@ -1306,11 +1330,13 @@ html, body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  line-height: 1.15;
+  line-height: 1.25;
+  min-width: 0;
+  flex: 1;
 }
 
 .sync-step-name {
-  font-size: 9.5px;
+  font-size: 11.5px;
   font-weight: 700;
   color: #0f172a;
   white-space: nowrap;
@@ -1327,7 +1353,7 @@ html, body {
 }
 
 .sync-step-desc {
-  font-size: 8px;
+  font-size: 10px;
   color: #64748b;
   white-space: nowrap;
   text-overflow: ellipsis;

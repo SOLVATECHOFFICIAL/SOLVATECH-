@@ -673,6 +673,9 @@
                   <p style="font-size: 11.5px; color: var(--muted); margin: 2px 0 0;">Manage user subscriptions, activate/deactivate Unlimited access, and grant runtime extensions instantly.</p>
                 </div>
                 <div class="admin-table-actions">
+                  <button id="admin-manual-unlimited-btn" type="button" class="admin-preset-btn" style="padding: 5px 12px; font-size: 11px; background:#dcfce7; color:#15803d; border-color:#86efac; font-weight:700;" onclick="adminManualAddUnlimitedPrompt()">
+                    ⚡ Add User to Unlimited
+                  </button>
                   <button id="admin-refresh-customers-btn" type="button" class="admin-preset-btn" style="padding: 5px 12px; font-size: 11px;">
                     ↻ Refresh Users
                   </button>
@@ -2039,26 +2042,44 @@
 
       function updateStatusUI(data) {
         const connected = data.status === "connected" || data.connected === true;
-        const failed = data.status === "disconnected" || data.failed === true;
-        const pending = data.status === "pairing" || data.status === "connecting";
+        const failed = !connected && (data.status === "disconnected" || data.failed === true) && !data.pairingCode;
+        const pending = data.status === "pairing" || data.status === "connecting" || Boolean(data.pairingCode);
+
+        // Check for active pairing code from backend status or stored in localStorage
+        let activePairingCode = data.pairingCode || "";
+        let activePairingNumber = data.pairingNumber || "";
+        let activePairingExpires = data.pairingCodeExpiresAt || 0;
+
+        if (!activePairingCode) {
+          try {
+            const savedPairing = JSON.parse(localStorage.getItem("solvatech_active_pairing") || "null");
+            if (savedPairing && (!savedPairing.expiresAt || savedPairing.expiresAt > Date.now())) {
+              activePairingCode = savedPairing.code;
+              activePairingNumber = savedPairing.number;
+              activePairingExpires = savedPairing.expiresAt;
+            } else if (savedPairing) {
+              localStorage.removeItem("solvatech_active_pairing");
+            }
+          } catch {}
+        }
 
         if (badge) {
-          badge.textContent = connected ? "Live Connected" : failed ? "Disconnected" : pending ? "Pairing socket open" : "Ready to pair";
+          badge.textContent = connected ? "Live Connected" : failed ? "Disconnected" : (activePairingCode || pending) ? "Pairing socket open" : "Ready to pair";
           badge.classList.toggle("connected", connected);
           badge.classList.toggle("failed", failed);
         }
-        if (state) state.textContent = connected ? "Active" : failed ? "Socket error" : pending ? "Pairing..." : "Not connected";
+        if (state) state.textContent = connected ? "Active" : failed ? "Socket error" : (activePairingCode || pending) ? "Pairing..." : "Not connected";
         if (detail) {
           detail.textContent = connected 
             ? "Your dedicated WhatsApp socket is active and listening for owner commands." 
+            : (activePairingCode || pending)
+            ? "Socket is open and waiting for WhatsApp mobile confirmation. Enter code in Linked Devices."
             : failed 
             ? (data.lastError || "WhatsApp closed the pairing socket. Ready to try again.") 
-            : pending 
-            ? "Socket is open and waiting for WhatsApp mobile confirmation." 
             : "Enter your phone number above to generate your pairing code.";
         }
-        if (number) number.textContent = data.botNumber || data.phoneNumber || data.lockedNumber || "—";
-        if (disconnect) disconnect.disabled = !connected && !pending;
+        if (number) number.textContent = data.botNumber || data.phoneNumber || data.lockedNumber || (activePairingNumber ? `+${activePairingNumber}` : "—");
+        if (disconnect) disconnect.disabled = !connected && !pending && !activePairingCode;
 
         // Update Account Number Lock banner
         if (accountLockBanner && accountLockedNumber) {
@@ -2067,6 +2088,28 @@
             accountLockedNumber.textContent = `+${data.lockedNumber}`;
           } else {
             accountLockBanner.classList.add("hidden");
+          }
+        }
+
+        if (connected) {
+          pairingActive = false;
+          try { localStorage.removeItem("solvatech_active_pairing"); } catch {}
+          if (timerId) clearInterval(timerId);
+          if (codePanel) codePanel.classList.add("hidden");
+          if (button) {
+            button.disabled = false;
+            button.textContent = "Get Pairing Code →";
+          }
+        } else if (activePairingCode) {
+          pairingActive = true;
+          if (code) code.textContent = activePairingCode;
+          if (pairingFor && activePairingNumber) {
+            pairingFor.textContent = `LINKING FOR +${activePairingNumber}`;
+          }
+          if (codePanel) codePanel.classList.remove("hidden", "expired");
+          if (!timerId && activePairingExpires) {
+            const secLeft = Math.max(10, Math.floor((activePairingExpires - Date.now()) / 1000));
+            startTimer(secLeft);
           }
         }
 
@@ -2079,16 +2122,6 @@
         if (data.preferences) {
           updateAutoDeletedUI(data.preferences.autoDeletedToDm !== false);
         }
-
-        if (connected && pairingActive) {
-          pairingActive = false;
-          if (timerId) clearInterval(timerId);
-          if (codePanel) codePanel.classList.add("hidden");
-          if (button) {
-            button.disabled = false;
-            button.textContent = "Get Pairing Code →";
-          }
-        }
       }
 
       function updateHandshakeSyncTracker(data) {
@@ -2099,9 +2132,9 @@
         if (!tracker) return;
 
         const isConnected = data.status === "connected" || data.connected === true;
-        const isPairing = data.status === "pairing" || Boolean(data.pairingCode);
+        const isPairing = data.status === "pairing" || Boolean(data.pairingCode) || pairingActive;
         const isConnecting = data.status === "connecting";
-        const hasSession = isConnected || isPairing || isConnecting || (data.status === "disconnected" && data.syncStep);
+        const hasSession = isConnected || isPairing || isConnecting || (data.status === "disconnected" && (data.syncStep?.currentStep > 0 || pairingActive));
 
         if (!hasSession && !pairingActive) {
           tracker.classList.add("hidden");
@@ -2711,12 +2744,21 @@
               throw customErr;
             }
 
+            pairingActive = true;
             if (code) code.textContent = data.code || data.pairingCode || "—";
             if (pairingFor) pairingFor.textContent = `LINKING FOR +${data.pairingNumber || formattedNumber}`;
             if (codePanel) {
               codePanel.classList.remove("hidden", "expired");
             }
-            startTimer(data.expiresAt ? Math.max(10, Math.floor((data.expiresAt - Date.now()) / 1000)) : 300);
+            const expTime = data.expiresAt || (Date.now() + 300000);
+            try {
+              localStorage.setItem("solvatech_active_pairing", JSON.stringify({
+                code: data.code || data.pairingCode,
+                number: data.pairingNumber || formattedNumber,
+                expiresAt: expTime
+              }));
+            } catch {}
+            startTimer(Math.max(10, Math.floor((expTime - Date.now()) / 1000)));
             refresh();
           } catch (err) {
             showError(
@@ -3962,16 +4004,19 @@
           if (adminCustomerFilter === "connected" && !isConnected) return false;
 
           if (adminCustomerSearch) {
-            const q = adminCustomerSearch;
+            const qTerms = adminCustomerSearch.trim().toLowerCase().split(/\s+/).filter(Boolean);
             const email = (cust.email || "").toLowerCase();
             const name = (cust.displayName || "").toLowerCase();
             const uid = (cust.uid || "").toLowerCase();
             const phone = (cust.phoneNumber || cust.lockedPhoneNumber || cust.connectedPhoneNumber || "").toLowerCase();
             const ref = (cust.referralCode || "").toLowerCase();
             const byRef = (cust.referredByCode || "").toLowerCase();
-            if (!email.includes(q) && !name.includes(q) && !uid.includes(q) && !phone.includes(q) && !ref.includes(q) && !byRef.includes(q)) {
-              return false;
-            }
+            const licCode = (cust.activeLicense?.code || cust.activeLicenseCode || "").toLowerCase();
+            const status = (cust.licenseStatus || cust.status || (isLifetime ? "unlimited lifetime" : "")).toLowerCase();
+            const preserved = (cust.preservedNotice || "").toLowerCase();
+            const fullText = `${email} ${name} ${uid} ${phone} ${ref} ${byRef} ${licCode} ${status} ${preserved}`;
+            const matchesAll = qTerms.every((term) => fullText.includes(term));
+            if (!matchesAll) return false;
           }
           return true;
         });
@@ -4026,7 +4071,10 @@
                   </td>
                   <td><span class="code-pill" style="font-size:11px; font-weight:700;">${cust.activeLicense?.code || cust.activeLicenseCode || "None"}</span></td>
                   <td>${licBadge}</td>
-                  <td><strong style="color:${isLifetime ? '#0f766e' : (cust.remainingMs > 0 ? 'var(--teal)' : '#b91c1c')};" data-admin-expiry="${isLifetime ? '' : (cust.expiresAt || '')}">${remainingStr}</strong></td>
+                  <td>
+                    <strong style="color:${isLifetime ? '#0f766e' : (cust.remainingMs > 0 ? 'var(--teal)' : '#b91c1c')};" data-admin-expiry="${isLifetime ? '' : (cust.expiresAt || '')}">${remainingStr}</strong>
+                    ${cust.preservedNotice ? `<div style="font-size:10px; color:#0d9488; font-weight:700; margin-top:2px;">🛡️ ${cust.preservedNotice}</div>` : ''}
+                  </td>
                   <td style="font-size:11px; color:var(--muted);">${expiresStr}</td>
                   <td onclick="event.stopPropagation();" style="text-align: center;">
                     <div style="display: inline-flex; gap: 6px; flex-wrap: wrap; justify-content: center;">
@@ -4146,7 +4194,10 @@
 
       // Admin Action: Toggle Unlimited Status
       window.adminToggleUnlimited = async function(uid, isUnlimited) {
-        if (!confirm(`Are you sure you want to ${isUnlimited ? "ACTIVATE UNLIMITED access" : "DEACTIVATE unlimited access"} for this user?`)) return;
+        const actionMsg = isUnlimited 
+          ? "ACTIVATE UNLIMITED access for this user? (Their current remaining normal license days will be safely stored)" 
+          : "DEACTIVATE unlimited access? (The user will immediately revert back to their preserved normal days if not finished)";
+        if (!confirm(`Are you sure you want to ${actionMsg}`)) return;
         try {
           let authHeader = await getAuthHeader();
           if (!authHeader) throw new Error("Admin session expired.");
@@ -4171,7 +4222,49 @@
 
           const data = await safeFetchJson(res);
           if (!res.ok) throw new Error(data.error || "Failed to update user unlimited status.");
-          alert(`Success: User unlimited status has been ${isUnlimited ? "ACTIVATED" : "DEACTIVATED"}!`);
+          alert(`✓ Success: User unlimited status has been ${isUnlimited ? "ACTIVATED (Normal days safely preserved)" : "DEACTIVATED (Reverted to preserved normal days)"}!`);
+          loadAdminOverview();
+        } catch (err) {
+          alert(`Error: ${err.message}`);
+        }
+      };
+
+      // Admin Action: Manually Add User to Unlimited by Email
+      window.adminManualAddUnlimitedPrompt = async function() {
+        const email = prompt("Enter the Gmail / Email address to grant UNLIMITED lifetime access to:", "");
+        if (!email || !email.trim()) return;
+        const cleanEmail = email.trim().toLowerCase();
+        if (!cleanEmail.includes("@")) {
+          alert("Please enter a valid email address.");
+          return;
+        }
+        if (!confirm(`Are you sure you want to grant UNLIMITED access to ${cleanEmail}? Any existing standard days will be preserved and restored if revoked.`)) return;
+
+        try {
+          let authHeader = await getAuthHeader();
+          if (!authHeader) throw new Error("Admin session expired.");
+
+          let res = await fetch(getApiUrl("/admin/users/unlimited-by-email"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": authHeader },
+            body: JSON.stringify({ email: cleanEmail }),
+          });
+
+          if (res.status === 401) {
+            const refreshed = await getValidIdToken(true);
+            if (refreshed) {
+              authHeader = `Bearer ${refreshed}`;
+              res = await fetch(getApiUrl("/admin/users/unlimited-by-email"), {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": authHeader },
+                body: JSON.stringify({ email: cleanEmail }),
+              });
+            }
+          }
+
+          const data = await safeFetchJson(res);
+          if (!res.ok) throw new Error(data.error || "Failed to add user to unlimited.");
+          alert(`✓ Success: ${cleanEmail} has been granted UNLIMITED access!`);
           loadAdminOverview();
         } catch (err) {
           alert(`Error: ${err.message}`);
