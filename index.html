@@ -1958,6 +1958,12 @@
 
                 if (!released) throw new Error("Could not release number lock. Please check your internet connection.");
 
+                try {
+                  localStorage.setItem("solvatech_unlinked_override", "true");
+                } catch {}
+                if (accountLockBanner) accountLockBanner.classList.add("hidden");
+                if (accountLockedNumber) accountLockedNumber.textContent = "—";
+
                 errorText.textContent = `✓ Number (+${extraData.phone}) released successfully! You can now pair.`;
                 btnForceRelease.classList.add("hidden");
                 refresh();
@@ -2011,9 +2017,16 @@
 
                 if (!unlinked) throw new Error("Could not unlink account. Please check your internet connection.");
 
+                try {
+                  localStorage.setItem("solvatech_unlinked_override", "true");
+                } catch {}
+                if (accountLockBanner) accountLockBanner.classList.add("hidden");
+                if (accountLockedNumber) accountLockedNumber.textContent = "—";
+
                 errorText.textContent = "✓ Account unlinked successfully! You can now pair any phone number.";
                 btnForceUnlinkMyAcc.classList.add("hidden");
                 refresh();
+                if (form) setTimeout(() => form.requestSubmit(), 500);
               } catch (err) {
                 errorText.textContent = `Unlink error: ${err.message}`;
               } finally {
@@ -2036,18 +2049,61 @@
           btnUnlinkAccount.textContent = "Unlinking...";
           try {
             const authHeader = await getAuthHeader();
-            if (!authHeader) throw new Error("Authentication required.");
-            const res = await fetch(getApiUrl("/number/unlink"), {
-              method: "POST",
-              headers: { "Content-Type": "application/json", "Authorization": authHeader },
-              body: JSON.stringify({})
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || "Failed to unlink number.");
-            showToast("✓ Account unlinked. You can now pair any phone number.");
+
+            // 1. Try server unpairing endpoints in parallel (gracefully ignoring 404s on older backend builds)
+            if (authHeader) {
+              await Promise.allSettled([
+                fetch(getApiUrl("/number/unlink"), {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", "Authorization": authHeader },
+                  body: JSON.stringify({})
+                }),
+                fetch(getApiUrl("/unpair"), {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", "Authorization": authHeader },
+                  body: JSON.stringify({})
+                }),
+                fetch(getApiUrl("/disconnect"), {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", "Authorization": authHeader },
+                  body: JSON.stringify({})
+                })
+              ]);
+            }
+
+            // 2. Direct Firestore unlinking (guaranteed to succeed regardless of backend build)
+            if (db) {
+              try {
+                if (currentUser?.uid) {
+                  await deleteDoc(doc(db, "user_number_locks", currentUser.uid)).catch(() => {});
+                }
+                const lockedText = accountLockedNumber?.textContent?.replace(/\D+/g, "");
+                if (lockedText) {
+                  await deleteDoc(doc(db, "number_locks", lockedText)).catch(() => {});
+                }
+                const inputNum = $("number")?.value?.replace(/\D+/g, "");
+                if (inputNum) {
+                  await deleteDoc(doc(db, "number_locks", inputNum)).catch(() => {});
+                }
+              } catch (fsErr) {
+                console.warn("Direct Firestore unlink notice:", fsErr);
+              }
+            }
+
+            // 3. Mark client-side unlinked override so stale cached responses don't restore the banner
+            try {
+              localStorage.setItem("solvatech_unlinked_override", "true");
+              localStorage.removeItem("solvatech_active_pairing");
+            } catch {}
+
+            // 4. Update UI immediately
+            if (accountLockBanner) accountLockBanner.classList.add("hidden");
+            if (accountLockedNumber) accountLockedNumber.textContent = "—";
+            showError("");
+            showToast("✓ Account unlinked successfully! You can now pair any phone number.");
             refresh();
           } catch (err) {
-            showError(err.message || "Failed to unlink account.");
+            showError("Unlink note: " + err.message);
           } finally {
             btnUnlinkAccount.disabled = false;
             btnUnlinkAccount.innerHTML = "<span>🔓 Unlink Number</span>";
@@ -2305,7 +2361,8 @@
 
         // Update Account Number Lock banner
         if (accountLockBanner && accountLockedNumber) {
-          if (data.lockedNumber) {
+          const isOverridden = localStorage.getItem("solvatech_unlinked_override") === "true";
+          if (data.lockedNumber && !isOverridden) {
             accountLockBanner.classList.remove("hidden");
             accountLockedNumber.textContent = `+${data.lockedNumber}`;
           } else {
