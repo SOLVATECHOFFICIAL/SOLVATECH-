@@ -7,7 +7,7 @@ import { PORT } from "./lib/config.js";
 import { logger } from "./lib/logger.js";
 import { getWhatsAppController, restoreAllSessions, auditActiveSessions, getAllWhatsAppStatuses } from "./lib/whatsapp.js";
 import { getLockedNumberForUid, getAllNumberLocks, unlinkNumberFromUser, unlinkPhoneNumber } from "./lib/number-lock.js";
-import { requireAuth, requireAdmin, createPreviewToken, getFirebaseServerFirestore } from "./lib/auth.js";
+import { requireAuth, requireAdmin, isAdminEmail, createPreviewToken, getFirebaseServerFirestore } from "./lib/auth.js";
 import { getUserPreferences, setUserPreferences } from "./lib/database.js";
 import {
   createLicenseRecord,

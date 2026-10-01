@@ -4186,7 +4186,6 @@
         });
 
         // 1. Desktop Table
-        const tbody = document.getElementById("admin-customers-tbody");
         if (tbody) {
           if (filtered.length === 0) {
             tbody.innerHTML = `
@@ -4263,7 +4262,6 @@
         }
 
         // 2. Mobile Cards
-        const cardsEl = document.getElementById("admin-customers-cards");
         if (cardsEl) {
           if (filtered.length === 0) {
             cardsEl.innerHTML = `<div style="text-align: center; color: var(--muted); padding: 20px;">No customers found.</div>`;
