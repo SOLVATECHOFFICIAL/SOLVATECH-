@@ -149,7 +149,7 @@ function getFirebaseClientConfig() {
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 app.get("/healthz", (_req, res) => res.json({ status: "ok" }));
 
-const prefixes = Array.from(new Set([apiPrefix, "/api", "/bot-api"]));
+const prefixes = Array.from(new Set([apiPrefix, "/api", "/bot-api", ""]));
 
 for (const p of prefixes) {
   // Public Health & Firebase Config endpoints
@@ -1081,8 +1081,23 @@ for (const p of prefixes) {
 }
 
 app.use((request, response, next) => {
-  if (prefixes.some((p) => request.path.startsWith(`${p}/`))) {
-    return response.status(404).json({ error: "API endpoint not found.", code: "ENDPOINT_NOT_FOUND" });
+  const isApiRequest =
+    request.path.startsWith("/bot-api") ||
+    request.path.startsWith("/api") ||
+    request.path.startsWith("/admin") ||
+    request.path.startsWith("/license") ||
+    request.path.startsWith("/referral") ||
+    request.path.startsWith("/user") ||
+    request.path.startsWith("/auth") ||
+    request.path === "/pair" ||
+    request.path === "/status" ||
+    request.path === "/disconnect" ||
+    request.headers.accept?.includes("application/json") ||
+    Boolean(request.headers.authorization);
+
+  if (isApiRequest) {
+    logger.warn(`API endpoint not found: ${request.method} ${request.originalUrl}`);
+    return response.status(404).json({ error: `API endpoint not found: ${request.method} ${request.originalUrl}`, code: "ENDPOINT_NOT_FOUND" });
   }
   const rootIndexHtml = path.join(rootDir, "index.html");
   const htmlFile = fs.existsSync(rootIndexHtml) ? rootIndexHtml : path.join(publicDir, "index.html");

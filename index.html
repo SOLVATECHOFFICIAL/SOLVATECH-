@@ -1367,24 +1367,25 @@
       const isSelfHosted = window.location.hostname.includes("railway.app") ||
                            window.location.hostname === "localhost" ||
                            window.location.hostname === "127.0.0.1" ||
-                           window.location.hostname.includes("run.app");
+                           window.location.hostname.includes("run.app") ||
+                           window.location.hostname.includes("googleusercontent.com");
       const DEFAULT_BACKEND_URL = isSelfHosted ? window.location.origin : FALLBACK_PRODUCTION_BACKEND;
-      let customApiUrl = localStorage.getItem("solvatech_backend_url") || "";
-      if (customApiUrl && (
+      let customApiUrl = isSelfHosted ? "" : (localStorage.getItem("solvatech_backend_url") || "");
+      if (isSelfHosted) {
+        try { localStorage.removeItem("solvatech_backend_url"); } catch (e) {}
+      } else if (customApiUrl && (
         customApiUrl.includes("3c1de8") ||
         customApiUrl.includes("215ab") ||
         customApiUrl.includes("localhost:5000") ||
-        (isSelfHosted && customApiUrl !== window.location.origin) ||
-        (!isSelfHosted && (customApiUrl.includes(window.location.hostname) || customApiUrl.includes("solvatech.name.ng") || customApiUrl.includes("github.io")))
+        customApiUrl.includes(window.location.hostname) ||
+        customApiUrl.includes("solvatech.name.ng") ||
+        customApiUrl.includes("github.io")
       )) {
         try { localStorage.removeItem("solvatech_backend_url"); } catch (e) {}
         customApiUrl = "";
       }
       function getApiUrl(endpoint) {
-        let baseUrl = (customApiUrl || DEFAULT_BACKEND_URL).replace(/\/$/, "");
-        if (!isSelfHosted && (baseUrl.includes("solvatech.name.ng") || baseUrl.includes("github.io") || baseUrl === window.location.origin)) {
-          baseUrl = FALLBACK_PRODUCTION_BACKEND;
-        }
+        let baseUrl = (isSelfHosted ? window.location.origin : (customApiUrl || DEFAULT_BACKEND_URL)).replace(/\/$/, "");
         const cleanEndpoint = endpoint.startsWith("/bot-api") ? endpoint.replace(/^\/bot-api/, "") : endpoint;
         return `${baseUrl}/bot-api${cleanEndpoint.startsWith("/") ? cleanEndpoint : "/" + cleanEndpoint}`;
       }
@@ -1393,15 +1394,11 @@
       // DYNAMIC BACKEND & SECRETS CONTROLLER (STORED IN FIRESTORE)
       // =========================================================================
       function getActiveBackendUrl() {
-        let active = (customApiUrl || DEFAULT_BACKEND_URL).replace(/\/$/, "");
-        if (!isSelfHosted && (active.includes("solvatech.name.ng") || active.includes("github.io") || active === window.location.origin)) {
-          active = FALLBACK_PRODUCTION_BACKEND;
-        }
-        return active;
+        return (isSelfHosted ? window.location.origin : (customApiUrl || DEFAULT_BACKEND_URL)).replace(/\/$/, "");
       }
 
       async function fetchBackendUrlFromFirestore() {
-        if (!db) return;
+        if (!db || isSelfHosted) return;
         try {
           const snap = await getDoc(doc(db, "system_config", "backend"));
           if (snap.exists() && snap.data()?.railwayUrl) {
@@ -2780,10 +2777,9 @@
             try {
               data = text ? JSON.parse(text) : {};
             } catch {
-              if (text.trim().startsWith("<") && !targetUrl.includes("railway.app")) {
+              if (text.trim().startsWith("<") && !isSelfHosted && !targetUrl.includes("railway.app")) {
                 // Auto-retry with resilient fallback backend
                 customApiUrl = FALLBACK_PRODUCTION_BACKEND;
-                try { localStorage.setItem("solvatech_backend_url", FALLBACK_PRODUCTION_BACKEND); } catch (e) {}
                 const fallbackUrl = `${FALLBACK_PRODUCTION_BACKEND}/bot-api/pair`;
                 const retryRes = await fetch(fallbackUrl, {
                   method: "POST",
