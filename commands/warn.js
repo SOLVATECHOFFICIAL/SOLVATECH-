@@ -13,16 +13,10 @@ export default async function warn({
   reply,
   userId = "default",
 }) {
-  const metadata = await requireAdmin(sock, chatId, sender, true, senderJids, senderIsLinkedAccount);
-  assertAdmin(metadata, [sender, ...(Array.isArray(senderJids) ? senderJids : [])], true, [
-    sock.user?.id,
-    sock.user?.lid,
-    sock.user?.phoneNumber,
-  ].filter(Boolean));
-
   const sub = String(args[0] || "").toLowerCase();
   const val = String(args[1] || "").toLowerCase();
   if (sub === "limit" || sub === "setlimit") {
+    const metadata = await requireAdmin(sock, chatId, sender, false, senderJids, senderIsLinkedAccount);
     const limitNum = parseInt(val, 10);
     if (!limitNum || isNaN(limitNum) || limitNum < 1 || limitNum > 10) {
       return reply("❌ *Invalid parameter:* Please specify a valid warning limit between *1* and *10*.\n_Example: *.warn limit 3* or *.warns limit 4*_");
@@ -30,6 +24,8 @@ export default async function warn({
     const newLimit = await setWarningLimit(chatId, limitNum, userId);
     return reply(`✅ *Group Warning Threshold Updated:* *${newLimit}* violations before removal.\n_Synced to Firebase Firestore._`);
   }
+
+  const metadata = await requireAdmin(sock, chatId, sender, false, senderJids, senderIsLinkedAccount);
 
   const resolved = resolveGroupTargetJids(metadata, message, args);
   if (!resolved || !resolved.canonicalJid) {

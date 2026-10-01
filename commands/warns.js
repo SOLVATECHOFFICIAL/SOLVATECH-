@@ -14,7 +14,7 @@ export default async function warns({
   reply,
   userId = "default",
 }) {
-  const metadata = await requireAdmin(sock, chatId, sender, true, senderJids, senderIsLinkedAccount);
+  const metadata = await requireAdmin(sock, chatId, sender, false, senderJids, senderIsLinkedAccount);
 
   const sub = String(args[0] || "").toLowerCase();
   const val = String(args[1] || "").toLowerCase();
