@@ -1356,7 +1356,7 @@
         messagingSenderId: "420914651308",
       };
 
-      const ADMIN_EMAILS = ["awoyinfasolomon1@gmail.com"];
+      const ADMIN_EMAILS = ["awoyinfasolomon1@gmail.com", "awoyinfasunday40@gmail.com"];
       const ADMIN_EMAIL = "awoyinfasolomon1@gmail.com";
       function isUserAdminEmail(email) {
         if (!email || typeof email !== "string") return false;
@@ -4434,20 +4434,17 @@
                   <td style="font-size:11px; color:var(--muted);">${expiresStr}</td>
                   <td onclick="event.stopPropagation();" style="text-align: center;">
                     <div style="display: inline-flex; gap: 6px; flex-wrap: wrap; justify-content: center;">
-                      ${isLifetime ? `
-                        <button type="button" class="admin-action-btn" style="background:#fee2e2; color:#991b1b; border-color:#fca5a5;" onclick="adminToggleUnlimited('${cust.uid}', false)">
-                          🛑 Deactivate Unlimited
-                        </button>
-                      ` : `
-                        <button type="button" class="admin-action-btn" style="background:#dcfce7; color:#15803d; border-color:#86efac;" onclick="adminToggleUnlimited('${cust.uid}', true)">
-                          ⚡ Activate Unlimited
-                        </button>
-                      `}
-                      <button type="button" class="admin-action-btn" style="background:#f1f5f9; color:#334155; border-color:#cbd5e1;" onclick="adminGrantDaysPrompt('${cust.uid}', '${cust.email || ''}')">
-                        ➕ Grant Days
+                      <button type="button" class="admin-action-btn" style="background:${isLifetime ? '#dcfce7' : '#f1f5f9'}; color:${isLifetime ? '#15803d' : '#334155'}; border-color:${isLifetime ? '#86efac' : '#cbd5e1'}; font-weight:700; padding:5px 9px;" onclick="adminToggleUnlimited('${cust.uid}', ${!isLifetime})" title="Click to instantly switch unlimited ${isLifetime ? 'OFF' : 'ON'}">
+                        ${isLifetime ? '🟢 Unlimited: ON' : '⚪ Unlimited: OFF'}
                       </button>
-                      <button type="button" class="admin-action-btn" style="background:#fef2f2; color:#b91c1c; border-color:#fecaca;" onclick="adminDeleteUser('${cust.uid}', '${cust.email || ''}')" title="Completely remove customer record">
-                        🗑️ Remove
+                      <button type="button" class="admin-action-btn" style="background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; font-size:11px; padding:5px 9px;" onclick="adminGenerateKeyForUserPrompt('${cust.uid}', '${cust.email || ''}')" title="Generate key for this user">
+                        🔑 Gen Key
+                      </button>
+                      <button type="button" class="admin-action-btn" style="background:#fef3c7; color:#92400e; border-color:#fde68a; font-size:11px; padding:5px 9px;" onclick="adminDirectOverwriteFirebasePrompt('${cust.uid}', '${cust.email || ''}')" title="Directly overwrite user in Firebase">
+                        ✏️ Edit DB
+                      </button>
+                      <button type="button" class="admin-action-btn" style="background:#fef2f2; color:#b91c1c; border-color:#fecaca; font-size:11px; padding:5px 8px;" onclick="adminDeleteUser('${cust.uid}', '${cust.email || ''}')" title="Completely remove customer record">
+                        🗑️
                       </button>
                     </div>
                   </td>
@@ -4479,18 +4476,15 @@
                     <div><span class="admin-card-label">WhatsApp:</span> <span>${phone ? `+${phone}` : "Not linked"}</span></div>
                     <div><span class="admin-card-label">License:</span> <span>${cust.activeLicense?.code || cust.activeLicenseCode || (isLifetime ? "UNLIMITED" : "None")} (<strong data-admin-expiry="${isLifetime ? '' : (cust.expiresAt || '')}">${remainingStr}</strong>)</span></div>
                   </div>
-                  <div style="margin-top: 8px; display: flex; gap: 6px; justify-content: flex-end;" onclick="event.stopPropagation();">
-                    ${isLifetime ? `
-                      <button type="button" class="admin-action-btn" style="background:#fee2e2; color:#991b1b; font-size:10px;" onclick="adminToggleUnlimited('${cust.uid}', false)">
-                        🛑 Deactivate
-                      </button>
-                    ` : `
-                      <button type="button" class="admin-action-btn" style="background:#dcfce7; color:#15803d; font-size:10px;" onclick="adminToggleUnlimited('${cust.uid}', true)">
-                        ⚡ Unlimited
-                      </button>
-                    `}
-                    <button type="button" class="admin-action-btn" style="background:#f1f5f9; color:#334155; font-size:10px;" onclick="adminGrantDaysPrompt('${cust.uid}', '${cust.email || ''}')">
-                      ➕ +Days
+                  <div style="margin-top: 8px; display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap;" onclick="event.stopPropagation();">
+                    <button type="button" class="admin-action-btn" style="background:${isLifetime ? '#dcfce7' : '#f1f5f9'}; color:${isLifetime ? '#15803d' : '#334155'}; font-size:10px; font-weight:700;" onclick="adminToggleUnlimited('${cust.uid}', ${!isLifetime})">
+                      ${isLifetime ? '🟢 Unlimited: ON' : '⚪ Unlimited: OFF'}
+                    </button>
+                    <button type="button" class="admin-action-btn" style="background:#eff6ff; color:#1d4ed8; font-size:10px;" onclick="adminGenerateKeyForUserPrompt('${cust.uid}', '${cust.email || ''}')">
+                      🔑 Gen Key
+                    </button>
+                    <button type="button" class="admin-action-btn" style="background:#fef3c7; color:#92400e; font-size:10px;" onclick="adminDirectOverwriteFirebasePrompt('${cust.uid}', '${cust.email || ''}')">
+                      ✏️ Edit DB
                     </button>
                   </div>
                 </div>
@@ -4550,63 +4544,167 @@
         }
       }
 
-      // Admin Action: Toggle Unlimited Status
+      // Admin Action: Toggle Unlimited Status (Instant switch, zero confirmation checks, real toggle)
       window.adminToggleUnlimited = async function(uid, isUnlimited) {
-        const actionMsg = isUnlimited 
-          ? "ACTIVATE UNLIMITED access for this user? (Their current remaining normal license days will be safely stored)" 
-          : "DEACTIVATE unlimited access? (The user will immediately revert back to their preserved normal days if not finished)";
-        if (!confirm(`Are you sure you want to ${actionMsg}`)) return;
+        const setUnl = Boolean(isUnlimited);
+
+        // 1. Immediate optimistic UI update (zero delay)
+        if (adminOverviewData && Array.isArray(adminOverviewData.customers)) {
+          const found = adminOverviewData.customers.find((c) => c.uid === uid);
+          if (found) {
+            found.isUnlimited = setUnl;
+            if (found.activeLicense) {
+              found.activeLicense.isUnlimited = setUnl;
+              found.activeLicense.durationDays = setUnl ? "Unlimited" : 0;
+              found.activeLicense.status = setUnl ? "active" : "expired";
+            }
+            found.durationDays = setUnl ? "Unlimited" : 0;
+            found.licenseStatus = setUnl ? "lifetime" : "expired";
+            found.status = setUnl ? "unlimited" : "expired";
+          }
+          renderAdminDashboard();
+        }
+
+        // 2. Direct Firestore Client SDK write (gen-lang-client-0324946831)
+        if (db) {
+          try {
+            const nowIso = new Date().toISOString();
+            const expiryIso = setUnl ? new Date(Date.now() + 100 * 365 * 86400000).toISOString() : nowIso;
+            const patch = {
+              isUnlimited: setUnl,
+              durationDays: setUnl ? "Unlimited" : 0,
+              status: setUnl ? "active" : "expired",
+              licenseStatus: setUnl ? "lifetime" : "expired",
+              expiresAt: expiryIso,
+              updatedAt: nowIso,
+            };
+            await Promise.all([
+              setDoc(doc(db, "user_licenses", uid), patch, { merge: true }),
+              setDoc(doc(db, "users", uid), { ...patch, "activeLicense.isUnlimited": setUnl, "activeLicense.durationDays": setUnl ? "Unlimited" : 0 }, { merge: true }),
+            ]);
+          } catch (e) {
+            console.debug("Firestore direct toggle write notice:", e.message);
+          }
+        }
+
+        // 3. Notify server in background
         try {
           let authHeader = await getAuthHeader();
-          if (!authHeader) throw new Error("Admin session expired.");
-
-          let res = await fetch(getApiUrl("/admin/users/unlimited"), {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "Authorization": authHeader },
-            body: JSON.stringify({ uid, isUnlimited }),
-          });
-
-          if (res.status === 401) {
-            const refreshed = await getValidIdToken(true);
-            if (refreshed) {
-              authHeader = `Bearer ${refreshed}`;
-              res = await fetch(getApiUrl("/admin/users/unlimited"), {
-                method: "POST",
-                headers: { "Content-Type": "application/json", "Authorization": authHeader },
-                body: JSON.stringify({ uid, isUnlimited }),
-              });
+          if (authHeader) {
+            let res = await fetch(getApiUrl("/admin/users/unlimited"), {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "Authorization": authHeader },
+              body: JSON.stringify({ uid, isUnlimited: setUnl }),
+            });
+            if (res.status === 401) {
+              const refreshed = await getValidIdToken(true);
+              if (refreshed) {
+                authHeader = `Bearer ${refreshed}`;
+                await fetch(getApiUrl("/admin/users/unlimited"), {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", "Authorization": authHeader },
+                  body: JSON.stringify({ uid, isUnlimited: setUnl }),
+                });
+              }
             }
           }
-
-          const data = await safeFetchJson(res);
-          if (!res.ok) throw new Error(data.error || "Failed to update user unlimited status.");
-
-          // Direct Firestore sync
-          if (db) {
-            try {
-              await Promise.all([
-                setDoc(doc(db, "user_licenses", uid), { isUnlimited: Boolean(isUnlimited), durationDays: isUnlimited ? "Unlimited" : 0 }, { merge: true }),
-                setDoc(doc(db, "users", uid), { isUnlimited: Boolean(isUnlimited), "activeLicense.isUnlimited": Boolean(isUnlimited) }, { merge: true }),
-              ]);
-            } catch (e) {}
-          }
-
-          // Immediate local state update
-          if (adminOverviewData && Array.isArray(adminOverviewData.customers)) {
-            const found = adminOverviewData.customers.find((c) => c.uid === uid);
-            if (found) {
-              found.isUnlimited = Boolean(isUnlimited);
-              if (found.activeLicense) found.activeLicense.isUnlimited = Boolean(isUnlimited);
-              found.licenseStatus = isUnlimited ? "lifetime" : "active";
-              found.status = isUnlimited ? "unlimited" : "active";
-            }
-            renderAdminDashboard();
-          }
-
-          alert(`✓ Success: User unlimited status has been ${isUnlimited ? "ACTIVATED (Normal days safely preserved)" : "DEACTIVATED (Reverted to preserved normal days)"}!`);
           await loadAdminOverview();
         } catch (err) {
-          alert(`Error: ${err.message}`);
+          console.debug("Backend toggle sync note:", err.message);
+        }
+      };
+
+      // Admin Action: Generate Key Specifically For User
+      window.adminGenerateKeyForUserPrompt = async function(uid, email) {
+        const targetLabel = email && email !== "—" ? email : uid;
+        const choice = prompt(
+          `Generate Key for ${targetLabel}\n\nEnter duration:\n• Type 'Unlimited' for Lifetime Unlimited\n• Or enter number of days (e.g. 1, 7, 30, 90, 365):\n• Add '+apply' to auto-activate immediately (e.g. 'Unlimited +apply' or '30 +apply')`,
+          "Unlimited +apply"
+        );
+        if (!choice || !choice.trim()) return;
+
+        const trimmed = choice.trim();
+        const autoApply = trimmed.toLowerCase().includes("+apply");
+        const daysPart = trimmed.replace(/\+apply/i, "").trim();
+        const days = (daysPart.toLowerCase() === "unlimited" || daysPart.toLowerCase() === "lifetime") ? "Unlimited" : parseInt(daysPart, 10);
+
+        if (days !== "Unlimited" && (isNaN(days) || days <= 0)) {
+          alert("Invalid duration. Please enter 'Unlimited' or positive number of days.");
+          return;
+        }
+
+        try {
+          let authHeader = await getAuthHeader();
+          let res = await fetch(getApiUrl("/admin/licenses/generate-for-user"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": authHeader || "" },
+            body: JSON.stringify({ target: email && email !== "—" ? email : uid, days, autoRedeem: autoApply }),
+          });
+          const data = await safeFetchJson(res);
+          if (!res.ok) throw new Error(data.error || "Failed to generate key.");
+
+          const keyCreated = data.license?.code;
+          if (autoApply) {
+            alert(`✓ Success: Key ${keyCreated} generated and immediately activated for ${targetLabel}!`);
+          } else {
+            if (navigator.clipboard) await navigator.clipboard.writeText(keyCreated);
+            alert(`✓ Generated Key: ${keyCreated} (${days} Days)\nCopied to clipboard! Send this code to customer.`);
+          }
+          await loadAdminOverview();
+        } catch (err) {
+          alert(`Error generating key: ${err.message}`);
+        }
+      };
+
+      // Admin Action: Direct Overwrite Firebase Document
+      window.adminDirectOverwriteFirebasePrompt = async function(uid, email) {
+        const targetLabel = email && email !== "—" ? email : uid;
+        const currentCust = (adminOverviewData?.customers || []).find((c) => c.uid === uid) || {};
+
+        const newDays = prompt(`Directly Overwrite Firebase for ${targetLabel}\n\nEnter duration days ('Unlimited' or number like 30, 0 to expire):`, currentCust.isUnlimited ? "Unlimited" : (currentCust.durationDays || 30));
+        if (newDays === null) return;
+
+        const isUnl = String(newDays).trim().toLowerCase() === "unlimited" || String(newDays).trim().toLowerCase() === "lifetime";
+        const parsedDays = isUnl ? "Unlimited" : (parseInt(newDays, 10) || 0);
+
+        const newPhone = prompt(`Update / Overwrite WhatsApp Phone Number (leave blank to keep current):`, currentCust.phoneNumber || "");
+
+        const updates = {
+          isUnlimited: isUnl,
+          durationDays: parsedDays,
+          status: isUnl ? "active" : (parsedDays > 0 ? "active" : "expired"),
+          licenseStatus: isUnl ? "lifetime" : (parsedDays > 0 ? "active" : "expired"),
+          ...(newPhone ? { phoneNumber: newPhone.replace(/[^0-9]/g, "") } : {}),
+        };
+
+        // 1. Direct Client Firestore write (gen-lang-client-0324946831)
+        if (db) {
+          try {
+            await Promise.all([
+              setDoc(doc(db, "user_licenses", uid), updates, { merge: true }),
+              setDoc(doc(db, "users", uid), { ...updates, "activeLicense.isUnlimited": isUnl, "activeLicense.durationDays": parsedDays }, { merge: true }),
+            ]);
+            console.log("Firebase document overwritten directly for", uid);
+          } catch (e) {
+            console.warn("Direct Firestore SDK overwrite note:", e.message);
+          }
+        }
+
+        // 2. Server API sync
+        try {
+          let authHeader = await getAuthHeader();
+          let res = await fetch(getApiUrl("/admin/users/overwrite"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": authHeader || "" },
+            body: JSON.stringify({ uid, updates }),
+          });
+          const data = await safeFetchJson(res);
+          if (!res.ok) throw new Error(data.error || "Failed to overwrite user.");
+          alert(`✓ Firebase document for ${targetLabel} overwritten successfully!`);
+          await loadAdminOverview();
+        } catch (err) {
+          alert(`Notice: ${err.message}`);
+          await loadAdminOverview();
         }
       };
 

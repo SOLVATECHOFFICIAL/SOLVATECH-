@@ -21,6 +21,8 @@ import {
   grantUserCustomDays,
   deleteLicenseKey,
   purgeExpiredOrUnusedKeys,
+  adminOverwriteUserRecord,
+  adminGenerateKeyForUser,
   getGlobalRailwayConfig,
   setGlobalRailwayConfig,
   ADMIN_EMAIL,
@@ -1045,6 +1047,36 @@ for (const p of prefixes) {
     } catch (error) {
       logger.error("Admin grant days error", error.stack || error.message);
       response.status(500).json({ error: error.message || "Failed to grant days." });
+    }
+  });
+
+  // Admin: Directly Overwrite User Record in Firestore / Local Store
+  app.post(`${p}/admin/users/overwrite`, requireAuth, requireAdmin, async (request, response) => {
+    try {
+      const { uid, updates } = request.body || {};
+      if (!uid) {
+        return response.status(400).json({ error: "User UID is required." });
+      }
+      const result = await adminOverwriteUserRecord(uid, updates || {}, request.auth.email, request.headers.authorization);
+      response.json({ success: true, ...result, message: "User record successfully updated in Firebase." });
+    } catch (error) {
+      logger.error("Admin overwrite user error", error.stack || error.message);
+      response.status(500).json({ error: error.message || "Failed to overwrite user." });
+    }
+  });
+
+  // Admin: Generate Key for a specific user and optionally redeem immediately
+  app.post(`${p}/admin/licenses/generate-for-user`, requireAuth, requireAdmin, async (request, response) => {
+    try {
+      const { target, days, autoRedeem } = request.body || {};
+      if (!target || !days) {
+        return response.status(400).json({ error: "Target UID/Email and days are required." });
+      }
+      const result = await adminGenerateKeyForUser(target, days, Boolean(autoRedeem), request.auth.email, request.headers.authorization);
+      response.json({ success: true, ...result, message: autoRedeem ? `Key generated and applied to ${target}.` : `Key generated for ${target}.` });
+    } catch (error) {
+      logger.error("Admin generate key for user error", error.stack || error.message);
+      response.status(500).json({ error: error.message || "Failed to generate key for user." });
     }
   });
 
