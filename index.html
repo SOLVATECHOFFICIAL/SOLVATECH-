@@ -1363,6 +1363,7 @@
         return ADMIN_EMAILS.includes(email.trim().toLowerCase());
       }
 
+      const isSelfHosted = typeof window !== "undefined" && !window.location.hostname.includes("github.io");
       const FALLBACK_PRODUCTION_BACKEND = "https://web-production-1f4c4.up.railway.app";
       let customApiUrl = localStorage.getItem("solvatech_backend_url") || FALLBACK_PRODUCTION_BACKEND;
       if (customApiUrl && (
@@ -2868,8 +2869,11 @@
 
           if (button) {
             button.disabled = true;
-            button.innerHTML = '<span class="button-loading"><i></i>Connecting to WhatsApp gateway (waiting for Baileys pairing code)…</span>';
+            button.innerHTML = '<span class="button-loading"><i></i>Requesting pairing code from WhatsApp…</span>';
           }
+
+          const abortCtrl = new AbortController();
+          const abortTimer = setTimeout(() => abortCtrl.abort(), 18000);
 
           try {
             let targetUrl = getApiUrl("/pair");
@@ -2880,6 +2884,7 @@
                 "Authorization": authHeader,
               },
               body: JSON.stringify({ number: formattedNumber }),
+              signal: abortCtrl.signal,
             });
 
             if (response.status === 401) {
@@ -2893,6 +2898,7 @@
                     "Authorization": authHeader,
                   },
                   body: JSON.stringify({ number: formattedNumber }),
+                  signal: abortCtrl.signal,
                 });
               }
             }
@@ -2903,7 +2909,6 @@
               data = text ? JSON.parse(text) : {};
             } catch {
               if (text.trim().startsWith("<") && !isSelfHosted && !targetUrl.includes("railway.app")) {
-                // Auto-retry with resilient fallback backend
                 customApiUrl = FALLBACK_PRODUCTION_BACKEND;
                 const fallbackUrl = `${FALLBACK_PRODUCTION_BACKEND}/bot-api/pair`;
                 const retryRes = await fetch(fallbackUrl, {
@@ -2913,6 +2918,7 @@
                     "Authorization": authHeader,
                   },
                   body: JSON.stringify({ number: formattedNumber }),
+                  signal: abortCtrl.signal,
                 });
                 const retryText = await retryRes.text();
                 data = JSON.parse(retryText);
@@ -2948,12 +2954,17 @@
             startTimer(Math.max(10, Math.floor((expTime - Date.now()) / 1000)));
             refresh();
           } catch (err) {
+            const isTimeout = err.name === "AbortError";
+            const errMsg = isTimeout
+              ? "WhatsApp connection took too long. Please tap Get Pairing Code again."
+              : (err.message || "Pairing code request failed. Check number format and try again.");
             showError(
-              err.message || "Pairing code request failed. Check number format and try again.",
-              err.code || (err.data && err.data.code) || "",
+              errMsg,
+              err.code || (err.data && err.data.code) || (isTimeout ? "TIMEOUT" : ""),
               { phone: formattedNumber, ...(err.data || {}) }
             );
           } finally {
+            clearTimeout(abortTimer);
             if (button) {
               button.disabled = false;
               button.textContent = "Get Pairing Code →";
