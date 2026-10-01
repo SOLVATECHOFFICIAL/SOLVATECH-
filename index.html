@@ -1308,6 +1308,13 @@
         messagingSenderId: "420914651308",
       };
 
+      const ADMIN_EMAILS = ["awoyinfasolomon1@gmail.com", "solomontech00@gmail.com"];
+      const ADMIN_EMAIL = "awoyinfasolomon1@gmail.com";
+      function isUserAdminEmail(email) {
+        if (!email || typeof email !== "string") return false;
+        return ADMIN_EMAILS.includes(email.trim().toLowerCase());
+      }
+
       const FALLBACK_PRODUCTION_BACKEND = "https://web-production-c6f21.up.railway.app";
       const isSelfHosted = window.location.hostname.includes("railway.app") ||
                            window.location.hostname === "localhost" ||
@@ -2277,7 +2284,7 @@
 
         const singlePageWrapper = $("single-page-wrapper");
         const sectionAdmin = $("admin-panel");
-        const isUserAdmin = currentUser && currentUser.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+        const isUserAdmin = currentUser && isUserAdminEmail(currentUser.email);
 
         if (tabName === "admin" && isUserAdmin) {
           if (singlePageWrapper) singlePageWrapper.classList.add("hidden");
@@ -2299,7 +2306,7 @@
           };
         });
 
-        const isUserAdmin = currentUser && currentUser.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+        const isUserAdmin = currentUser && isUserAdminEmail(currentUser.email);
         if (activeDashTab === "admin" && !isUserAdmin) {
           activeDashTab = "user";
         }
@@ -2836,7 +2843,6 @@
       // ======================================================================
       // SOLVATECH LICENSE & ADMIN SYSTEM JAVASCRIPT
       // ======================================================================
-      const ADMIN_EMAIL = "awoyinfasolomon1@gmail.com";
       let licenseCountdownTimerId = null;
       let cachedServerExpiryTime = null;
       let cachedServerOffset = 0; // ms offset between local client clock and server time
@@ -2938,7 +2944,7 @@
 
           // If current user is the administrator, reveal admin tab and populate records
           const tabBtnAdmin = $("tab-btn-admin");
-          if (data.isAdmin || currentUser.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+          if (data.isAdmin || isUserAdminEmail(currentUser?.email)) {
             if (tabBtnAdmin) tabBtnAdmin.classList.remove("hidden");
             if (activeDashTab === "admin" || activeDashTab === "all") {
               if (adminPanel) adminPanel.classList.remove("hidden");
@@ -2952,7 +2958,7 @@
           }
         } catch (err) {
           console.debug("License poll error:", err.message);
-          if (currentUser?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+          if (isUserAdminEmail(currentUser?.email)) {
             updateLicenseUI({ isAdmin: true, status: "active", durationDays: "Unlimited", hasActiveLicense: true });
           } else if (db && currentUser?.uid) {
             try {
@@ -2981,7 +2987,7 @@
           cachedServerOffset = serverMs - Date.now();
         }
 
-        const isUserAdmin = data.isAdmin || currentUser?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+        const isUserAdmin = data.isAdmin || isUserAdminEmail(currentUser?.email);
 
         const tabLicenseIndicator = $("tab-license-indicator");
         if (tabLicenseIndicator) {
