@@ -2916,7 +2916,7 @@
           }
 
           const abortCtrl = new AbortController();
-          const abortTimer = setTimeout(() => abortCtrl.abort(), 18000);
+          const abortTimer = setTimeout(() => abortCtrl.abort(), 45000);
 
           try {
             let targetUrl = getApiUrl("/pair");
@@ -3531,13 +3531,11 @@
               throw new Error(data.error || "License generation failed.");
             }
 
-            // Write to Firestore if accessible
+            // Write to Firestore if accessible (fire-and-forget, never hang the UI)
             if (db && data.license && data.license.code) {
-              try {
-                await setDoc(doc(db, "licenses", data.license.code), data.license, { merge: true });
-              } catch (fsErr) {
-                console.debug("Client Firestore save notice:", fsErr.message);
-              }
+              setDoc(doc(db, "licenses", data.license.code), data.license, { merge: true }).catch((fsErr) => {
+                console.debug("Client Firestore save notice:", fsErr?.message);
+              });
             }
 
             if (adminGenerateMsg) {
