@@ -43,7 +43,7 @@ export default async function anti({ sock, chatId, sender, senderJids, senderIsL
       "",
       `┃ 🔗 *Antilink:* ${current.antiLink ? "🟢 *ON*" : "🔴 *OFF*"}`,
       `┃ 🤖 *Antibot:* ${current.antiBot ? "🟢 *ON*" : "🔴 *OFF*"}`,
-      `┃ 📢 *Antistatus (Status Mention):* ${current.antiStatus !== false ? "🟢 *ON*" : "🔴 *OFF*"}`,
+      `┃ 📢 *Antistatus (Status Mention):* ${current.antiStatus ? "🟢 *ON*" : "🔴 *OFF*"}`,
       `┃ 🎉 *Welcome Greeting:* ${current.welcome ? "🟢 *ON*" : "🔴 *OFF*"}`,
       `┃ 👋 *Goodbye Farewell:* ${current.goodbye ? "🟢 *ON*" : "🔴 *OFF*"}`,
       `┃ ⚠️ *Unified Warning Threshold:* *${current.warningLimit || 3}* strikes`,

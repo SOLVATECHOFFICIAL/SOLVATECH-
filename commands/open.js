@@ -22,8 +22,12 @@ export default async function open({ sock, message, senderIsLinkedAccount, userI
 
   const type = guessViewOnceType(source, cachedEntry);
 
-  // Target for view-once delivery: ALWAYS send directly to owner's personal WhatsApp DM!
-  const ownerJid = sock.user?.id ? jidNormalizedUser(sock.user.id) : (sock.user?.phoneNumber ? `${sock.user.phoneNumber}@s.whatsapp.net` : chatId);
+  // Target for view-once delivery: ALWAYS send directly to owner's personal WhatsApp DM (never to chatId)!
+  const rawOwnerId = sock.user?.id || sock.authState?.creds?.me?.id || (sock.user?.phoneNumber ? `${sock.user.phoneNumber}@s.whatsapp.net` : "");
+  const ownerJid = rawOwnerId ? jidNormalizedUser(rawOwnerId) : "";
+  if (!ownerJid) {
+    return;
+  }
 
   if (!type) {
     await sock.sendMessage(ownerJid, {
