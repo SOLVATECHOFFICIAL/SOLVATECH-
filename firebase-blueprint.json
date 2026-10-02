@@ -2,37 +2,47 @@
   "entities": {
     "UserProfile": {
       "title": "UserProfile",
-      "description": "User profile with authentication and referral attribution data",
+      "description": "User profile with authentication, referral attribution and activity timestamps",
       "type": "object",
       "properties": {
         "id": { "type": "string", "description": "Unique Firebase Auth UID" },
         "email": { "type": "string", "description": "User email address" },
         "displayName": { "type": "string", "description": "User display name" },
-        "photoURL": { "type": "string", "description": "Google avatar URL" },
-        "createdAt": { "type": "string", "description": "ISO timestamp of account creation" },
-        "lastLoginAt": { "type": "string", "description": "ISO timestamp of last login" },
+        "photoURL": { "type": "string", "description": "Google profile picture URL" },
+        "role": { "type": "string", "description": "Access role: user or admin" },
         "referralCode": { "type": "string", "description": "Permanent referral code" },
         "referredBy": { "type": "string", "description": "UID of referrer" },
         "referredAt": { "type": "string", "description": "ISO timestamp when referred" },
         "qualifyingSalesNgn": { "type": "number", "description": "Total qualifying referral sales in NGN" },
-        "claimedDaysTotal": { "type": "number", "description": "Total claimed referral reward days" }
-      }
+        "claimedDaysTotal": { "type": "number", "description": "Total claimed referral reward days" },
+        "isBanned": { "type": "boolean", "description": "Whether user is barred from bot services" },
+        "createdAt": { "type": "string", "description": "ISO timestamp of account creation" },
+        "lastLoginAt": { "type": "string", "description": "ISO timestamp of last login" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp of last update" }
+      },
+      "required": ["id", "email"]
     },
     "License": {
       "title": "License",
-      "description": "Admin generated license key record",
+      "description": "Admin generated cryptographic license key record",
       "type": "object",
       "properties": {
         "code": { "type": "string", "description": "Cryptographic unique license code" },
-        "durationDays": { "type": "number", "description": "Duration in days" },
-        "createdAt": { "type": "string", "description": "ISO timestamp when created by admin" },
-        "createdBy": { "type": "string", "description": "Admin email who created the license" },
+        "durationDays": { "type": "string", "description": "Duration in days as string" },
+        "isUnlimited": { "type": "boolean", "description": "Whether license grants perpetual access" },
         "status": { "type": "string", "description": "unused or used" },
+        "createdBy": { "type": "string", "description": "Admin email who created the license" },
+        "notes": { "type": "string", "description": "Internal notes or customer name" },
         "redeemedByUid": { "type": "string", "description": "Verified UID of redeemer" },
         "redeemedByEmail": { "type": "string", "description": "Email of redeemer" },
         "redeemedAt": { "type": "string", "description": "ISO timestamp when redeemed" },
-        "expiresAt": { "type": "string", "description": "ISO timestamp of expiry" }
-      }
+        "expiresAt": { "type": "string", "description": "ISO timestamp of expiry" },
+        "priceNgn": { "type": "number", "description": "Official price of license in NGN" },
+        "batchId": { "type": "string", "description": "Batch identifier for grouped generation" },
+        "createdAt": { "type": "string", "description": "ISO timestamp when created" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp when updated" }
+      },
+      "required": ["code", "durationDays"]
     },
     "UserLicense": {
       "title": "UserLicense",
@@ -40,13 +50,17 @@
       "type": "object",
       "properties": {
         "uid": { "type": "string", "description": "Verified UID of license holder" },
-        "email": { "type": "string", "description": "Account email" },
+        "email": { "type": "string", "description": "Account email address" },
         "lastLicenseCode": { "type": "string", "description": "Last redeemed license code" },
-        "durationDays": { "type": "number", "description": "Duration in days" },
+        "durationDays": { "type": "string", "description": "Duration in days" },
+        "isUnlimited": { "type": "boolean", "description": "Unlimited status flag" },
+        "status": { "type": "string", "description": "active or expired" },
         "redeemedAt": { "type": "string", "description": "ISO timestamp when redeemed" },
         "expiresAt": { "type": "string", "description": "ISO timestamp when license expires" },
-        "status": { "type": "string", "description": "active or expired" }
-      }
+        "createdAt": { "type": "string", "description": "ISO timestamp of creation" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp of update" }
+      },
+      "required": ["uid"]
     },
     "GroupSettings": {
       "title": "GroupSettings",
@@ -54,140 +68,300 @@
       "type": "object",
       "properties": {
         "safeUserId": { "type": "string", "description": "User identifier" },
-        "settings": { "type": "object", "description": "Group settings map by groupId" }
-      }
+        "settings": { "type": "object", "description": "Group settings map by groupId" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp when updated" }
+      },
+      "required": ["safeUserId"]
+    },
+    "GroupRules": {
+      "title": "GroupRules",
+      "description": "Permanent WhatsApp group rules preserved across sessions keyed by group JID",
+      "type": "object",
+      "properties": {
+        "groupId": { "type": "string", "description": "WhatsApp Group JID" },
+        "groupName": { "type": "string", "description": "WhatsApp Group Subject/Title" },
+        "welcome": { "type": "boolean", "description": "Auto-welcome greeting toggle" },
+        "goodbye": { "type": "boolean", "description": "Auto-goodbye farewell toggle" },
+        "antiLink": { "type": "boolean", "description": "Anti-link protection toggle" },
+        "antiBot": { "type": "boolean", "description": "Anti-bot protection toggle" },
+        "antiStatus": { "type": "boolean", "description": "Anti-status protection toggle" },
+        "antiSticker": { "type": "boolean", "description": "Anti-sticker spam toggle" },
+        "warningLimit": { "type": "number", "description": "Infraction warning threshold" },
+        "createdAt": { "type": "string", "description": "ISO timestamp when created" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp when last modified" }
+      },
+      "required": ["groupId"]
     },
     "WhatsAppSession": {
       "title": "WhatsAppSession",
-      "description": "Baileys WhatsApp session state and credentials",
+      "description": "Baileys WhatsApp session authentication state and multi-device keys",
       "type": "object",
       "properties": {
-        "updatedAt": { "type": "string", "description": "ISO timestamp of last update" },
-        "fileCount": { "type": "number", "description": "Number of session files" },
-        "files": { "type": "object", "description": "Map of filename to JSON content" }
-      }
+        "safeUserId": { "type": "string", "description": "Verified safe user UID" },
+        "phoneNumber": { "type": "string", "description": "Connected WhatsApp phone number" },
+        "connectionStatus": { "type": "string", "description": "connected, ready, connecting, or disconnected" },
+        "fileCount": { "type": "number", "description": "Number of Baileys session files stored" },
+        "files": { "type": "object", "description": "Map of filename to encoded credentials" },
+        "lastActiveAt": { "type": "string", "description": "ISO timestamp of last socket ping" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp of last update" }
+      },
+      "required": ["safeUserId"]
     },
     "NumberLock": {
       "title": "NumberLock",
-      "description": "Permanent lock mapping WhatsApp phone numbers to UIDs",
+      "description": "Anti-hijack permanent lock binding WhatsApp phone numbers to user UIDs",
       "type": "object",
       "properties": {
-        "phoneNumber": { "type": "string", "description": "Cleaned WhatsApp phone number" },
+        "phoneNumber": { "type": "string", "description": "Cleaned WhatsApp phone number digits" },
         "uid": { "type": "string", "description": "Locked user UID" },
         "userEmail": { "type": "string", "description": "Locked user email" },
+        "deviceName": { "type": "string", "description": "Device or browser description" },
         "lockedAt": { "type": "string", "description": "ISO timestamp when locked" }
-      }
+      },
+      "required": ["phoneNumber", "uid"]
     },
     "UserNumberLock": {
       "title": "UserNumberLock",
-      "description": "Permanent lock mapping UIDs to WhatsApp phone numbers",
+      "description": "Reverse lookup lock mapping user UIDs to WhatsApp phone numbers",
       "type": "object",
       "properties": {
         "uid": { "type": "string", "description": "Locked user UID" },
         "phoneNumber": { "type": "string", "description": "Cleaned WhatsApp phone number" },
+        "userEmail": { "type": "string", "description": "User email address" },
         "lockedAt": { "type": "string", "description": "ISO timestamp when locked" }
-      }
+      },
+      "required": ["uid", "phoneNumber"]
     },
     "ReferralPurchase": {
       "title": "ReferralPurchase",
-      "description": "Purchase transaction record for referral rewards attribution",
+      "description": "Purchase transaction record for referral commission attribution",
       "type": "object",
       "properties": {
-        "purchaseId": { "type": "string", "description": "Unique transaction/purchase ID" },
+        "purchaseId": { "type": "string", "description": "Unique transaction identifier" },
         "buyerUid": { "type": "string", "description": "Buyer user UID" },
         "buyerEmail": { "type": "string", "description": "Buyer email address" },
         "referrerUid": { "type": "string", "description": "Referrer user UID" },
         "licenseCode": { "type": "string", "description": "Redeemed license code" },
-        "durationDays": { "type": "number", "description": "Duration in days" },
+        "durationDays": { "type": "string", "description": "Duration in days" },
         "amountNgn": { "type": "number", "description": "Purchase price in NGN" },
-        "isQualifying": { "type": "boolean", "description": "Whether purchase qualifies for referral sales" },
+        "isQualifying": { "type": "boolean", "description": "Whether purchase qualifies for rewards" },
         "createdAt": { "type": "string", "description": "ISO timestamp of transaction" }
-      }
+      },
+      "required": ["purchaseId", "buyerUid", "referrerUid"]
     },
     "ReferralReward": {
       "title": "ReferralReward",
-      "description": "Earned referral reward threshold record",
+      "description": "Earned referral reward threshold milestone record",
       "type": "object",
       "properties": {
         "rewardId": { "type": "string", "description": "Unique reward identifier" },
         "referrerUid": { "type": "string", "description": "Referrer user UID" },
-        "thresholdNgn": { "type": "number", "description": "Qualifying sales threshold reached in NGN" },
-        "freeDays": { "type": "number", "description": "Free days generated by this threshold" },
-        "createdAt": { "type": "string", "description": "ISO timestamp when threshold was earned" },
+        "thresholdNgn": { "type": "number", "description": "Qualifying sales threshold in NGN" },
+        "freeDays": { "type": "number", "description": "Free subscription days awarded" },
         "status": { "type": "string", "description": "earned or claimed" },
         "claimedAt": { "type": "string", "description": "ISO timestamp when claimed" },
-        "claimId": { "type": "string", "description": "Associated claim ID" }
-      }
+        "claimId": { "type": "string", "description": "Associated claim transaction ID" },
+        "createdAt": { "type": "string", "description": "ISO timestamp when threshold reached" }
+      },
+      "required": ["rewardId", "referrerUid", "thresholdNgn"]
     },
     "ReferralClaim": {
       "title": "ReferralClaim",
-      "description": "Claim record of redeemed free days",
+      "description": "Claim record of redeemed free days credited to user account",
       "type": "object",
       "properties": {
         "claimId": { "type": "string", "description": "Unique claim transaction ID" },
         "userUid": { "type": "string", "description": "User UID receiving the free days" },
         "userEmail": { "type": "string", "description": "User account email" },
         "daysAwarded": { "type": "number", "description": "Number of free days awarded" },
-        "claimedAt": { "type": "string", "description": "ISO timestamp of claim" },
         "previousExpiresAt": { "type": "string", "description": "Expiry timestamp before claim" },
         "newExpiresAt": { "type": "string", "description": "Expiry timestamp after claim" },
-        "status": { "type": "string", "description": "completed status" }
-      }
-    },
-    "GroupRules": {
-      "title": "GroupRules",
-      "description": "Permanent WhatsApp group rules preserved by group JID across sessions",
-      "type": "object",
-      "properties": {
-        "groupId": { "type": "string", "description": "WhatsApp Group JID" },
-        "welcome": { "type": "boolean", "description": "Auto-welcome toggle" },
-        "goodbye": { "type": "boolean", "description": "Auto-goodbye toggle" },
-        "antiLink": { "type": "boolean", "description": "Anti-link toggle" },
-        "antiBot": { "type": "boolean", "description": "Anti-bot toggle" },
-        "antiStatus": { "type": "boolean", "description": "Anti-status toggle" },
-        "warningLimit": { "type": "number", "description": "Warning threshold" },
-        "updatedAt": { "type": "string", "description": "ISO timestamp when last modified" }
-      }
+        "status": { "type": "string", "description": "completed status" },
+        "claimedAt": { "type": "string", "description": "ISO timestamp of claim" }
+      },
+      "required": ["claimId", "userUid", "daysAwarded"]
     },
     "SystemConfig": {
       "title": "SystemConfig",
-      "description": "System configuration such as backend Railway production URL",
+      "description": "Global system configuration, prices, and backend endpoints",
       "type": "object",
       "properties": {
+        "key": { "type": "string", "description": "Unique configuration key name" },
+        "value": { "type": "object", "description": "Arbitrary configuration JSON object" },
         "railwayUrl": { "type": "string", "description": "Active backend service URL" },
         "updatedAt": { "type": "string", "description": "ISO timestamp of update" },
-        "updatedBy": { "type": "string", "description": "Admin email who set the URL" }
-      }
+        "updatedBy": { "type": "string", "description": "Admin email who modified settings" }
+      },
+      "required": ["key"]
     },
     "DeletedMessage": {
       "title": "DeletedMessage",
-      "description": "Metadata of deleted messages for DDD recovery",
+      "description": "Anti-delete DDD recovered message record and media attachment",
       "type": "object",
       "properties": {
         "id": { "type": "string", "description": "Unique deleted message record ID" },
-        "userId": { "type": "string", "description": "User account ID" },
-        "remoteJid": { "type": "string", "description": "WhatsApp chat JID" },
-        "sender": { "type": "string", "description": "Sender JID" },
+        "userId": { "type": "string", "description": "Account ID of the bot session" },
+        "originalId": { "type": "string", "description": "Original WhatsApp message ID" },
+        "remoteJid": { "type": "string", "description": "WhatsApp chat or group JID" },
+        "sender": { "type": "string", "description": "Original message sender JID" },
+        "senderName": { "type": "string", "description": "Push name of sender" },
         "text": { "type": "string", "description": "Text content of deleted message" },
-        "mediaType": { "type": "string", "description": "Type of media if applicable" },
-        "mediaStoragePath": { "type": "string", "description": "Firebase Storage path if large media attachment" },
-        "deletedAt": { "type": "number", "description": "Timestamp of deletion" },
-        "originalTimestamp": { "type": "number", "description": "Timestamp of original message" }
-      }
+        "mediaType": { "type": "string", "description": "Type of media (image, video, audio, sticker)" },
+        "mediaStoragePath": { "type": "string", "description": "Firebase Storage path if stored" },
+        "mediaUrl": { "type": "string", "description": "Direct download URL for media" },
+        "originalTimestamp": { "type": "number", "description": "Unix timestamp of original message" },
+        "deletedAt": { "type": "number", "description": "Unix timestamp when deletion detected" },
+        "createdAt": { "type": "string", "description": "ISO timestamp of record creation" }
+      },
+      "required": ["id", "userId", "remoteJid", "sender"]
+    },
+    "BotCommandLog": {
+      "title": "BotCommandLog",
+      "description": "Execution log and performance telemetry for bot commands",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique command execution ID" },
+        "userId": { "type": "string", "description": "User UID of bot owner" },
+        "commandName": { "type": "string", "description": "Command invoked without prefix" },
+        "args": { "type": "string", "description": "Parameters passed to command" },
+        "chatJid": { "type": "string", "description": "Chat where command was triggered" },
+        "isGroup": { "type": "boolean", "description": "Whether executed in a group" },
+        "callerJid": { "type": "string", "description": "Participant who called the command" },
+        "executionTimeMs": { "type": "number", "description": "Execution latency in ms" },
+        "success": { "type": "boolean", "description": "Whether execution succeeded" },
+        "errorMessage": { "type": "string", "description": "Error details if failed" },
+        "createdAt": { "type": "string", "description": "ISO timestamp of execution" }
+      },
+      "required": ["id", "userId", "commandName"]
+    },
+    "GroupWarning": {
+      "title": "GroupWarning",
+      "description": "Active group member warnings and violation tracking",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique warning record ID" },
+        "groupId": { "type": "string", "description": "WhatsApp Group JID" },
+        "targetUserJid": { "type": "string", "description": "Infracting member JID" },
+        "warningCount": { "type": "number", "description": "Cumulative warnings count" },
+        "violationType": { "type": "string", "description": "antilink, antibot, antispam, manual" },
+        "reason": { "type": "string", "description": "Explanation of warning" },
+        "warnedByJid": { "type": "string", "description": "Admin who issued the warning" },
+        "expiresAt": { "type": "string", "description": "ISO timestamp of warning expiration" },
+        "createdAt": { "type": "string", "description": "ISO timestamp when warned" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp of last update" }
+      },
+      "required": ["id", "groupId", "targetUserJid"]
+    },
+    "AntiSpamEvent": {
+      "title": "AntiSpamEvent",
+      "description": "Audit event when an anti-spam rate limiter is triggered",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique event ID" },
+        "userId": { "type": "string", "description": "Bot account UID" },
+        "chatJid": { "type": "string", "description": "Target chat or group JID" },
+        "senderJid": { "type": "string", "description": "Spamming participant JID" },
+        "eventType": { "type": "string", "description": "message_flood, sticker_flood, repeated_text" },
+        "messagesInWindow": { "type": "number", "description": "Message count detected in burst window" },
+        "actionTaken": { "type": "string", "description": "warn, mute, kick, or delete" },
+        "createdAt": { "type": "string", "description": "ISO timestamp of incident" }
+      },
+      "required": ["id", "chatJid", "senderJid"]
+    },
+    "AIChatMemory": {
+      "title": "AIChatMemory",
+      "description": "Contextual AI conversation turn stored for multi-turn coherence",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique memory turn ID" },
+        "chatId": { "type": "string", "description": "WhatsApp chat JID" },
+        "userId": { "type": "string", "description": "Bot session UID" },
+        "role": { "type": "string", "description": "user or model" },
+        "content": { "type": "string", "description": "Text message content" },
+        "modelUsed": { "type": "string", "description": "Model alias used" },
+        "tokensUsed": { "type": "number", "description": "Estimated token count" },
+        "createdAt": { "type": "string", "description": "ISO timestamp of turn" }
+      },
+      "required": ["id", "chatId", "role", "content"]
+    },
+    "AIDeepFact": {
+      "title": "AIDeepFact",
+      "description": "Extracted long-term factual knowledge about chat participants",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique fact identifier" },
+        "chatId": { "type": "string", "description": "WhatsApp chat JID" },
+        "factKey": { "type": "string", "description": "Fact identifier or subject key" },
+        "factValue": { "type": "string", "description": "Fact description or detail" },
+        "confidence": { "type": "number", "description": "Confidence score 0.0 to 1.0" },
+        "source": { "type": "string", "description": "conversation or admin_set" },
+        "createdAt": { "type": "string", "description": "ISO timestamp when learned" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp when updated" }
+      },
+      "required": ["id", "chatId", "factKey", "factValue"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Security audit record of sensitive administrative actions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique audit record ID" },
+        "adminEmail": { "type": "string", "description": "Email of admin who executed action" },
+        "action": { "type": "string", "description": "GRANT_DAYS, TOGGLE_UNLIMITED, DELETE_USER, etc." },
+        "targetUid": { "type": "string", "description": "Affected user UID" },
+        "targetResource": { "type": "string", "description": "Resource identifier" },
+        "details": { "type": "object", "description": "Additional event context payload" },
+        "ipAddress": { "type": "string", "description": "Client IP address" },
+        "createdAt": { "type": "string", "description": "ISO timestamp of action" }
+      },
+      "required": ["id", "adminEmail", "action"]
+    },
+    "MediaCache": {
+      "title": "MediaCache",
+      "description": "Decrypted anti-view-once media files metadata",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique cache ID" },
+        "userId": { "type": "string", "description": "User UID who captured the media" },
+        "mediaType": { "type": "string", "description": "image, video, or audio" },
+        "fileHash": { "type": "string", "description": "SHA-256 hash of media" },
+        "fileSize": { "type": "number", "description": "Size in bytes" },
+        "storagePath": { "type": "string", "description": "Storage path" },
+        "mimeType": { "type": "string", "description": "MIME type" },
+        "caption": { "type": "string", "description": "Accompanying caption" },
+        "createdAt": { "type": "string", "description": "ISO timestamp when cached" }
+      },
+      "required": ["id", "userId", "mediaType"]
+    },
+    "BroadcastLog": {
+      "title": "BroadcastLog",
+      "description": "Administrative broadcast message dispatch audit record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique broadcast ID" },
+        "senderEmail": { "type": "string", "description": "Admin email who sent broadcast" },
+        "messageText": { "type": "string", "description": "Broadcast message text" },
+        "recipientType": { "type": "string", "description": "all, active, or expired" },
+        "totalRecipients": { "type": "number", "description": "Target recipient count" },
+        "successfulDeliveries": { "type": "number", "description": "Successful delivery count" },
+        "failedDeliveries": { "type": "number", "description": "Failed delivery count" },
+        "createdAt": { "type": "string", "description": "ISO timestamp when broadcast dispatched" }
+      },
+      "required": ["id", "senderEmail", "messageText"]
     }
   },
   "firestore": {
     "/users/{userId}": {
       "schema": "UserProfile",
-      "description": "User profiles and referral attributes"
+      "description": "User profiles, referral attributes, roles, and account status"
     },
     "/licenses/{code}": {
       "schema": "License",
-      "description": "Cryptographic license keys"
+      "description": "Cryptographic license keys generated by admin"
     },
     "/user_licenses/{userId}": {
       "schema": "UserLicense",
-      "description": "Active user license activations"
+      "description": "Active user license activations and subscriptions"
     },
     "/group_settings/{userId}": {
       "schema": "GroupSettings",
@@ -195,39 +369,71 @@
     },
     "/whatsapp_sessions/{userId}": {
       "schema": "WhatsAppSession",
-      "description": "Baileys WhatsApp session state"
+      "description": "Baileys WhatsApp multi-device authentication credentials"
     },
     "/number_locks/{phoneNumber}": {
       "schema": "NumberLock",
-      "description": "WhatsApp phone number locks"
+      "description": "WhatsApp phone number locks binding phone to user UID"
     },
     "/user_number_locks/{userId}": {
       "schema": "UserNumberLock",
-      "description": "User UID number locks"
+      "description": "User UID number locks binding user UID to phone"
     },
     "/referral_purchases/{purchaseId}": {
       "schema": "ReferralPurchase",
-      "description": "Referral purchase records"
+      "description": "Referral purchase transaction records"
     },
     "/referral_rewards/{rewardId}": {
       "schema": "ReferralReward",
-      "description": "Earned referral rewards"
+      "description": "Earned referral milestone reward records"
     },
     "/referral_claims/{claimId}": {
       "schema": "ReferralClaim",
-      "description": "Claimed referral reward free days"
+      "description": "Claimed referral reward free days transaction records"
     },
     "/deleted_messages/{recordId}": {
       "schema": "DeletedMessage",
-      "description": "Deleted message metadata for recovery"
+      "description": "Anti-delete DDD recovered message records"
     },
     "/group_rules/{groupId}": {
       "schema": "GroupRules",
-      "description": "Permanent group rules keyed by WhatsApp group JID"
+      "description": "Permanent group rules preserved by group JID across sessions"
     },
     "/system_config/{configId}": {
       "schema": "SystemConfig",
-      "description": "Global system configuration"
+      "description": "Global system configuration, prices, and backend URLs"
+    },
+    "/bot_command_logs/{logId}": {
+      "schema": "BotCommandLog",
+      "description": "Bot command execution history and performance telemetry"
+    },
+    "/group_warnings/{warningId}": {
+      "schema": "GroupWarning",
+      "description": "Group member warnings and infractions"
+    },
+    "/anti_spam_events/{eventId}": {
+      "schema": "AntiSpamEvent",
+      "description": "Anti-spam rate limit trigger incidents"
+    },
+    "/ai_chat_memories/{memoryId}": {
+      "schema": "AIChatMemory",
+      "description": "Multi-turn AI conversation memory history"
+    },
+    "/ai_deep_facts/{factId}": {
+      "schema": "AIDeepFact",
+      "description": "AI long-term knowledge facts extracted from chat"
+    },
+    "/audit_logs/{auditId}": {
+      "schema": "AuditLog",
+      "description": "Administrative security audit trail records"
+    },
+    "/media_cache/{cacheId}": {
+      "schema": "MediaCache",
+      "description": "Anti-view-once decrypted media cache store"
+    },
+    "/broadcast_logs/{broadcastId}": {
+      "schema": "BroadcastLog",
+      "description": "Admin broadcast notification records"
     }
   }
 }

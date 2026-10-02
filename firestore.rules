@@ -1,8 +1,192 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Default-deny global safety net
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
+    }
+
+    // Security helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'king1solomon3t@gmail.com' ||
+        request.auth.token.email == 'awoyinfasolomon1@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // 1. User Profiles
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+      allow create: if isOwner(userId) && (!('role' in incoming()) || incoming().role == 'user');
+      allow update: if (isOwner(userId) && (!('role' in incoming()) || incoming().role == existing().role)) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // 2. Cryptographic Licenses
+    match /licenses/{code} {
+      allow get: if isSignedIn();
+      allow list: if isAdmin();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (
+        isSignedIn() && 
+        existing().status == 'unused' && 
+        incoming().status == 'used' && 
+        incoming().redeemedByUid == request.auth.uid
+      );
+    }
+
+    // 3. User Active Licenses & Subscriptions
+    match /user_licenses/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+      allow write: if isOwner(userId) || isAdmin();
+    }
+
+    // 4. WhatsApp Group Settings
+    match /group_settings/{userId} {
+      allow get, write: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+    }
+
+    // 5. WhatsApp Baileys Authentication Sessions
+    match /whatsapp_sessions/{userId} {
+      allow get, write: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+    }
+
+    // 6. Anti-Hijack Number Locks (Phone -> UID)
+    match /number_locks/{phoneNumber} {
+      allow get: if isSignedIn();
+      allow list: if isAdmin();
+      allow create: if isSignedIn() && incoming().uid == request.auth.uid;
+      allow update, delete: if isAdmin() || (isSignedIn() && existing().uid == request.auth.uid);
+    }
+
+    // 7. User Number Locks (UID -> Phone)
+    match /user_number_locks/{userId} {
+      allow get, write: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+    }
+
+    // 8. Referral Purchases
+    match /referral_purchases/{purchaseId} {
+      allow get: if isSignedIn() && (existing().buyerUid == request.auth.uid || existing().referrerUid == request.auth.uid || isAdmin());
+      allow list: if isAdmin() || (isSignedIn() && resource.data.referrerUid == request.auth.uid);
+      allow create: if isSignedIn() && incoming().buyerUid == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // 9. Referral Rewards
+    match /referral_rewards/{rewardId} {
+      allow get: if isSignedIn() && (existing().referrerUid == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.referrerUid == request.auth.uid || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    // 10. Referral Claims
+    match /referral_claims/{claimId} {
+      allow get: if isSignedIn() && (existing().userUid == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userUid == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && incoming().userUid == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // 11. Cross-Session Permanent Group Rules
+    match /group_rules/{groupId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // 12. Global System Configuration (Pricing plans, Railway backend URL)
+    match /system_config/{configId} {
+      allow get, list: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // 13. Anti-Delete Message Recovery (DDD Logs)
+    match /deleted_messages/{recordId} {
+      allow get: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid;
+      allow update, delete: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+    }
+
+    // 14. Bot Command Execution Logs
+    match /bot_command_logs/{logId} {
+      allow get: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // 15. Group Infraction Warnings
+    match /group_warnings/{warningId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // 16. Anti-Spam Rate Limit Events
+    match /anti_spam_events/{eventId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+
+    // 17. AI Chat Memories
+    match /ai_chat_memories/{memoryId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // 18. AI Deep Facts
+    match /ai_deep_facts/{factId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // 19. Administrative Audit Logs
+    match /audit_logs/{auditId} {
+      allow read, write: if isAdmin();
+    }
+
+    // 20. Anti-View-Once Media Cache
+    match /media_cache/{cacheId} {
+      allow get: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if isSignedIn() && (incoming().userId == request.auth.uid || isAdmin());
+    }
+
+    // 21. Admin Broadcast Logs
+    match /broadcast_logs/{broadcastId} {
+      allow get, list: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Administrative roles collection
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
   }
 }
