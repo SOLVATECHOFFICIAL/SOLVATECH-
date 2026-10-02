@@ -4477,6 +4477,60 @@
             renderAdminDashboard();
           }
         } catch (err) {
+          console.debug("Backend overview fetch error, trying direct Firestore vault fallback:", err.message);
+          if (db) {
+            try {
+              const [licSnap, userLicSnap, paySnap] = await Promise.all([
+                getDocs(collection(db, "licenses")).catch(() => null),
+                getDocs(collection(db, "user_licenses")).catch(() => null),
+                getDocs(collection(db, "payment_requests")).catch(() => null),
+              ]);
+              if (licSnap || userLicSnap) {
+                const licenses = [];
+                if (licSnap) {
+                  licSnap.forEach((d) => {
+                    licenses.push({ code: d.id, ...d.data() });
+                  });
+                }
+                const customers = [];
+                if (userLicSnap) {
+                  userLicSnap.forEach((d) => {
+                    customers.push({ uid: d.id, ...d.data() });
+                  });
+                }
+                const payments = [];
+                if (paySnap) {
+                  paySnap.forEach((d) => {
+                    payments.push({ id: d.id, ...d.data() });
+                  });
+                }
+                adminOverviewData = {
+                  overview: {
+                    totalUsers: customers.length,
+                    activeLicenses: licenses.filter(l => l.status === "used").length,
+                    unusedKeys: licenses.filter(l => l.status === "unused").length,
+                    usedKeys: licenses.filter(l => l.status === "used").length,
+                    connectedWhatsApp: 0,
+                  },
+                  licenses,
+                  customers,
+                  payments,
+                  referrals: { referrers: [] },
+                  systemHealth: { uptimeSeconds: 0, platform: "Cloud Firestore Direct" },
+                };
+                adminOverviewLoading = false;
+                adminOverviewError = null;
+                if (lastSyncEl) {
+                  lastSyncEl.textContent = `Synced: ${new Date().toLocaleTimeString()} (Firestore Vault)`;
+                }
+                renderAdminDashboard();
+                return;
+              }
+            } catch (fsErr) {
+              console.debug("Firestore direct fallback notice:", fsErr.message);
+            }
+          }
+
           adminOverviewLoading = false;
           adminOverviewError = err.message || "Failed to load admin overview data";
           console.debug("Failed to load admin overview:", err.message);
@@ -5692,47 +5746,12 @@
       if (adminRailwaySaveBtn) {
         adminRailwaySaveBtn.addEventListener("click", async () => {
           const input = document.getElementById("admin-railway-url-input");
-          const alertEl = document.getElementById("admin-railway-alert");
           const val = (input?.value || "").trim().replace(/\/+$/, "");
-
-          if (!val || !val.startsWith("http")) {
-            if (alertEl) {
-              alertEl.className = "license-msg error";
-              alertEl.textContent = "Please enter a valid Railway HTTPS URL (e.g. https://web-production-xxxx.up.railway.app)";
-              alertEl.classList.remove("hidden");
-            }
-            return;
-          }
-
           adminRailwaySaveBtn.disabled = true;
-          adminRailwaySaveBtn.textContent = "Saving to Firestore...";
-
+          adminRailwaySaveBtn.textContent = "Saving to Cloud...";
           try {
-            let authHeader = await getAuthHeader();
-            let res = await fetch(getApiUrl("/admin/backend-url"), {
-              method: "POST",
-              headers: { "Content-Type": "application/json", "Authorization": authHeader || "" },
-              body: JSON.stringify({ railwayUrl: val }),
-            });
-
-            const data = await safeFetchJson(res);
-            if (!res.ok) throw new Error(data.error || "Failed to save Railway backend URL.");
-
-            customApiUrl = val;
-            try { localStorage.setItem("solvatech_backend_url", val); } catch (e) {}
-
-            if (alertEl) {
-              alertEl.className = "license-msg success";
-              alertEl.textContent = "✅ Saved for everyone! All users and dashboard instances now connect to this Railway URL.";
-              alertEl.classList.remove("hidden");
-            }
-            testBackendHealth(false);
-          } catch (err) {
-            if (alertEl) {
-              alertEl.className = "license-msg error";
-              alertEl.textContent = `Save failed: ${err.message}`;
-              alertEl.classList.remove("hidden");
-            }
+            await applyRailwayBackendUrl(val, "admin-railway-alert");
+            await loadAdminOverview(true);
           } finally {
             adminRailwaySaveBtn.disabled = false;
             adminRailwaySaveBtn.textContent = "💾 Save & Link Backend";
