@@ -26,6 +26,11 @@ import {
   adminGenerateKeyForUser,
   getGlobalRailwayConfig,
   setGlobalRailwayConfig,
+  getGlobalLicensePlans,
+  updateGlobalLicensePlans,
+  getMaintenanceDiagnostics,
+  performSafeMaintenanceCleanup,
+  getOfficialLicensePrice,
   ADMIN_EMAIL,
 } from "./lib/license.js";
 import {
@@ -33,7 +38,6 @@ import {
   getReferralStats,
   claimReferralReward,
   getAdminReferralAudit,
-  getOfficialLicensePrice,
 } from "./lib/referral.js";
 
 const origConsoleError = console.error;
@@ -288,6 +292,7 @@ for (const p of prefixes) {
     const controller = getWhatsAppController(safeUserId, { verifiedUid, userEmail });
     try {
       await controller.start();
+      controller.recheckCommunity?.();
       response.json({ ok: true, ...controller.getStatus(), userId: verifiedUid });
     } catch (error) {
       response.status(500).json({ error: error.message || "Reconnect failed.", userId: verifiedUid });
@@ -558,27 +563,6 @@ for (const p of prefixes) {
         listAllUsersWithLicenses(authToken).catch(e => { logger.debug("listAllUsersWithLicenses err:", e.message); return []; }),
       ]);
 
-      const db = getFirebaseServerFirestore();
-      const firestoreUsers = {};
-      if (db) {
-        try {
-          const { collection, getDocs } = await import("firebase/firestore");
-          const [usersSnap, userLicensesSnap] = await Promise.all([
-            getDocs(collection(db, "users")).catch(() => ({ forEach: () => {} })),
-            getDocs(collection(db, "user_licenses")).catch(() => ({ forEach: () => {} })),
-          ]);
-
-          usersSnap.forEach((d) => {
-            if (d.data()) firestoreUsers[d.id] = { ...(firestoreUsers[d.id] || {}), ...d.data(), uid: d.id };
-          });
-          userLicensesSnap.forEach((d) => {
-            if (d.data()) firestoreUsers[d.id] = { ...(firestoreUsers[d.id] || {}), activeLicense: d.data(), uid: d.id };
-          });
-        } catch (err) {
-          logger.debug("Admin comprehensive Firestore scan notice", err.message);
-        }
-      }
-
       const locksByUid = {};
       for (const [phone, lock] of Object.entries(numberLocks || {})) {
         if (lock && lock.uid) {
@@ -652,7 +636,6 @@ for (const p of prefixes) {
 
         const redeemedUid = lic.redeemedByUid || "";
         const phone = locksByUid[redeemedUid] || "";
-        const fsUser = firestoreUsers[redeemedUid] || {};
 
         return {
           ...lic,
@@ -661,19 +644,19 @@ for (const p of prefixes) {
           computedStatus: calculatedStatus,
           remainingMs,
           whatsappNumber: phone,
-          customerEmail: lic.redeemedByEmail || fsUser.email || "",
-          customerName: fsUser.displayName || "",
+          customerEmail: lic.redeemedByEmail || "",
+          customerName: "",
         };
       });
 
       const customersMap = {};
 
-      // 1. Seed with full authoritative user records (includes in-memory & unlimited users)
+      // 1. Seed with full authoritative user records from Supabase (source of truth)
       for (const u of (fullUserRecords || [])) {
         customersMap[u.uid] = {
           uid: u.uid,
           email: u.email && u.email !== "—" ? u.email : "",
-          displayName: u.displayName || "",
+          displayName: u.displayName || (u.email ? u.email.split("@")[0] : "User"),
           phoneNumber: u.phoneNumber && u.phoneNumber !== "—" ? u.phoneNumber : "",
           createdAt: u.createdAt || null,
           lastLoginAt: u.lastLoginAt || null,
@@ -690,21 +673,6 @@ for (const p of prefixes) {
             isUnlimited: Boolean(u.isUnlimited),
             status: u.status,
           },
-        };
-      }
-
-      // 2. Merge Firestore users
-      for (const [uid, uData] of Object.entries(firestoreUsers)) {
-        const existing = customersMap[uid] || { uid };
-        const isExplicitlyRevoked = existing.isUnlimited === false || uData.isUnlimited === false || uData.activeLicense?.isUnlimited === false;
-        customersMap[uid] = {
-          ...existing,
-          email: uData.email || existing.email || "",
-          displayName: uData.displayName || existing.displayName || "",
-          photoURL: uData.photoURL || existing.photoURL || "",
-          createdAt: uData.createdAt || uData.joinedAt || existing.createdAt || null,
-          isUnlimited: isExplicitlyRevoked ? false : Boolean(existing.isUnlimited || uData.isUnlimited || uData.activeLicense?.isUnlimited),
-          activeLicense: existing.activeLicense || uData.activeLicense || null,
         };
       }
 
@@ -940,22 +908,31 @@ for (const p of prefixes) {
     }
   });
 
+  // Global Plans & Prices (Public & Authenticated)
+  app.get(`${p}/plans`, async (_request, response) => {
+    try {
+      const plans = await getGlobalLicensePlans();
+      response.json({ success: true, plans });
+    } catch (err) {
+      response.status(500).json({ error: "Failed to fetch license plans." });
+    }
+  });
+
+  app.post(`${p}/admin/plans`, requireAuth, requireAdmin, async (request, response) => {
+    try {
+      const { plans } = request.body || {};
+      const updated = await updateGlobalLicensePlans(plans);
+      response.json({ success: true, plans: updated, message: "Global license plans updated in Supabase." });
+    } catch (err) {
+      response.status(400).json({ error: err.message || "Failed to update plans." });
+    }
+  });
+
+  // Central Railway Backend URL Setting (Supabase system_config Source of Truth)
   app.get(`${p}/admin/backend-url`, requireAuth, requireAdmin, async (_request, response) => {
     try {
-      let railwayUrl = process.env.RAILWAY_URL || "";
-      const db = getFirebaseServerFirestore();
-      if (db) {
-        try {
-          const { doc, getDoc } = await import("firebase/firestore");
-          const snap = await getDoc(doc(db, "system_config", "backend"));
-          if (snap.exists() && snap.data()?.railwayUrl) {
-            railwayUrl = snap.data().railwayUrl;
-          }
-        } catch (e) {
-          logger.debug("Firestore backend-url read notice", e.message);
-        }
-      }
-      response.json({ success: true, railwayUrl });
+      const cfg = await getGlobalRailwayConfig();
+      response.json({ success: true, railwayUrl: cfg.railwayUrl || "" });
     } catch (error) {
       response.status(500).json({ error: "Failed to get backend URL." });
     }
@@ -964,24 +941,30 @@ for (const p of prefixes) {
   app.post(`${p}/admin/backend-url`, requireAuth, requireAdmin, async (request, response) => {
     try {
       const url = String(request.body?.railwayUrl || request.body?.url || "").trim();
-      process.env.RAILWAY_URL = url;
-      const db = getFirebaseServerFirestore();
-      if (db) {
-        try {
-          const { doc, setDoc } = await import("firebase/firestore");
-          await setDoc(doc(db, "system_config", "backend"), {
-            railwayUrl: url,
-            updatedAt: new Date().toISOString(),
-            updatedBy: request.auth.email || "admin",
-          }, { merge: true });
-          logger.info(`Admin updated system Railway backend URL in Firestore: ${url}`);
-        } catch (e) {
-          logger.warn("Could not save backend URL to Firestore", e.message);
-        }
-      }
-      response.json({ success: true, railwayUrl: url, message: "Railway backend URL successfully saved to Firestore." });
+      const res = await setGlobalRailwayConfig(url);
+      response.json({ success: true, railwayUrl: res.railwayUrl, message: "Railway backend URL successfully saved to Supabase system_config." });
     } catch (error) {
       response.status(500).json({ error: error.message || "Failed to update backend URL." });
+    }
+  });
+
+  // Admin Safe Storage / Maintenance Diagnostics & Cleanup
+  app.get(`${p}/admin/maintenance/diagnostics`, requireAuth, requireAdmin, async (_request, response) => {
+    try {
+      const diag = await getMaintenanceDiagnostics();
+      response.json(diag);
+    } catch (err) {
+      response.status(500).json({ error: err.message || "Failed to fetch maintenance diagnostics." });
+    }
+  });
+
+  app.post(`${p}/admin/maintenance/cleanup`, requireAuth, requireAdmin, async (request, response) => {
+    try {
+      const { action } = request.body || {};
+      const res = await performSafeMaintenanceCleanup(action);
+      response.json(res);
+    } catch (err) {
+      response.status(400).json({ error: err.message || "Failed to run maintenance cleanup." });
     }
   });
 
@@ -1151,6 +1134,29 @@ for (const p of prefixes) {
       response.json({ success: true, ...result, message: "Global Railway URL configured successfully for all users." });
     } catch (error) {
       response.status(500).json({ error: error.message || "Failed to update Railway configuration." });
+    }
+  });
+
+  // Global License Plans (Supabase source of truth)
+  app.get(`${p}/plans`, async (_request, response) => {
+    try {
+      const plans = await getGlobalLicensePlans();
+      response.json({ success: true, plans });
+    } catch (error) {
+      response.status(500).json({ error: "Failed to retrieve plans." });
+    }
+  });
+
+  app.post(`${p}/admin/plans`, requireAuth, requireAdmin, async (request, response) => {
+    try {
+      const { plans } = request.body || {};
+      if (!Array.isArray(plans) || plans.length === 0) {
+        return response.status(400).json({ error: "Plans array is required." });
+      }
+      const updated = await updateGlobalLicensePlans(plans);
+      response.json({ success: true, plans: updated, message: "Global license plans updated in Supabase." });
+    } catch (error) {
+      response.status(400).json({ error: error.message || "Failed to update global plans." });
     }
   });
 }

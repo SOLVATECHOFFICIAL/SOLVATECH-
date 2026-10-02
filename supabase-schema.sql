@@ -114,6 +114,15 @@ CREATE TABLE IF NOT EXISTS public.system_config (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 11. WhatsApp Sessions table (Persistent Baileys session files to survive restarts)
+CREATE TABLE IF NOT EXISTS public.whatsapp_sessions (
+  safe_user_id TEXT PRIMARY KEY,
+  uid TEXT,
+  files JSONB DEFAULT '{}'::jsonb,
+  file_count INTEGER DEFAULT 0,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Enable Row Level Security (RLS) on all tables
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.licenses ENABLE ROW LEVEL SECURITY;
@@ -125,6 +134,7 @@ ALTER TABLE public.referral_purchases ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.referral_rewards ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.referral_claims ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.system_config ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.whatsapp_sessions ENABLE ROW LEVEL SECURITY;
 
 -- Allow Service Role to perform all operations (used by backend)
 CREATE POLICY "service_role_all_users" ON public.users FOR ALL TO service_role USING (true) WITH CHECK (true);
@@ -137,3 +147,4 @@ CREATE POLICY "service_role_all_referral_purchases" ON public.referral_purchases
 CREATE POLICY "service_role_all_referral_rewards" ON public.referral_rewards FOR ALL TO service_role USING (true) WITH CHECK (true);
 CREATE POLICY "service_role_all_referral_claims" ON public.referral_claims FOR ALL TO service_role USING (true) WITH CHECK (true);
 CREATE POLICY "service_role_all_system_config" ON public.system_config FOR ALL TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY "service_role_all_whatsapp_sessions" ON public.whatsapp_sessions FOR ALL TO service_role USING (true) WITH CHECK (true);

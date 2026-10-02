@@ -900,3 +900,84 @@
   color: #0f172a;
 }
 
+/* ==========================================================================
+   SIMPLIFIED ADMIN USERS PAGE — CLEAN ON/OFF TOGGLE SWITCH
+   ========================================================================== */
+.admin-unlimited-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 86px;
+  height: 34px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  cursor: pointer;
+  border: 1.5px solid transparent;
+  font-family: inherit;
+  font-weight: 800;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.admin-unlimited-switch.is-on {
+  background: #10b981;
+  color: #ffffff;
+  border-color: #059669;
+}
+
+.admin-unlimited-switch.is-on:hover {
+  background: #059669;
+}
+
+.admin-unlimited-switch.is-off {
+  background: #f1f5f9;
+  color: #64748b;
+  border-color: #cbd5e1;
+}
+
+.admin-unlimited-switch.is-off:hover {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.admin-unlimited-switch .switch-slider {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+.admin-unlimited-switch.is-on .switch-slider {
+  order: 2;
+}
+
+.admin-unlimited-switch.is-off .switch-slider {
+  order: 1;
+}
+
+.admin-unlimited-switch .switch-text {
+  order: 1;
+}
+
+.admin-unlimited-switch.is-off .switch-text {
+  order: 2;
+}
+
+.admin-user-simple-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  background: #ffffff;
+  border: 1px solid var(--admin-card-border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+

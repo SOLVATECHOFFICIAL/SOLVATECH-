@@ -665,7 +665,7 @@
           <!-- Sub-Navigation Tabs within Admin Console -->
           <div class="admin-subnav" role="tablist">
             <button type="button" class="admin-subnav-btn active" data-subtab="customers" id="admin-subtab-btn-customers">
-              <span>👥 Users & Licenses</span>
+              <span>👥 Users</span>
               <span id="admin-count-customers" class="admin-subnav-count">0</span>
             </button>
             <button type="button" class="admin-subnav-btn" data-subtab="generate" id="admin-subtab-btn-generate">
@@ -675,8 +675,7 @@
               <span>🚂 Railway URL</span>
             </button>
             <button type="button" class="admin-subnav-btn" data-subtab="recycling" id="admin-subtab-btn-recycling">
-              <span>🗑️ Recycling Bin</span>
-              <span id="admin-count-recycling" class="admin-subnav-count" style="background:#fee2e2; color:#b91c1c;">0</span>
+              <span>🧹 Safe Storage & Cleanup</span>
             </button>
             <button type="button" class="admin-subnav-btn" data-subtab="overview" id="admin-subtab-btn-overview">
               <span>📊 Overview & Stats</span>
@@ -717,45 +716,38 @@
             <div class="admin-table-container">
               <div class="admin-table-header-row">
                 <div>
-                  <h3 class="admin-table-title">👥 All Registered Users & License Status</h3>
-                  <p style="font-size: 11.5px; color: var(--muted); margin: 2px 0 0;">Manage user subscriptions, activate/deactivate Unlimited access, and grant runtime extensions instantly.</p>
+                  <h3 class="admin-table-title">👥 All Registered Users</h3>
+                  <p style="font-size: 11.5px; color: var(--muted); margin: 2px 0 0;">Toggle Unlimited access ON/OFF instantly. Persisted in Supabase.</p>
                 </div>
                 <div class="admin-table-actions">
-                  <button id="admin-manual-unlimited-btn" type="button" class="admin-preset-btn" style="padding: 5px 12px; font-size: 11px; background:#dcfce7; color:#15803d; border-color:#86efac; font-weight:700;" onclick="adminManualAddUnlimitedPrompt()">
-                    ⚡ Add User to Unlimited
-                  </button>
                   <button id="admin-refresh-customers-btn" type="button" class="admin-preset-btn" style="padding: 5px 12px; font-size: 11px;">
                     ↻ Refresh Users
                   </button>
                 </div>
               </div>
 
-              <!-- Desktop Full Customers Table -->
+              <!-- Desktop Simplified Users Table -->
               <div class="admin-table-scroll">
                 <table class="admin-master-table">
                   <thead>
                     <tr>
-                      <th>#</th>
-                      <th>User Account</th>
-                      <th>WhatsApp No. & Status</th>
-                      <th>Active License</th>
-                      <th>Status</th>
-                      <th>Time Remaining</th>
-                      <th>Expiration Date</th>
-                      <th style="min-width: 220px; text-align: center;">⚡ Admin Controls</th>
+                      <th style="width: 50px;">#</th>
+                      <th>User Name</th>
+                      <th>User Email</th>
+                      <th style="width: 140px; text-align: center;">Unlimited</th>
                     </tr>
                   </thead>
                   <tbody id="admin-customers-tbody">
                     <tr>
-                      <td colspan="8" style="text-align: center; color: var(--muted); padding: 24px;">Loading customers directory...</td>
+                      <td colspan="4" style="text-align: center; color: var(--muted); padding: 24px;">Loading users...</td>
                     </tr>
                   </tbody>
                 </table>
               </div>
 
-              <!-- Mobile Responsive Customer Cards List -->
+              <!-- Mobile Responsive User Cards List -->
               <div id="admin-customers-cards" class="admin-cards-list">
-                <div style="text-align: center; color: var(--muted); padding: 20px;">Loading customer profiles...</div>
+                <div style="text-align: center; color: var(--muted); padding: 20px;">Loading users...</div>
               </div>
             </div>
           </div>
@@ -765,56 +757,52 @@
             <div class="surface" style="padding: 24px; border-radius: 8px; border: 1px solid var(--admin-card-border); max-width: 800px; margin: 0 auto 24px;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                 <h3 style="font-size: 16px; font-weight: 800; color: var(--ink); margin: 0;">🔑 License Key Generator</h3>
-                <span class="admin-badge badge-unused">Instant Server Creation</span>
+                <span class="admin-badge badge-unused">Instant Key Creation</span>
               </div>
               <p style="font-size: 12px; color: var(--muted); margin: 0 0 16px; line-height: 1.5;">
-                Select duration tier to generate a cryptographically unguessable activation code. Keys work immediately for any customer upon entering into their dashboard.
+                Select duration plan to generate a cryptographically unguessable activation code. Unlimited keys set user's Supabase Unlimited state to ON upon redemption.
               </p>
 
-              <div class="admin-preset-grid-v2">
-                <button type="button" class="admin-preset-card-btn active" data-days="1" data-price="150">
+              <div class="admin-preset-grid-v2" id="admin-preset-grid">
+                <button type="button" class="admin-preset-card-btn active" data-days="1" data-price="200">
                   <span class="admin-preset-days">1 Day</span>
-                  <span class="admin-preset-price">₦150</span>
+                  <span class="admin-preset-price">₦200</span>
                 </button>
-                <button type="button" class="admin-preset-card-btn" data-days="3" data-price="400">
+                <button type="button" class="admin-preset-card-btn" data-days="3" data-price="500">
                   <span class="admin-preset-days">3 Days</span>
-                  <span class="admin-preset-price">₦400</span>
+                  <span class="admin-preset-price">₦500</span>
                 </button>
-                <button type="button" class="admin-preset-card-btn" data-days="7" data-price="750">
+                <button type="button" class="admin-preset-card-btn" data-days="7" data-price="1000">
                   <span class="admin-preset-days">7 Days</span>
-                  <span class="admin-preset-price">₦750</span>
+                  <span class="admin-preset-price">₦1,000</span>
                 </button>
-                <button type="button" class="admin-preset-card-btn" data-days="14" data-price="1400">
+                <button type="button" class="admin-preset-card-btn" data-days="14" data-price="2000">
                   <span class="admin-preset-days">14 Days</span>
-                  <span class="admin-preset-price">₦1,400</span>
+                  <span class="admin-preset-price">₦2,000</span>
                 </button>
-                <button type="button" class="admin-preset-card-btn" data-days="30" data-price="2500">
+                <button type="button" class="admin-preset-card-btn" data-days="30" data-price="4000">
                   <span class="admin-preset-days">30 Days</span>
-                  <span class="admin-preset-price">₦2,500</span>
+                  <span class="admin-preset-price">₦4,000</span>
                 </button>
-                <button type="button" class="admin-preset-card-btn" data-days="60" data-price="4800">
+                <button type="button" class="admin-preset-card-btn" data-days="60" data-price="8000">
                   <span class="admin-preset-days">2 Months</span>
-                  <span class="admin-preset-price">₦4,800</span>
+                  <span class="admin-preset-price">₦8,000</span>
                 </button>
-                <button type="button" class="admin-preset-card-btn" data-days="90" data-price="6800">
+                <button type="button" class="admin-preset-card-btn" data-days="90" data-price="12000">
                   <span class="admin-preset-days">3 Months</span>
-                  <span class="admin-preset-price">₦6,800</span>
+                  <span class="admin-preset-price">₦12,000</span>
                 </button>
-                <button type="button" class="admin-preset-card-btn" data-days="180" data-price="12500">
+                <button type="button" class="admin-preset-card-btn" data-days="180" data-price="24000">
                   <span class="admin-preset-days">6 Months</span>
-                  <span class="admin-preset-price">₦12,500</span>
+                  <span class="admin-preset-price">₦24,000</span>
                 </button>
-                <button type="button" class="admin-preset-card-btn" data-days="365" data-price="22000">
+                <button type="button" class="admin-preset-card-btn" data-days="365" data-price="48000">
                   <span class="admin-preset-days">12 Months</span>
-                  <span class="admin-preset-price">₦22,000</span>
+                  <span class="admin-preset-price">₦48,000</span>
                 </button>
-                <button type="button" class="admin-preset-card-btn" data-days="Unlimited" data-price="Lifetime">
-                  <span class="admin-preset-days">Unlimited</span>
-                  <span class="admin-preset-price">Lifetime</span>
-                </button>
-                <button type="button" class="admin-preset-card-btn" data-days="custom" data-price="custom">
-                  <span class="admin-preset-days">Custom</span>
-                  <span class="admin-preset-price">Variable</span>
+                <button type="button" class="admin-preset-card-btn" data-days="Unlimited" data-price="Lifetime" style="border-color:#10b981; background: #ecfdf5;">
+                  <span class="admin-preset-days" style="color: #065f46; font-weight: 800;">Unlimited</span>
+                  <span class="admin-preset-price" style="color: #047857;">Lifetime</span>
                 </button>
               </div>
 
@@ -833,30 +821,66 @@
             </div>
           </div>
 
-          <!-- SUBTAB 3: RECYCLING BIN & CACHE CLEARER -->
+          <!-- SUBTAB 3: SAFE STORAGE & MAINTENANCE CLEANUP -->
           <div id="admin-view-recycling" class="admin-subview hidden">
-            <!-- Purge Actions Banner -->
-            <div class="surface" style="padding: 20px; border-radius: 8px; border: 1px solid var(--admin-card-border); margin-bottom: 20px; background: #fff5f5; border-color: #fecdd3;">
-              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <!-- Safe Diagnostics & Operations Banner -->
+            <div class="surface" style="padding: 22px; border-radius: 8px; border: 1px solid var(--admin-card-border); margin-bottom: 20px; background: #fafdfb; border-color: #d1fae5;">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 14px; margin-bottom: 16px;">
                 <div>
-                  <h3 style="font-size: 15px; font-weight: 800; color: #9f1239; margin: 0 0 4px;">
-                    🗑️ License Key Recycling Bin & Cache Purge
-                  </h3>
-                  <p style="font-size: 12px; color: #be123c; margin: 0;">
-                    Delete stale, unused, or expired license keys to clear clutter, bugs, and reset system cache.
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span class="admin-badge badge-active" style="background:#dcfce7; color:#15803d; border-color:#86efac; font-weight:800;">SAFE STORAGE</span>
+                    <h3 style="font-size: 16px; font-weight: 800; color: #065f46; margin: 0;">
+                      🧹 Supabase Storage Maintenance & Safe Cleanup
+                    </h3>
+                  </div>
+                  <p style="font-size: 12px; color: #047857; margin: 4px 0 0; line-height: 1.5; max-width: 680px;">
+                    Perform non-destructive cleanup of expired historical records, unused expired keys, and cache. 
+                    <strong>Active licenses, Unlimited users, and active WhatsApp sessions are strictly protected and never touched.</strong>
                   </p>
                 </div>
-                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                  <button type="button" id="admin-purge-expired-btn" class="admin-preset-btn" style="background: #fee2e2; color: #991b1b; border-color: #fca5a5; font-weight: 700;">
-                    🧹 Clear Expired Keys
-                  </button>
-                  <button type="button" id="admin-purge-unused-btn" class="admin-preset-btn" style="background: #fef3c7; color: #92400e; border-color: #fcd34d; font-weight: 700;">
-                    🧹 Clear Unused Keys
-                  </button>
-                  <button type="button" id="admin-purge-all-btn" class="admin-preset-btn" style="background: #e11d48; color: #ffffff; border-color: #be123c; font-weight: 800;">
-                    💥 Purge All & Reset Cache
-                  </button>
+                <button type="button" id="admin-refresh-diag-btn" class="admin-preset-btn" style="padding: 6px 14px; font-size: 11px;">
+                  ↻ Refresh Diagnostics
+                </button>
+              </div>
+
+              <!-- Quick Diagnostics Row -->
+              <div class="admin-kpi-grid" style="margin-bottom: 16px;">
+                <div class="admin-kpi-card" style="padding: 12px 14px; background:#ffffff;">
+                  <span class="admin-kpi-label" style="font-size: 10px;">ACTIVE LICENSES</span>
+                  <div id="admin-diag-active" class="admin-kpi-val" style="font-size: 20px; color:#10b981;">—</div>
+                  <div class="admin-kpi-sub">Guaranteed safe</div>
                 </div>
+                <div class="admin-kpi-card" style="padding: 12px 14px; background:#ffffff;">
+                  <span class="admin-kpi-label" style="font-size: 10px;">UNLIMITED USERS</span>
+                  <div id="admin-diag-unlimited" class="admin-kpi-val" style="font-size: 20px; color:#0f766e;">—</div>
+                  <div class="admin-kpi-sub">Permanent access</div>
+                </div>
+                <div class="admin-kpi-card" style="padding: 12px 14px; background:#ffffff;">
+                  <span class="admin-kpi-label" style="font-size: 10px;">EXPIRED LICENSES</span>
+                  <div id="admin-diag-expired" class="admin-kpi-val" style="font-size: 20px; color:#ef4444;">—</div>
+                  <div class="admin-kpi-sub">Historical records</div>
+                </div>
+                <div class="admin-kpi-card" style="padding: 12px 14px; background:#ffffff;">
+                  <span class="admin-kpi-label" style="font-size: 10px;">WHATSAPP SESSIONS</span>
+                  <div id="admin-diag-sessions" class="admin-kpi-val" style="font-size: 20px; color:#2563eb;">—</div>
+                  <div class="admin-kpi-sub">Persistent in Supabase</div>
+                </div>
+              </div>
+
+              <!-- Action Buttons -->
+              <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                <button type="button" id="admin-clean-expired-lic-btn" class="admin-preset-btn" style="background: #fee2e2; color: #991b1b; border-color: #fca5a5; font-weight: 700; font-size: 11px;">
+                  🧹 Purge Expired Licenses
+                </button>
+                <button type="button" id="admin-clean-unused-keys-btn" class="admin-preset-btn" style="background: #fef3c7; color: #92400e; border-color: #fcd34d; font-weight: 700; font-size: 11px;">
+                  🧹 Purge Unused Expired Keys
+                </button>
+                <button type="button" id="admin-clean-orphaned-btn" class="admin-preset-btn" style="background: #f1f5f9; color: #334155; border-color: #cbd5e1; font-weight: 700; font-size: 11px;">
+                  🛡️ Clean Orphaned Records
+                </button>
+                <button type="button" id="admin-resync-cache-btn" class="admin-preset-btn" style="background: #ecfdf5; color: #047857; border-color: #86efac; font-weight: 700; font-size: 11px;">
+                  🔄 Re-sync Cache
+                </button>
               </div>
               <div id="admin-purge-msg" class="license-msg hidden" style="margin-top: 12px;"></div>
             </div>
@@ -1263,43 +1287,29 @@
             </div>
           </div>
 
-          <!-- SUBTAB 8: RAILWAY BACKEND & SECRETS MANAGER -->
+          <!-- SUBTAB: ONE GLOBAL RAILWAY BACKEND URL SETTING -->
           <div id="admin-view-railway" class="admin-subview hidden">
-            <!-- Active Backend URL Config Card -->
-            <div class="railway-card">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
-                <div>
-                  <h3 style="font-size: 15px; font-weight: 800; color: var(--ink); margin: 0;">🚂 Active Railway Backend URL</h3>
-                  <p style="font-size: 12px; color: var(--muted); margin: 4px 0 0;">
-                    Connect this frontend to your active Railway container. If you deploy a new Railway instance or change domain, simply paste the URL here.
-                  </p>
-                </div>
-                <div id="railway-status-badge-admin" class="admin-badge badge-active" style="display: inline-flex; align-items: center; gap: 6px;">
-                  <span class="railway-status-dot" id="railway-dot-admin"></span>
-                  <span id="railway-status-text-admin">Checking connection...</span>
-                </div>
-              </div>
+            <div class="surface" style="padding: 24px; border-radius: 8px; border: 1px solid var(--admin-card-border); max-width: 650px; margin: 0 auto;">
+              <h3 style="font-size: 16px; font-weight: 800; color: var(--ink); margin: 0 0 6px;">Railway Backend URL</h3>
+              <p style="font-size: 12px; color: var(--muted); margin: 0 0 16px; line-height: 1.5;">
+                Central backend configuration stored in Supabase system_config. When changed, all users and clients automatically use the updated URL.
+              </p>
 
-              <div class="railway-input-group">
+              <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                 <input
                   type="url"
                   id="admin-railway-url-input"
                   class="railway-url-input"
-                  placeholder="https://web-production-xxxx.up.railway.app"
+                  placeholder="https://................"
                   spellcheck="false"
+                  style="flex: 1; min-width: 260px; padding: 10px 14px; font-size: 13px;"
                 />
-                <button type="button" id="admin-railway-save-btn" class="railway-action-btn">
-                  💾 Save & Link Backend
-                </button>
-                <button type="button" id="admin-railway-ping-btn" class="railway-action-btn railway-btn-secondary">
-                  ⚡ Test Ping
-                </button>
-                <button type="button" id="admin-railway-reset-btn" class="railway-action-btn railway-btn-secondary">
-                  ↺ Reset Default
+                <button type="button" id="admin-railway-save-btn" class="license-btn" style="padding: 10px 24px; font-size: 13px; margin: 0; background: var(--teal); color: #fff;">
+                  Save
                 </button>
               </div>
 
-              <div id="admin-railway-alert" class="hidden" style="margin-top: 12px; padding: 10px 14px; border-radius: 6px; font-size: 12px;"></div>
+              <div id="admin-railway-alert" class="hidden" style="margin-top: 14px; padding: 10px 14px; border-radius: 6px; font-size: 12px;"></div>
             </div>
           </div>
         </section>
@@ -1414,57 +1424,49 @@
       }
 
       // =========================================================================
-      // DYNAMIC GLOBAL PRODUCTION BACKEND (STORED IN FIRESTORE FOR EVERYONE GLOBALLY)
+      // DYNAMIC GLOBAL PRODUCTION BACKEND (STORED IN SUPABASE SYSTEM_CONFIG)
       // =========================================================================
-      let backendUnsubscribe = null;
-      async function fetchBackendUrlFromFirestore() {
-        if (!db) return;
+      async function fetchBackendUrlFromSupabaseConfig() {
         try {
-          const [backendSnap, railwaySnap] = await Promise.all([
-            getDoc(doc(db, "system_config", "backend")).catch(() => null),
-            getDoc(doc(db, "system_config", "railway")).catch(() => null)
-          ]);
-          let remoteUrl = "";
-          if (backendSnap && backendSnap.exists()) {
-            remoteUrl = backendSnap.data()?.railwayUrl || backendSnap.data()?.url || "";
-          }
-          if (!remoteUrl && railwaySnap && railwaySnap.exists()) {
-            remoteUrl = railwaySnap.data()?.url || railwaySnap.data()?.railwayUrl || "";
-          }
-          remoteUrl = String(remoteUrl || "").trim().replace(/\/+$/, "");
-          if (remoteUrl.includes("c6f21") || remoteUrl.includes("3c1de8") || remoteUrl.includes("215ab")) {
-            remoteUrl = FALLBACK_PRODUCTION_BACKEND;
-          }
-          if (remoteUrl && remoteUrl.startsWith("http")) {
-            if (remoteUrl !== customApiUrl) {
-              customApiUrl = remoteUrl;
-              try { localStorage.setItem("solvatech_backend_url", remoteUrl); } catch (e) {}
-              syncRailwayInputs();
-              testBackendHealth(false);
+          const res = await fetch(getApiUrl("/system/railway-config"), {
+            headers: { "Cache-Control": "no-cache" }
+          }).catch(() => null);
+
+          if (res && res.ok) {
+            const data = await res.json().catch(() => ({}));
+            let remoteUrl = String(data.railwayUrl || "").trim().replace(/\/+$/, "");
+            if (remoteUrl && remoteUrl.startsWith("http")) {
+              if (remoteUrl !== customApiUrl) {
+                console.log("[Global Backend Sync] Updated to central Supabase backend URL:", remoteUrl);
+                customApiUrl = remoteUrl;
+                try { localStorage.setItem("solvatech_backend_url", remoteUrl); } catch (e) {}
+                syncRailwayInputs();
+                testBackendHealth(false);
+              }
             }
           }
-
-          // Real-time listener: all users on solvatech.name.ng immediately pick up any admin changes in the background
-          if (!backendUnsubscribe && typeof onSnapshot === "function") {
-            backendUnsubscribe = onSnapshot(doc(db, "system_config", "backend"), (snap) => {
-              if (snap.exists()) {
-                const liveUrl = String(snap.data()?.railwayUrl || snap.data()?.url || "").trim().replace(/\/+$/, "");
-                if (liveUrl && liveUrl.startsWith("http") && liveUrl !== customApiUrl) {
-                  console.log("[Global Backend Sync] Updated to new admin backend:", liveUrl);
-                  customApiUrl = liveUrl;
-                  try { localStorage.setItem("solvatech_backend_url", liveUrl); } catch (e) {}
-                  syncRailwayInputs();
-                  testBackendHealth(false);
-                }
-              }
-            }, (err) => {
-              console.debug("Backend URL onSnapshot notice:", err.message);
-            });
-          }
         } catch (err) {
-          console.debug("Firestore backend URL lookup notice:", err.message);
+          console.debug("Supabase backend URL lookup notice:", err.message);
         }
       }
+
+      async function fetchGlobalOfficialPlans() {
+        try {
+          const res = await fetch(getApiUrl("/plans"), {
+            headers: { "Cache-Control": "no-cache" }
+          }).catch(() => null);
+          if (res && res.ok) {
+            const data = await res.json().catch(() => ({}));
+            if (Array.isArray(data.plans) && data.plans.length > 0) {
+              window.globalOfficialPlans = data.plans;
+              renderTierBreakdown();
+            }
+          }
+        } catch (e) {
+          console.debug("Global official plans fetch notice:", e.message);
+        }
+      }
+
 
       function syncRailwayInputs() {
         const active = getActiveBackendUrl();
@@ -1537,15 +1539,6 @@
           try { localStorage.removeItem("solvatech_backend_url"); } catch (e) {}
           customApiUrl = "";
           syncRailwayInputs();
-          if (db) {
-            try {
-              await setDoc(doc(db, "system_config", "backend"), {
-                railwayUrl: "",
-                updatedAt: new Date().toISOString(),
-                updatedBy: currentUser?.email || "admin"
-              }, { merge: true });
-            } catch (e) {}
-          }
           if (targetAlert) {
             targetAlert.className = "";
             targetAlert.style.display = "block";
@@ -1569,21 +1562,7 @@
         customApiUrl = trimmed;
         syncRailwayInputs();
 
-        // 1. Direct Firestore write as permanent single source of truth
-        if (db) {
-          try {
-            await setDoc(doc(db, "system_config", "backend"), {
-              railwayUrl: trimmed,
-              updatedAt: new Date().toISOString(),
-              updatedBy: currentUser?.email || "admin"
-            }, { merge: true });
-            console.log("Railway backend URL saved directly to Firestore system_config/backend");
-          } catch (fsErr) {
-            console.warn("Could not write backend URL to Firestore:", fsErr.message);
-          }
-        }
-
-        // 2. Also notify backend server
+        // 1. Save directly to Supabase system_config via server API
         try {
           const authHeader = await getAuthHeader();
           if (authHeader) {
@@ -1594,9 +1573,11 @@
                 "Authorization": authHeader,
               },
               body: JSON.stringify({ railwayUrl: trimmed }),
-            }).catch(() => {});
+            });
           }
-        } catch (e) {}
+        } catch (e) {
+          console.debug("Backend URL save error:", e.message);
+        }
 
         if (targetAlert) {
           targetAlert.className = "";
@@ -1604,7 +1585,7 @@
           targetAlert.style.background = "#dcfce7";
           targetAlert.style.border = "1px solid #86efac";
           targetAlert.style.color = "#15803d";
-          targetAlert.innerHTML = `<strong>✓ Saved & Synced to Firestore!</strong> Linking frontend to <code>${trimmed}</code>. Testing connection...`;
+          targetAlert.innerHTML = `<strong>✓ Saved to Supabase!</strong> Linking frontend to <code>${trimmed}</code>. Testing connection...`;
         }
 
         await testBackendHealth(true, alertTargetId);
@@ -2770,7 +2751,8 @@
 
         initDashboardTabs();
         initRailwayManager();
-        fetchBackendUrlFromFirestore();
+        fetchBackendUrlFromSupabaseConfig();
+        fetchGlobalOfficialPlans();
 
         onAuthStateChanged(auth, (user) => {
           if (user) {
@@ -2779,7 +2761,8 @@
             localStorage.removeItem("solvatech_preview_token");
             localStorage.removeItem("solvatech_preview_user");
             renderAuthState(user);
-            fetchBackendUrlFromFirestore();
+            fetchBackendUrlFromSupabaseConfig();
+            fetchGlobalOfficialPlans();
           } else {
             const previewToken = sessionStorage.getItem("solvatech_preview_token") || localStorage.getItem("solvatech_preview_token");
             const previewUserStr = sessionStorage.getItem("solvatech_preview_user") || localStorage.getItem("solvatech_preview_user");
@@ -3531,12 +3514,6 @@
               throw new Error(data.error || "License generation failed.");
             }
 
-            // Write to Firestore if accessible (fire-and-forget, never hang the UI)
-            if (db && data.license && data.license.code) {
-              setDoc(doc(db, "licenses", data.license.code), data.license, { merge: true }).catch((fsErr) => {
-                console.debug("Client Firestore save notice:", fsErr?.message);
-              });
-            }
 
             if (adminGenerateMsg) {
               adminGenerateMsg.className = "license-msg success";
@@ -3842,97 +3819,8 @@
               const serverMs = new Date(data.serverTime || data.systemHealth?.serverTime).getTime();
               cachedServerOffset = serverMs - Date.now();
             }
+            // Authoritative customer data is directly from Supabase via backend API
 
-            // Direct sync with project gen-lang-client-0324946831 Firestore to keep all users fully intact
-            if (db) {
-              try {
-                const [fsUsersSnap, fsLicensesSnap] = await Promise.all([
-                  getDocs(collection(db, "users")).catch(() => null),
-                  getDocs(collection(db, "user_licenses")).catch(() => null),
-                ]);
-
-                const existingCustMap = new Map();
-                (adminOverviewData.customers || []).forEach((c) => {
-                  if (c.uid) existingCustMap.set(c.uid, c);
-                  if (c.email) existingCustMap.set(c.email.toLowerCase(), c);
-                });
-
-                if (fsUsersSnap && !fsUsersSnap.empty) {
-                  fsUsersSnap.forEach((d) => {
-                    const u = d.data() || {};
-                    const uEmail = (u.email || "").toLowerCase();
-                    const existing = existingCustMap.get(d.id) || (uEmail ? existingCustMap.get(uEmail) : null);
-                    let isUnl = false;
-                    if (u.isUnlimited === false || u.activeLicense?.isUnlimited === false) {
-                      isUnl = false;
-                    } else if (u.isUnlimited === true || u.activeLicense?.isUnlimited === true || u.durationDays === "Unlimited" || u.licenseStatus === "lifetime") {
-                      isUnl = true;
-                    } else {
-                      isUnl = Boolean(existing?.isUnlimited);
-                    }
-
-                    const merged = {
-                      ...(existing || {}),
-                      uid: d.id,
-                      email: u.email || existing?.email || "",
-                      displayName: u.displayName || existing?.displayName || u.email?.split("@")[0] || "User",
-                      photoURL: u.photoURL || existing?.photoURL || "",
-                      createdAt: u.createdAt || existing?.createdAt || null,
-                      isUnlimited: isUnl,
-                      activeLicense: u.activeLicense || existing?.activeLicense || null,
-                      licenseStatus: isUnl ? "lifetime" : (u.licenseStatus || existing?.licenseStatus || "active"),
-                      status: isUnl ? "unlimited" : (u.status || existing?.status || "active"),
-                    };
-                    existingCustMap.set(d.id, merged);
-                    if (uEmail) existingCustMap.set(uEmail, merged);
-                  });
-                }
-
-                if (fsLicensesSnap && !fsLicensesSnap.empty) {
-                  fsLicensesSnap.forEach((d) => {
-                    const lic = d.data() || {};
-                    const uid = d.id;
-                    const licEmail = (lic.email || "").toLowerCase();
-                    const existing = existingCustMap.get(uid) || (licEmail ? existingCustMap.get(licEmail) : null);
-                    let isUnl = false;
-                    if (lic.isUnlimited === false) {
-                      isUnl = false;
-                    } else if (lic.isUnlimited === true || lic.durationDays === "Unlimited" || lic.status === "unlimited") {
-                      isUnl = true;
-                    } else {
-                      isUnl = Boolean(existing?.isUnlimited);
-                    }
-
-                    const merged = {
-                      ...(existing || {}),
-                      uid: existing?.uid || uid,
-                      email: lic.email || existing?.email || "",
-                      displayName: existing?.displayName || lic.email?.split("@")[0] || "User",
-                      activeLicense: lic,
-                      isUnlimited: isUnl,
-                      licenseStatus: isUnl ? "lifetime" : (lic.status === "active" ? "active" : (existing?.licenseStatus || "active")),
-                      status: isUnl ? "unlimited" : (lic.status || existing?.status || "active"),
-                      expiresAt: lic.expiresAt || existing?.expiresAt || null,
-                      durationDays: isUnl ? "Unlimited" : (lic.durationDays || existing?.durationDays || 0),
-                    };
-                    existingCustMap.set(merged.uid, merged);
-                    if (licEmail) existingCustMap.set(licEmail, merged);
-                  });
-                }
-
-                const uniqueCustomers = [];
-                const seenUids = new Set();
-                for (const cust of existingCustMap.values()) {
-                  if (cust.uid && !seenUids.has(cust.uid)) {
-                    seenUids.add(cust.uid);
-                    uniqueCustomers.push(cust);
-                  }
-                }
-                adminOverviewData.customers = uniqueCustomers;
-              } catch (fsErr) {
-                console.debug("Firestore direct customer sync note:", fsErr?.message);
-              }
-            }
 
             if (lastSyncEl) {
               lastSyncEl.textContent = `Synced: ${new Date().toLocaleTimeString()}`;
@@ -4044,15 +3932,18 @@
         if (!grid || !adminOverviewData) return;
         const allLicenses = adminOverviewData.licenses || [];
 
-        const defaultTiers = [
-          { name: "1 Day (Trial)", days: 1, price: 150 },
-          { name: "7 Days (Weekly)", days: 7, price: 750 },
-          { name: "15 Days (Bi-Weekly)", days: 15, price: 1400 },
-          { name: "30 Days (Monthly)", days: 30, price: 2500 },
-          { name: "90 Days (Quarterly)", days: 90, price: 6800 },
-          { name: "180 Days (Half-Year)", days: 180, price: 12500 },
-          { name: "365 Days (Yearly)", days: 365, price: 22000 },
+        const defaultTiers = window.globalOfficialPlans || [
+          { name: "1 Day", days: 1, price: 200 },
+          { name: "3 Days", days: 3, price: 500 },
+          { name: "7 Days", days: 7, price: 1000 },
+          { name: "14 Days", days: 14, price: 2000 },
+          { name: "30 Days", days: 30, price: 4000 },
+          { name: "2 Months", days: 60, price: 8000 },
+          { name: "3 Months", days: 90, price: 12000 },
+          { name: "6 Months", days: 180, price: 24000 },
+          { name: "12 Months", days: 365, price: 48000 },
         ];
+
 
         grid.innerHTML = defaultTiers.map((t) => {
           const matching = allLicenses.filter((l) => l.durationDays === t.days);
@@ -4394,57 +4285,26 @@
                 : `<span class="admin-badge badge-disconnected"><span class="badge-dot"></span>${(cust.whatsappStatus || "DISCONNECTED").toUpperCase()}</span>`;
 
               const isLifetime = isLifetimeCustomer(cust);
-              let licBadge = `<span class="admin-badge badge-neutral"><span class="badge-dot"></span>NO LICENSE</span>`;
-              if (isLifetime) {
-                licBadge = `<span class="admin-badge badge-lifetime"><span class="badge-dot"></span>UNLIMITED</span>`;
-              } else if (cust.hasActiveLicense || cust.licenseStatus === "active") {
-                licBadge = `<span class="admin-badge badge-active"><span class="badge-dot"></span>ACTIVE</span>`;
-              } else if (cust.licenseStatus === "expiring_soon") {
-                licBadge = `<span class="admin-badge badge-expiring"><span class="badge-dot"></span>EXPIRING SOON</span>`;
-              } else if (cust.licenseStatus === "expired") {
-                licBadge = `<span class="admin-badge badge-expired"><span class="badge-dot"></span>EXPIRED</span>`;
-              }
-
-              const remainingStr = isLifetime ? "LIFETIME / UNLIMITED" : (cust.expiresAt ? formatAdminCountdown(cust.remainingMs, false, cust.expiresAt) : (cust.hasActiveLicense ? "Active" : "—"));
-              const phone = cust.phoneNumber || cust.lockedPhoneNumber || cust.connectedPhoneNumber || "";
-              const phoneDisplay = phone ? `<a href="https://wa.me/${phone}" target="_blank" rel="noopener noreferrer" style="color:var(--teal); font-weight:700; text-decoration:none;">+${phone}</a>` : `<span style="color:var(--muted);">Not paired</span>`;
-              const expiresStr = isLifetime ? "Never (Unlimited Access)" : (cust.expiresAt ? new Date(cust.expiresAt).toLocaleString() : "—");
+              const displayName = cust.displayName || (cust.email ? cust.email.split("@")[0] : "User");
+              const email = cust.email || cust.uid || "—";
 
               return `
-                <tr style="cursor: pointer;" onclick="openCustomerDetail('${cust.uid}')">
-                  <td>${idx + 1}</td>
+                <tr>
+                  <td style="color: var(--muted);">${idx + 1}</td>
                   <td>
-                    <div>
-                      <strong style="color:var(--ink);">${cust.email || cust.displayName || "User"}</strong>
-                      <div style="font-size: 10px; color: var(--muted); font-family: 'DM Mono', monospace;">UID: ${cust.uid ? cust.uid.slice(0, 10) + "..." : "—"}</div>
-                    </div>
+                    <strong style="color: var(--ink); font-size: 13.5px;">${displayName}</strong>
                   </td>
                   <td>
-                    <div>${phoneDisplay}</div>
-                    <div style="margin-top: 3px;">${waBadge}</div>
+                    <span style="color: var(--ink); font-size: 13px;">${email}</span>
                   </td>
-                  <td><span class="code-pill" style="font-size:11px; font-weight:700;">${cust.activeLicense?.code || cust.activeLicenseCode || (isLifetime ? "UNLIMITED" : "None")}</span></td>
-                  <td>${licBadge}</td>
-                  <td>
-                    <strong style="color:${isLifetime ? '#0f766e' : (cust.remainingMs > 0 ? 'var(--teal)' : '#b91c1c')};" data-admin-expiry="${isLifetime ? '' : (cust.expiresAt || '')}">${remainingStr}</strong>
-                    ${cust.preservedNotice ? `<div style="font-size:10px; color:#0d9488; font-weight:700; margin-top:2px;">🛡️ ${cust.preservedNotice}</div>` : ''}
-                  </td>
-                  <td style="font-size:11px; color:var(--muted);">${expiresStr}</td>
-                  <td onclick="event.stopPropagation();" style="text-align: center;">
-                    <div style="display: inline-flex; gap: 6px; flex-wrap: wrap; justify-content: center;">
-                      <button type="button" class="admin-action-btn" style="background:${isLifetime ? '#dcfce7' : '#f1f5f9'}; color:${isLifetime ? '#15803d' : '#334155'}; border-color:${isLifetime ? '#86efac' : '#cbd5e1'}; font-weight:700; padding:5px 9px;" onclick="adminToggleUnlimited('${cust.uid}', ${!isLifetime})" title="Click to instantly switch unlimited ${isLifetime ? 'OFF' : 'ON'}">
-                        ${isLifetime ? '🟢 Unlimited: ON' : '⚪ Unlimited: OFF'}
-                      </button>
-                      <button type="button" class="admin-action-btn" style="background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; font-size:11px; padding:5px 9px;" onclick="adminGenerateKeyForUserPrompt('${cust.uid}', '${cust.email || ''}')" title="Generate key for this user">
-                        🔑 Gen Key
-                      </button>
-                      <button type="button" class="admin-action-btn" style="background:#fef3c7; color:#92400e; border-color:#fde68a; font-size:11px; padding:5px 9px;" onclick="adminDirectOverwriteFirebasePrompt('${cust.uid}', '${cust.email || ''}')" title="Directly overwrite user in Firebase">
-                        ✏️ Edit DB
-                      </button>
-                      <button type="button" class="admin-action-btn" style="background:#fef2f2; color:#b91c1c; border-color:#fecaca; font-size:11px; padding:5px 8px;" onclick="adminDeleteUser('${cust.uid}', '${cust.email || ''}')" title="Completely remove customer record">
-                        🗑️
-                      </button>
-                    </div>
+                  <td style="text-align: center;" onclick="event.stopPropagation();">
+                    <button type="button" 
+                      class="admin-unlimited-switch ${isLifetime ? 'is-on' : 'is-off'}" 
+                      onclick="adminToggleUnlimited('${cust.uid}', ${!isLifetime})"
+                      title="Switch Unlimited ${isLifetime ? 'OFF' : 'ON'}">
+                      <span class="switch-slider"></span>
+                      <span class="switch-text">${isLifetime ? 'ON' : 'OFF'}</span>
+                    </button>
                   </td>
                 </tr>
               `;
@@ -4452,37 +4312,29 @@
           }
         }
 
-        // 2. Mobile Cards
+        // 2. Mobile Cards (Simplified: Name, Email, Unlimited Switch only)
         if (cardsEl) {
           if (filtered.length === 0) {
-            cardsEl.innerHTML = `<div style="text-align: center; color: var(--muted); padding: 20px;">No customers found.</div>`;
+            cardsEl.innerHTML = `<div style="text-align: center; color: var(--muted); padding: 20px;">No users found.</div>`;
           } else {
             cardsEl.innerHTML = filtered.map((cust) => {
               const isLifetime = isLifetimeCustomer(cust);
-              const waConnected = cust.whatsappConnected || cust.whatsappStatus === "connected";
-              const waBadge = waConnected ? `<span class="admin-badge badge-connected"><span class="badge-dot"></span>CONNECTED</span>` : `<span class="admin-badge badge-disconnected"><span class="badge-dot"></span>OFFLINE</span>`;
-              const remainingStr = isLifetime ? "LIFETIME UNLIMITED" : (cust.expiresAt ? formatAdminCountdown(cust.remainingMs, false, cust.expiresAt) : (cust.hasActiveLicense ? "Active" : "No License"));
-              const phone = cust.phoneNumber || cust.lockedPhoneNumber || cust.connectedPhoneNumber || "";
+              const displayName = cust.displayName || (cust.email ? cust.email.split("@")[0] : "User");
+              const email = cust.email || cust.uid || "—";
 
               return `
-                <div class="admin-card-row" style="cursor: pointer;" onclick="openCustomerDetail('${cust.uid}')">
-                  <div class="admin-card-row-top">
-                    <strong>${cust.email || cust.displayName || "Customer"}</strong>
-                    ${waBadge}
+                <div class="admin-user-simple-card">
+                  <div style="flex: 1; min-width: 0;">
+                    <strong style="display: block; font-size: 14px; color: var(--ink);">${displayName}</strong>
+                    <span style="font-size: 12px; color: var(--muted); word-break: break-all;">${email}</span>
                   </div>
-                  <div class="admin-card-grid-meta">
-                    <div><span class="admin-card-label">WhatsApp:</span> <span>${phone ? `+${phone}` : "Not linked"}</span></div>
-                    <div><span class="admin-card-label">License:</span> <span>${cust.activeLicense?.code || cust.activeLicenseCode || (isLifetime ? "UNLIMITED" : "None")} (<strong data-admin-expiry="${isLifetime ? '' : (cust.expiresAt || '')}">${remainingStr}</strong>)</span></div>
-                  </div>
-                  <div style="margin-top: 8px; display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap;" onclick="event.stopPropagation();">
-                    <button type="button" class="admin-action-btn" style="background:${isLifetime ? '#dcfce7' : '#f1f5f9'}; color:${isLifetime ? '#15803d' : '#334155'}; font-size:10px; font-weight:700;" onclick="adminToggleUnlimited('${cust.uid}', ${!isLifetime})">
-                      ${isLifetime ? '🟢 Unlimited: ON' : '⚪ Unlimited: OFF'}
-                    </button>
-                    <button type="button" class="admin-action-btn" style="background:#eff6ff; color:#1d4ed8; font-size:10px;" onclick="adminGenerateKeyForUserPrompt('${cust.uid}', '${cust.email || ''}')">
-                      🔑 Gen Key
-                    </button>
-                    <button type="button" class="admin-action-btn" style="background:#fef3c7; color:#92400e; font-size:10px;" onclick="adminDirectOverwriteFirebasePrompt('${cust.uid}', '${cust.email || ''}')">
-                      ✏️ Edit DB
+                  <div style="flex-shrink: 0;" onclick="event.stopPropagation();">
+                    <button type="button" 
+                      class="admin-unlimited-switch ${isLifetime ? 'is-on' : 'is-off'}" 
+                      onclick="adminToggleUnlimited('${cust.uid}', ${!isLifetime})"
+                      title="Switch Unlimited ${isLifetime ? 'OFF' : 'ON'}">
+                      <span class="switch-slider"></span>
+                      <span class="switch-text">${isLifetime ? 'ON' : 'OFF'}</span>
                     </button>
                   </div>
                 </div>
@@ -4543,6 +4395,7 @@
       }
 
       // Admin Action: Toggle Unlimited Status (Instant switch, zero confirmation checks, real toggle)
+      // Admin Action: Toggle Unlimited Status (Instant switch, saved directly to Supabase)
       window.adminToggleUnlimited = async function(uid, isUnlimited) {
         const setUnl = Boolean(isUnlimited);
 
@@ -4553,39 +4406,17 @@
             found.isUnlimited = setUnl;
             if (found.activeLicense) {
               found.activeLicense.isUnlimited = setUnl;
-              found.activeLicense.durationDays = setUnl ? "Unlimited" : 0;
-              found.activeLicense.status = setUnl ? "active" : "expired";
+              found.activeLicense.durationDays = setUnl ? "Unlimited" : (found.savedNormalDays || 0);
+              found.activeLicense.status = setUnl ? "active" : (found.savedNormalDays > 0 ? "active" : "expired");
             }
-            found.durationDays = setUnl ? "Unlimited" : 0;
-            found.licenseStatus = setUnl ? "lifetime" : "expired";
-            found.status = setUnl ? "unlimited" : "expired";
+            found.durationDays = setUnl ? "Unlimited" : (found.savedNormalDays || 0);
+            found.licenseStatus = setUnl ? "lifetime" : (found.savedNormalDays > 0 ? "active" : "expired");
+            found.status = setUnl ? "unlimited" : (found.savedNormalDays > 0 ? "active" : "expired");
           }
           renderAdminDashboard();
         }
 
-        // 2. Direct Firestore Client SDK write (gen-lang-client-0324946831)
-        if (db) {
-          try {
-            const nowIso = new Date().toISOString();
-            const expiryIso = setUnl ? new Date(Date.now() + 100 * 365 * 86400000).toISOString() : nowIso;
-            const patch = {
-              isUnlimited: setUnl,
-              durationDays: setUnl ? "Unlimited" : 0,
-              status: setUnl ? "active" : "expired",
-              licenseStatus: setUnl ? "lifetime" : "expired",
-              expiresAt: expiryIso,
-              updatedAt: nowIso,
-            };
-            await Promise.all([
-              setDoc(doc(db, "user_licenses", uid), patch, { merge: true }),
-              setDoc(doc(db, "users", uid), { ...patch, "activeLicense.isUnlimited": setUnl, "activeLicense.durationDays": setUnl ? "Unlimited" : 0 }, { merge: true }),
-            ]);
-          } catch (e) {
-            console.debug("Firestore direct toggle write notice:", e.message);
-          }
-        }
-
-        // 3. Notify server in background
+        // 2. Persist directly to Supabase via server API
         try {
           let authHeader = await getAuthHeader();
           if (authHeader) {
@@ -4608,224 +4439,94 @@
           }
           await loadAdminOverview();
         } catch (err) {
-          console.debug("Backend toggle sync note:", err.message);
+          console.debug("Supabase toggle sync notice:", err.message);
+          await loadAdminOverview();
         }
       };
 
-      // Admin Action: Generate Key Specifically For User
-      window.adminGenerateKeyForUserPrompt = async function(uid, email) {
-        const targetLabel = email && email !== "—" ? email : uid;
-        const choice = prompt(
-          `Generate Key for ${targetLabel}\n\nEnter duration:\n• Type 'Unlimited' for Lifetime Unlimited\n• Or enter number of days (e.g. 1, 7, 30, 90, 365):\n• Add '+apply' to auto-activate immediately (e.g. 'Unlimited +apply' or '30 +apply')`,
-          "Unlimited +apply"
-        );
-        if (!choice || !choice.trim()) return;
-
-        const trimmed = choice.trim();
-        const autoApply = trimmed.toLowerCase().includes("+apply");
-        const daysPart = trimmed.replace(/\+apply/i, "").trim();
-        const days = (daysPart.toLowerCase() === "unlimited" || daysPart.toLowerCase() === "lifetime") ? "Unlimited" : parseInt(daysPart, 10);
-
-        if (days !== "Unlimited" && (isNaN(days) || days <= 0)) {
-          alert("Invalid duration. Please enter 'Unlimited' or positive number of days.");
-          return;
-        }
-
+      // Safe Storage / Maintenance Diagnostics & Cleanup
+      async function loadMaintenanceDiagnostics() {
         try {
           let authHeader = await getAuthHeader();
-          let res = await fetch(getApiUrl("/admin/licenses/generate-for-user"), {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "Authorization": authHeader || "" },
-            body: JSON.stringify({ target: email && email !== "—" ? email : uid, days, autoRedeem: autoApply }),
+          if (!authHeader) return;
+          const res = await fetch(getApiUrl("/admin/maintenance/diagnostics"), {
+            headers: { "Authorization": authHeader }
           });
-          const data = await safeFetchJson(res);
-          if (!res.ok) throw new Error(data.error || "Failed to generate key.");
-
-          const keyCreated = data.license?.code;
-          if (autoApply) {
-            alert(`✓ Success: Key ${keyCreated} generated and immediately activated for ${targetLabel}!`);
-          } else {
-            if (navigator.clipboard) await navigator.clipboard.writeText(keyCreated);
-            alert(`✓ Generated Key: ${keyCreated} (${days} Days)\nCopied to clipboard! Send this code to customer.`);
+          if (res.ok) {
+            const data = await res.json();
+            const diag = data.diagnostics || {};
+            const actEl = $("admin-diag-active");
+            if (actEl) actEl.textContent = String(diag.activeLicenses ?? "—");
+            const unlEl = $("admin-diag-unlimited");
+            if (unlEl) unlEl.textContent = String(diag.unlimitedUsers ?? "—");
+            const expEl = $("admin-diag-expired");
+            if (expEl) expEl.textContent = String(diag.expiredLicenses ?? "—");
+            const sesEl = $("admin-diag-sessions");
+            if (sesEl) sesEl.textContent = String(diag.pairedWhatsAppSessions ?? "—");
           }
-          await loadAdminOverview();
-        } catch (err) {
-          alert(`Error generating key: ${err.message}`);
+        } catch (e) {
+          console.debug("Diagnostics fetch notice:", e.message);
         }
-      };
+      }
 
-      // Admin Action: Direct Overwrite Firebase Document
-      window.adminDirectOverwriteFirebasePrompt = async function(uid, email) {
-        const targetLabel = email && email !== "—" ? email : uid;
-        const currentCust = (adminOverviewData?.customers || []).find((c) => c.uid === uid) || {};
-
-        const newDays = prompt(`Directly Overwrite Firebase for ${targetLabel}\n\nEnter duration days ('Unlimited' or number like 30, 0 to expire):`, currentCust.isUnlimited ? "Unlimited" : (currentCust.durationDays || 30));
-        if (newDays === null) return;
-
-        const isUnl = String(newDays).trim().toLowerCase() === "unlimited" || String(newDays).trim().toLowerCase() === "lifetime";
-        const parsedDays = isUnl ? "Unlimited" : (parseInt(newDays, 10) || 0);
-
-        const newPhone = prompt(`Update / Overwrite WhatsApp Phone Number (leave blank to keep current):`, currentCust.phoneNumber || "");
-
-        const updates = {
-          isUnlimited: isUnl,
-          durationDays: parsedDays,
-          status: isUnl ? "active" : (parsedDays > 0 ? "active" : "expired"),
-          licenseStatus: isUnl ? "lifetime" : (parsedDays > 0 ? "active" : "expired"),
-          ...(newPhone ? { phoneNumber: newPhone.replace(/[^0-9]/g, "") } : {}),
-        };
-
-        // 1. Direct Client Firestore write (gen-lang-client-0324946831)
-        if (db) {
-          try {
-            await Promise.all([
-              setDoc(doc(db, "user_licenses", uid), updates, { merge: true }),
-              setDoc(doc(db, "users", uid), { ...updates, "activeLicense.isUnlimited": isUnl, "activeLicense.durationDays": parsedDays }, { merge: true }),
-            ]);
-            console.log("Firebase document overwritten directly for", uid);
-          } catch (e) {
-            console.warn("Direct Firestore SDK overwrite note:", e.message);
-          }
+      async function executeSafeCleanup(action, btnElem) {
+        if (btnElem) {
+          btnElem.disabled = true;
+          btnElem.dataset.origText = btnElem.textContent;
+          btnElem.textContent = "Processing...";
         }
-
-        // 2. Server API sync
+        const msgEl = $("admin-purge-msg");
         try {
           let authHeader = await getAuthHeader();
-          let res = await fetch(getApiUrl("/admin/users/overwrite"), {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "Authorization": authHeader || "" },
-            body: JSON.stringify({ uid, updates }),
-          });
-          const data = await safeFetchJson(res);
-          if (!res.ok) throw new Error(data.error || "Failed to overwrite user.");
-          alert(`✓ Firebase document for ${targetLabel} overwritten successfully!`);
-          await loadAdminOverview();
-        } catch (err) {
-          alert(`Notice: ${err.message}`);
-          await loadAdminOverview();
-        }
-      };
-
-      // Admin Action: Delete User Completely
-      window.adminDeleteUser = async function(uid, email) {
-        const label = email && email !== "—" ? email : uid;
-        if (!confirm(`Are you sure you want to COMPLETELY REMOVE user ${label}?\nThis will remove unlimited status, unlink their phone, and purge license records.`)) return;
-        try {
-          let authHeader = await getAuthHeader();
-          if (!authHeader) throw new Error("Admin session expired.");
-
-          let res = await fetch(getApiUrl("/admin/users/delete"), {
+          if (!authHeader) throw new Error("Admin authentication required.");
+          const res = await fetch(getApiUrl("/admin/maintenance/cleanup"), {
             method: "POST",
             headers: { "Content-Type": "application/json", "Authorization": authHeader },
-            body: JSON.stringify({ uid }),
+            body: JSON.stringify({ action }),
           });
-
-          if (res.status === 401) {
-            const refreshed = await getValidIdToken(true);
-            if (refreshed) {
-              authHeader = `Bearer ${refreshed}`;
-              res = await fetch(getApiUrl("/admin/users/delete"), {
-                method: "POST",
-                headers: { "Content-Type": "application/json", "Authorization": authHeader },
-                body: JSON.stringify({ uid }),
-              });
-            }
-          }
-
           const data = await safeFetchJson(res);
-          if (!res.ok) throw new Error(data.error || "Failed to remove user.");
-          alert(`✓ Success: User ${label} has been completely removed!`);
+          if (!res.ok) throw new Error(data.error || "Cleanup operation failed.");
+          if (msgEl) {
+            msgEl.className = "license-msg success";
+            msgEl.textContent = `✅ ${data.message || "Operation completed successfully."}`;
+            msgEl.classList.remove("hidden");
+          }
+          await loadMaintenanceDiagnostics();
           await loadAdminOverview();
         } catch (err) {
-          alert(`Error: ${err.message}`);
-        }
-      };
-
-      // Admin Action: Manually Add User to Unlimited by Email
-      window.adminManualAddUnlimitedPrompt = async function() {
-        const email = prompt("Enter the Gmail / Email address to grant UNLIMITED lifetime access to:", "");
-        if (!email || !email.trim()) return;
-        const cleanEmail = email.trim().toLowerCase();
-        if (!cleanEmail.includes("@")) {
-          alert("Please enter a valid email address.");
-          return;
-        }
-        if (!confirm(`Are you sure you want to grant UNLIMITED access to ${cleanEmail}? Any existing standard days will be preserved and restored if revoked.`)) return;
-
-        try {
-          let authHeader = await getAuthHeader();
-          if (!authHeader) throw new Error("Admin session expired.");
-
-          let res = await fetch(getApiUrl("/admin/users/unlimited-by-email"), {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "Authorization": authHeader },
-            body: JSON.stringify({ email: cleanEmail }),
-          });
-
-          if (res.status === 401) {
-            const refreshed = await getValidIdToken(true);
-            if (refreshed) {
-              authHeader = `Bearer ${refreshed}`;
-              res = await fetch(getApiUrl("/admin/users/unlimited-by-email"), {
-                method: "POST",
-                headers: { "Content-Type": "application/json", "Authorization": authHeader },
-                body: JSON.stringify({ email: cleanEmail }),
-              });
-            }
+          if (msgEl) {
+            msgEl.className = "license-msg error";
+            msgEl.textContent = `❌ ${err.message}`;
+            msgEl.classList.remove("hidden");
           }
-
-          const data = await safeFetchJson(res);
-          if (!res.ok) throw new Error(data.error || "Failed to add user to unlimited.");
-          alert(`✓ Success: ${cleanEmail} has been granted UNLIMITED access!`);
-          loadAdminOverview();
-        } catch (err) {
-          alert(`Error: ${err.message}`);
-        }
-      };
-
-      // Admin Action: Grant Custom Days Prompt
-      window.adminGrantDaysPrompt = function(uid, email) {
-        const daysStr = prompt(`Enter number of days to grant to ${email || uid}:`, "30");
-        if (!daysStr) return;
-        const days = parseInt(daysStr, 10);
-        if (isNaN(days) || days <= 0) {
-          alert("Please enter a valid positive number of days.");
-          return;
-        }
-        adminGrantDays(uid, days, email);
-      };
-
-      window.adminGrantDays = async function(uid, days, email) {
-        try {
-          let authHeader = await getAuthHeader();
-          if (!authHeader) throw new Error("Admin session expired.");
-
-          let res = await fetch(getApiUrl("/admin/users/grant-days"), {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "Authorization": authHeader },
-            body: JSON.stringify({ uid, days, email }),
-          });
-
-          if (res.status === 401) {
-            const refreshed = await getValidIdToken(true);
-            if (refreshed) {
-              authHeader = `Bearer ${refreshed}`;
-              res = await fetch(getApiUrl("/admin/users/grant-days"), {
-                method: "POST",
-                headers: { "Content-Type": "application/json", "Authorization": authHeader },
-                body: JSON.stringify({ uid, days, email }),
-              });
-            }
+        } finally {
+          if (btnElem) {
+            btnElem.disabled = false;
+            btnElem.textContent = btnElem.dataset.origText || "Clean";
           }
-
-          const data = await safeFetchJson(res);
-          if (!res.ok) throw new Error(data.error || "Failed to grant days.");
-          alert(`Success: Granted ${days} days to ${email || uid}! New Expiry: ${new Date(data.newExpiresAt).toLocaleString()}`);
-          loadAdminOverview();
-        } catch (err) {
-          alert(`Error: ${err.message}`);
         }
-      };
+      }
+
+      const btnCleanExpired = $("admin-clean-expired-lic-btn");
+      if (btnCleanExpired) {
+        btnCleanExpired.onclick = () => executeSafeCleanup("expired_licenses", btnCleanExpired);
+      }
+      const btnCleanUnusedKeys = $("admin-clean-unused-keys-btn");
+      if (btnCleanUnusedKeys) {
+        btnCleanUnusedKeys.onclick = () => executeSafeCleanup("unused_expired_keys", btnCleanUnusedKeys);
+      }
+      const btnCleanOrphaned = $("admin-clean-orphaned-btn");
+      if (btnCleanOrphaned) {
+        btnCleanOrphaned.onclick = () => executeSafeCleanup("orphaned_records", btnCleanOrphaned);
+      }
+      const btnResyncCache = $("admin-resync-cache-btn");
+      if (btnResyncCache) {
+        btnResyncCache.onclick = () => executeSafeCleanup("stale_cache", btnResyncCache);
+      }
+      const btnRefreshDiag = $("admin-refresh-diag-btn");
+      if (btnRefreshDiag) {
+        btnRefreshDiag.onclick = () => loadMaintenanceDiagnostics();
+      }
 
       // Admin Action: Delete Single License Key
       window.adminDeleteKey = async function(code) {
