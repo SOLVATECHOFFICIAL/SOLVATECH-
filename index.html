@@ -1478,7 +1478,9 @@
             const data = await res.json().catch(() => ({}));
             if (Array.isArray(data.plans) && data.plans.length > 0) {
               window.globalOfficialPlans = data.plans;
-              renderTierBreakdown();
+              if (adminOverviewData) {
+                try { renderTierBreakdown(); } catch {}
+              }
             }
           }
         } catch (e) {
@@ -2573,7 +2575,7 @@
               refresh();
               refreshLicenseStatus();
               refreshReferralStatus();
-            }, 4000);
+            }, 6000);
           }
         } else {
           currentUser = null;
@@ -3185,7 +3187,7 @@
             updateLicenseUI(data);
           }
 
-          // If current user is the administrator, reveal admin tab and populate records
+          // If current user is the administrator, reveal admin tab and populate records once
           const tabBtnAdmin = $("tab-btn-admin");
           if (data.isAdmin || isUserAdminEmail(currentUser?.email)) {
             currentUserIsAdmin = true;
@@ -3195,8 +3197,12 @@
             } else {
               if (adminPanel) adminPanel.classList.add("hidden");
             }
-            loadAdminUsers();
-            loadAdminOverview();
+            const nowTime = Date.now();
+            if (!adminOverviewData && !adminOverviewLoading && (nowTime - lastAdminOverviewFetchTime > 15000)) {
+              lastAdminOverviewFetchTime = nowTime;
+              loadAdminUsers(true);
+              loadAdminOverview(true);
+            }
           } else {
             if (tabBtnAdmin) tabBtnAdmin.classList.add("hidden");
             if (adminPanel) adminPanel.classList.add("hidden");
@@ -3440,6 +3446,7 @@
       let adminOverviewData = null;
       let adminOverviewLoading = false;
       let adminOverviewError = null;
+      let lastAdminOverviewFetchTime = 0;
       let adminUsersList = null;
       let adminUsersLoading = false;
       let adminUsersError = null;
@@ -3818,11 +3825,13 @@
       };
 
       // Primary Admin Data Fetcher
-      async function loadAdminOverview() {
+      async function loadAdminOverview(silent = false) {
         if (!currentUser || !isUserAdminEmail(currentUser.email)) return;
 
         const lastSyncEl = document.getElementById("admin-last-sync-time");
-        if (lastSyncEl) lastSyncEl.textContent = "Syncing with cloud...";
+        if (lastSyncEl && !silent && !adminOverviewData) {
+          lastSyncEl.textContent = "Syncing with cloud...";
+        }
 
         adminOverviewLoading = true;
         adminOverviewError = null;
@@ -3882,12 +3891,12 @@
             const shortErr = err.message.length > 25 ? err.message.slice(0, 25) + "..." : err.message;
             lastSyncEl.textContent = `Sync failed (${shortErr})`;
           }
-          renderLicensesTable();
+          try { renderLicensesTable(); } catch {}
         }
       }
 
       // Dedicated Admin Users Fetcher from Supabase
-      async function loadAdminUsers() {
+      async function loadAdminUsers(silent = false) {
         if (!currentUser || !isUserAdminEmail(currentUser.email)) return;
         const tbody = document.getElementById("admin-customers-tbody");
         const cardsEl = document.getElementById("admin-customers-cards");
@@ -3895,11 +3904,14 @@
         adminUsersLoading = true;
         adminUsersError = null;
 
-        if (tbody) {
-          tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--muted); padding: 24px;">Loading users...</td></tr>`;
-        }
-        if (cardsEl) {
-          cardsEl.innerHTML = `<div style="text-align: center; color: var(--muted); padding: 20px;">Loading users...</div>`;
+        // ONLY show "Loading users..." placeholder on initial empty load, never during background silent refresh
+        if (!silent && (!adminUsersList || adminUsersList.length === 0)) {
+          if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--muted); padding: 24px;">Loading users...</td></tr>`;
+          }
+          if (cardsEl) {
+            cardsEl.innerHTML = `<div style="text-align: center; color: var(--muted); padding: 20px;">Loading users...</div>`;
+          }
         }
 
         try {
@@ -3933,7 +3945,7 @@
             throw new Error(data?.error || `Failed to fetch users (HTTP ${res.status})`);
           }
 
-          adminUsersList = Array.isArray(data?.users) ? data.users : [];
+          adminUsersList = Array.isArray(data?.users) ? data.users.filter(Boolean) : [];
           adminUsersLoading = false;
           adminUsersError = null;
 
@@ -3955,7 +3967,7 @@
 
       // Backward compatible loadAdminLicenses
       async function loadAdminLicenses() {
-        loadAdminUsers();
+        loadAdminUsers(true);
         return loadAdminOverview();
       }
 
@@ -3966,114 +3978,121 @@
         const s = d.overview || d.summary || {};
 
         // 1. KPI Cards
-        const totalUsers = s.totalUsers ?? s.totalRegisteredCustomers ?? (d.customers?.length || 0);
-        const elTotalUsers = document.getElementById("admin-kpi-total-users");
-        if (elTotalUsers) elTotalUsers.textContent = String(totalUsers);
+        try {
+          const totalUsers = s.totalUsers ?? s.totalRegisteredCustomers ?? (d.customers?.length || 0);
+          const elTotalUsers = document.getElementById("admin-kpi-total-users");
+          if (elTotalUsers) elTotalUsers.textContent = String(totalUsers);
 
-        const elActiveLic = document.getElementById("admin-kpi-active-licenses");
-        if (elActiveLic) elActiveLic.textContent = String(s.activeLicenses || 0);
+          const elActiveLic = document.getElementById("admin-kpi-active-licenses");
+          if (elActiveLic) elActiveLic.textContent = String(s.activeLicenses || 0);
 
-        const elExpiringLic = document.getElementById("admin-kpi-expiring-licenses");
-        if (elExpiringLic) elExpiringLic.textContent = String(s.expiringSoon || s.expiringSoonLicenses || 0);
+          const elExpiringLic = document.getElementById("admin-kpi-expiring-licenses");
+          if (elExpiringLic) elExpiringLic.textContent = String(s.expiringSoon || s.expiringSoonLicenses || 0);
 
-        const elExpiredLic = document.getElementById("admin-kpi-expired-licenses");
-        if (elExpiredLic) elExpiredLic.textContent = String(s.expiredLicenses || 0);
+          const elExpiredLic = document.getElementById("admin-kpi-expired-licenses");
+          if (elExpiredLic) elExpiredLic.textContent = String(s.expiredLicenses || 0);
 
-        const elUnusedKeys = document.getElementById("admin-kpi-unused-keys");
-        if (elUnusedKeys) elUnusedKeys.textContent = String(s.unusedKeys || 0);
+          const elUnusedKeys = document.getElementById("admin-kpi-unused-keys");
+          if (elUnusedKeys) elUnusedKeys.textContent = String(s.unusedKeys || 0);
 
-        const elUsedKeys = document.getElementById("admin-kpi-used-keys");
-        if (elUsedKeys) elUsedKeys.textContent = String(s.usedKeys || 0);
+          const elUsedKeys = document.getElementById("admin-kpi-used-keys");
+          if (elUsedKeys) elUsedKeys.textContent = String(s.usedKeys || 0);
 
-        const elWaConnected = document.getElementById("admin-kpi-whatsapp-connected");
-        if (elWaConnected) elWaConnected.textContent = String(s.connectedWhatsApp ?? s.whatsappConnectedCount ?? 0);
+          const elWaConnected = document.getElementById("admin-kpi-whatsapp-connected");
+          if (elWaConnected) elWaConnected.textContent = String(s.connectedWhatsApp ?? s.whatsappConnectedCount ?? 0);
 
-        const totalRev = s.totalRevenueNgn ?? s.totalQualifyingSalesNgn ?? 0;
-        const elRevenue = document.getElementById("admin-kpi-total-revenue");
-        if (elRevenue) elRevenue.textContent = `₦${Number(totalRev).toLocaleString()}`;
+          const totalRev = s.totalRevenueNgn ?? s.totalQualifyingSalesNgn ?? 0;
+          const elRevenue = document.getElementById("admin-kpi-total-revenue");
+          if (elRevenue) elRevenue.textContent = `₦${Number(totalRev).toLocaleString()}`;
 
-        const rEarned = s.rewardsEarnedDays ?? (d.referrals?.summary?.totalRewardsEarnedDays || 0);
-        const rClaimed = s.rewardsClaimedDays ?? (d.referrals?.summary?.totalRewardsClaimedDays || 0);
-        const elRewards = document.getElementById("admin-kpi-reward-days");
-        if (elRewards) elRewards.textContent = `${rEarned} / ${rClaimed}`;
+          const rEarned = s.rewardsEarnedDays ?? (d.referrals?.summary?.totalRewardsEarnedDays || 0);
+          const rClaimed = s.rewardsClaimedDays ?? (d.referrals?.summary?.totalRewardsClaimedDays || 0);
+          const elRewards = document.getElementById("admin-kpi-reward-days");
+          if (elRewards) elRewards.textContent = `${rEarned} / ${rClaimed}`;
 
-        const totalRef = s.totalReferrers ?? (d.referrals?.summary?.totalReferrers || 0);
-        const elTotalRef = document.getElementById("admin-kpi-total-referrers");
-        if (elTotalRef) elTotalRef.textContent = String(totalRef);
+          const totalRef = s.totalReferrers ?? (d.referrals?.summary?.totalReferrers || 0);
+          const elTotalRef = document.getElementById("admin-kpi-total-referrers");
+          if (elTotalRef) elTotalRef.textContent = String(totalRef);
 
-        // Subtab Badge Counts
-        const countLic = document.getElementById("admin-count-licenses");
-        if (countLic) countLic.textContent = String((d.licenses || []).length);
+          // Subtab Badge Counts
+          const countLic = document.getElementById("admin-count-licenses");
+          if (countLic) countLic.textContent = String((d.licenses || []).length);
 
-        const countCust = document.getElementById("admin-count-customers");
-        if (countCust) countCust.textContent = String(totalUsers);
+          const countCust = document.getElementById("admin-count-customers");
+          if (countCust) countCust.textContent = String(totalUsers);
 
-        const expiringList = (d.licenses || []).filter(l => l.computedStatus === "expiring_soon" || (l.status === "used" && l.remainingMs > 0 && l.remainingMs <= 48 * 3600 * 1000));
-        const countExp = document.getElementById("admin-count-expiring");
-        if (countExp) countExp.textContent = String(expiringList.length);
+          const expiringList = (d.licenses || []).filter(l => l && (l.computedStatus === "expiring_soon" || (l.status === "used" && l.remainingMs > 0 && l.remainingMs <= 48 * 3600 * 1000)));
+          const countExp = document.getElementById("admin-count-expiring");
+          if (countExp) countExp.textContent = String(expiringList.length);
 
-        const countRef = document.getElementById("admin-count-referrals");
-        if (countRef) countRef.textContent = String(totalRef);
+          const countRef = document.getElementById("admin-count-referrals");
+          if (countRef) countRef.textContent = String(totalRef);
 
-        const countConn = document.getElementById("admin-count-connected");
-        if (countConn) countConn.textContent = String(s.connectedWhatsApp ?? s.whatsappConnectedCount ?? 0);
+          const countConn = document.getElementById("admin-count-connected");
+          if (countConn) countConn.textContent = String(s.connectedWhatsApp ?? s.whatsappConnectedCount ?? 0);
+        } catch (kpiErr) {
+          console.warn("KPI cards render notice:", kpiErr);
+        }
 
         // 2. Tier Breakdown
-        renderTierBreakdown();
+        try { renderTierBreakdown(); } catch (err) { console.warn("Tier breakdown render notice:", err); }
 
         // 3. Urgent Expiry Watchlist Preview (Overview) & Full Table (Subtab 4)
-        renderExpiringWatch();
+        try { renderExpiringWatch(); } catch (err) { console.warn("Expiring watch render notice:", err); }
 
         // 4. Licenses Table & Mobile Cards (Subtab 2)
-        renderLicensesTable();
+        try { renderLicensesTable(); } catch (err) { console.warn("Licenses table render notice:", err); }
 
         // 5. Customers Table & Mobile Cards (Subtab 3)
-        renderCustomersTable();
+        try { renderCustomersTable(); } catch (err) { console.warn("Customers table render notice:", err); }
 
         // 5b. Recycling Bin Table (Subtab 4)
-        renderRecyclingTable();
+        try { renderRecyclingTable(); } catch (err) { console.warn("Recycling table render notice:", err); }
 
         // 6. Referrals Audit (Subtab 5)
-        renderReferralsTable();
+        try { renderReferralsTable(); } catch (err) { console.warn("Referrals table render notice:", err); }
 
         // 7. System & WhatsApp Health (Subtab 6)
-        renderSystemHealth();
+        try { renderSystemHealth(); } catch (err) { console.warn("System health render notice:", err); }
 
         // 8. Event Activity Timeline (Subtab 7)
-        renderActivityTimeline();
+        try { renderActivityTimeline(); } catch (err) { console.warn("Activity timeline render notice:", err); }
 
         // 9. Start live countdown interval
-        startAdminLiveTimers();
+        try { startAdminLiveTimers(); } catch (err) { console.warn("Live timers start notice:", err); }
       }
 
       // Render Tier Breakdown
       function renderTierBreakdown() {
         const grid = document.getElementById("admin-tier-breakdown-grid");
         if (!grid || !adminOverviewData) return;
-        const allLicenses = adminOverviewData.licenses || [];
+        const allLicenses = (adminOverviewData.licenses || []).filter(Boolean);
 
-        const defaultTiers = window.globalOfficialPlans || [
-          { name: "1 Day", days: 1, price: 200 },
-          { name: "3 Days", days: 3, price: 500 },
-          { name: "7 Days", days: 7, price: 1000 },
-          { name: "14 Days", days: 14, price: 2000 },
-          { name: "30 Days", days: 30, price: 4000 },
-          { name: "2 Months", days: 60, price: 8000 },
-          { name: "3 Months", days: 90, price: 12000 },
-          { name: "6 Months", days: 180, price: 24000 },
-          { name: "12 Months", days: 365, price: 48000 },
-        ];
-
+        const defaultTiers = (window.globalOfficialPlans && window.globalOfficialPlans.length > 0)
+          ? window.globalOfficialPlans
+          : [
+              { name: "1 Day", days: 1, priceNgn: 200, price: 200 },
+              { name: "3 Days", days: 3, priceNgn: 500, price: 500 },
+              { name: "7 Days", days: 7, priceNgn: 1000, price: 1000 },
+              { name: "14 Days", days: 14, priceNgn: 2000, price: 2000 },
+              { name: "30 Days", days: 30, priceNgn: 4000, price: 4000 },
+              { name: "2 Months", days: 60, priceNgn: 8000, price: 8000 },
+              { name: "3 Months", days: 90, priceNgn: 12000, price: 12000 },
+              { name: "6 Months", days: 180, priceNgn: 24000, price: 24000 },
+              { name: "12 Months", days: 365, priceNgn: 48000, price: 48000 },
+            ];
 
         grid.innerHTML = defaultTiers.map((t) => {
-          const matching = allLicenses.filter((l) => l.durationDays === t.days);
+          if (!t) return "";
+          const matching = allLicenses.filter((l) => l && l.durationDays === t.days);
           const totalKeys = matching.length;
-          const unusedKeys = matching.filter((l) => l.status === "unused").length;
+          const unusedKeys = matching.filter((l) => l && l.status === "unused").length;
+          const priceNum = Number(t.priceNgn ?? t.price ?? 0);
           return `
             <div style="padding: 12px; border-radius: 6px; background: var(--admin-neutral-50); border: 1px solid var(--admin-line);">
               <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
-                <strong style="font-size: 13px; color: var(--ink);">${t.name}</strong>
-                <span style="font-size: 11px; font-weight: 700; color: var(--teal); font-family: 'DM Mono', monospace;">₦${t.price.toLocaleString()}</span>
+                <strong style="font-size: 13px; color: var(--ink);">${escapeHtml(t.name || `${t.days} Days`)}</strong>
+                <span style="font-size: 11px; font-weight: 700; color: var(--teal); font-family: 'DM Mono', monospace;">₦${priceNum.toLocaleString()}</span>
               </div>
               <div style="font-size: 11px; color: var(--muted); display: flex; justify-content: space-between;">
                 <span>Total Keys: <strong>${totalKeys}</strong></span>
@@ -4589,10 +4608,10 @@
               }
             }
           }
-          await loadAdminUsers();
+          await loadAdminUsers(true);
         } catch (err) {
           console.debug("Supabase toggle sync notice:", err.message);
-          await loadAdminUsers();
+          await loadAdminUsers(true);
         }
       };
 
