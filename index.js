@@ -1181,15 +1181,18 @@ for (const p of prefixes) {
     }
   });
 
-  app.post(`${p}/admin/railway-config`, requireAuth, requireAdmin, async (request, response) => {
+  const handleSetRailwayConfig = async (request, response) => {
     try {
-      const { railwayUrl } = request.body || {};
+      const railwayUrl = request.body?.railwayUrl || request.body?.backendUrl || "";
       const result = await setGlobalRailwayConfig(railwayUrl, request.headers.authorization);
       response.json({ success: true, ...result, message: "Global Railway URL configured successfully for all users." });
     } catch (error) {
       response.status(500).json({ error: error.message || "Failed to update Railway configuration." });
     }
-  });
+  };
+
+  app.post(`${p}/admin/railway-config`, requireAuth, requireAdmin, handleSetRailwayConfig);
+  app.post(`${p}/admin/backend-url`, requireAuth, requireAdmin, handleSetRailwayConfig);
 
   // Global License Plans (Supabase source of truth)
   app.get(`${p}/plans`, async (_request, response) => {

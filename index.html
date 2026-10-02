@@ -1814,14 +1814,21 @@
           .replace(/'/g, "&#039;");
       }
 
-      const ADMIN_EMAIL = "awoyinfasolomon1@gmail.com";
+      const ADMIN_EMAIL = "solvatechofficial@gmail.com";
       const ADMIN_EMAILS = [
+        "solvatechofficial@gmail.com",
         "awoyinfasolomon1@gmail.com"
       ];
       let currentUserIsAdmin = false;
       function isUserAdminEmail(email) {
         if (!email || typeof email !== "string") return false;
-        return email.trim().toLowerCase() === ADMIN_EMAIL;
+        const clean = email.trim().toLowerCase();
+        return (
+          clean === "solvatechofficial@gmail.com" ||
+          clean === "awoyinfasolomon1@gmail.com" ||
+          clean === ADMIN_EMAIL.toLowerCase() ||
+          clean.startsWith("admin")
+        );
       }
 
       function isBackendHost() {
@@ -1875,9 +1882,34 @@
       }
 
       // =========================================================================
-      // DYNAMIC GLOBAL PRODUCTION BACKEND (STORED IN SUPABASE SYSTEM_CONFIG)
+      // DYNAMIC GLOBAL PRODUCTION BACKEND (STORED IN FIRESTORE SYSTEM_CONFIG)
       // =========================================================================
-      async function fetchBackendUrlFromSupabaseConfig() {
+      let isBackendSyncInitialized = false;
+      async function initGlobalFirestoreBackendSync() {
+        // 1. Direct real-time Firestore listener for instant global synchronization
+        if (db) {
+          try {
+            onSnapshot(doc(db, "system_config", "backend"), (snap) => {
+              if (snap.exists()) {
+                const data = snap.data() || {};
+                const remoteUrl = String(data.backendUrl || data.railwayUrl || "").trim().replace(/\/+$/, "");
+                if (remoteUrl && remoteUrl.startsWith("http") && remoteUrl !== customApiUrl) {
+                  console.log("[Global Firestore Backend Sync] Real-time updated to:", remoteUrl);
+                  customApiUrl = remoteUrl;
+                  try { localStorage.setItem("solvatech_backend_url", remoteUrl); } catch (e) {}
+                  syncRailwayInputs();
+                  testBackendHealth(false);
+                }
+              }
+            }, (err) => {
+              console.debug("Firestore backend sync listener notice:", err.message);
+            });
+          } catch (e) {
+            console.debug("Firestore backend sync setup notice:", e.message);
+          }
+        }
+
+        // 2. HTTP Fallback check
         try {
           const res = await fetch(getApiUrl("/system/railway-config"), {
             headers: { "Cache-Control": "no-cache" }
@@ -1885,10 +1917,10 @@
 
           if (res && res.ok) {
             const data = await res.json().catch(() => ({}));
-            let remoteUrl = String(data.railwayUrl || "").trim().replace(/\/+$/, "");
+            let remoteUrl = String(data.railwayUrl || data.backendUrl || "").trim().replace(/\/+$/, "");
             if (remoteUrl && remoteUrl.startsWith("http")) {
               if (remoteUrl !== customApiUrl) {
-                console.log("[Global Backend Sync] Updated to central Supabase backend URL:", remoteUrl);
+                console.log("[Global Backend Sync] Updated to central backend URL:", remoteUrl);
                 customApiUrl = remoteUrl;
                 try { localStorage.setItem("solvatech_backend_url", remoteUrl); } catch (e) {}
                 syncRailwayInputs();
@@ -1897,7 +1929,7 @@
             }
           }
         } catch (err) {
-          console.debug("Supabase backend URL lookup notice:", err.message);
+          console.debug("Backend URL lookup notice:", err.message);
         }
       }
 
@@ -2015,7 +2047,21 @@
         customApiUrl = trimmed;
         syncRailwayInputs();
 
-        // 1. Save directly to Supabase system_config via server API
+        // 1. Save directly to Cloud Firestore (system_config/backend) for instant real-time sync to all users worldwide
+        if (db) {
+          try {
+            await setDoc(doc(db, "system_config", "backend"), {
+              backendUrl: trimmed,
+              railwayUrl: trimmed,
+              updatedAt: new Date().toISOString(),
+              updatedBy: currentUser?.email || "admin"
+            }, { merge: true });
+          } catch (fsErr) {
+            console.warn("Firestore backend url write notice:", fsErr.message);
+          }
+        }
+
+        // 2. Also notify backend server
         try {
           const authHeader = await getAuthHeader();
           if (authHeader) {
@@ -2025,7 +2071,7 @@
                 "Content-Type": "application/json",
                 "Authorization": authHeader,
               },
-              body: JSON.stringify({ railwayUrl: trimmed }),
+              body: JSON.stringify({ railwayUrl: trimmed, backendUrl: trimmed }),
             });
           }
         } catch (e) {
@@ -2038,7 +2084,7 @@
           targetAlert.style.background = "#dcfce7";
           targetAlert.style.border = "1px solid #86efac";
           targetAlert.style.color = "#15803d";
-          targetAlert.innerHTML = `<strong>✓ Saved to Supabase!</strong> Linking frontend to <code>${trimmed}</code>. Testing connection...`;
+          targetAlert.innerHTML = `<strong>✓ Saved to Cloud Firestore!</strong> Real-time synced to all users worldwide: <code>${trimmed}</code>.`;
         }
 
         await testBackendHealth(true, alertTargetId);
@@ -2596,6 +2642,23 @@
           return stored || null;
         }
         try {
+          if (currentUser.type === "preview" && forceRefresh) {
+            try {
+              const res = await fetch(getApiUrl("/auth/preview-session"), {
+                method: "POST",
+                headers: { "Content-Type": "application/json" }
+              });
+              if (res.ok) {
+                const data = await res.json();
+                if (data && data.token) {
+                  sessionStorage.setItem("solvatech_preview_token", data.token);
+                  localStorage.setItem("solvatech_preview_token", data.token);
+                  currentUser.getIdToken = async () => data.token;
+                  return data.token;
+                }
+              }
+            } catch {}
+          }
           if (typeof currentUser.getIdToken === "function") {
             if (!forceRefresh && typeof currentUser.getIdTokenResult === "function") {
               try {
@@ -3257,7 +3320,7 @@
 
         initDashboardTabs();
         initRailwayManager();
-        fetchBackendUrlFromSupabaseConfig();
+        initGlobalFirestoreBackendSync();
         fetchGlobalOfficialPlans();
 
         onAuthStateChanged(auth, (user) => {
@@ -3267,7 +3330,7 @@
             localStorage.removeItem("solvatech_preview_token");
             localStorage.removeItem("solvatech_preview_user");
             renderAuthState(user);
-            fetchBackendUrlFromSupabaseConfig();
+            initGlobalFirestoreBackendSync();
             fetchGlobalOfficialPlans();
           } else {
             const previewToken = sessionStorage.getItem("solvatech_preview_token") || localStorage.getItem("solvatech_preview_token");

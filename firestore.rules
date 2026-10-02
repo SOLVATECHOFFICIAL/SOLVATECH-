@@ -14,7 +14,8 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSignedIn() && (
-        request.auth.token.email == 'awoyinfasolomon1@gmail.com'
+        request.auth.token.email == 'awoyinfasolomon1@gmail.com' ||
+        request.auth.token.email == 'solvatechofficial@gmail.com'
       );
     }
 
@@ -121,7 +122,7 @@ service cloud.firestore {
 
     // 12. Global System Configuration (Pricing plans, Railway backend URL)
     match /system_config/{configId} {
-      allow get, list: if isSignedIn();
+      allow get, list: if true;
       allow write: if isAdmin();
     }
 
