@@ -507,13 +507,149 @@
                       <input id="license-code-input" type="text" placeholder="SOLVA-XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false" required />
                     </div>
                     <button id="license-redeem-btn" class="license-btn" type="submit">Activate Code</button>
-                    <a href="https://wa.me/2349049979183?text=Hello%20SOLVATECH%20BOT%2C%20I%20want%20to%20get%20a%20license%20key." target="_blank" rel="noopener noreferrer" class="get-key-btn" title="Purchase or request a license key on WhatsApp">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                    <button id="open-get-key-btn" type="button" class="get-key-btn" title="Purchase a license key via Automatic or Manual Payment">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>
                       <span>GET KEY</span>
-                    </a>
+                    </button>
                   </div>
                   <p id="license-msg" class="license-msg hidden"></p>
                 </form>
+
+                <!-- ACTIVE / PENDING / RECENT PAYMENT STATUS BANNER FOR CUSTOMER -->
+                <div id="customer-payment-status-box" class="hidden" style="margin-top: 14px; padding: 14px; border-radius: 10px; border: 1px solid rgba(15, 118, 110, 0.25); background: rgba(16, 185, 129, 0.06);"></div>
+
+                <!-- CUSTOMER GET KEY / LICENSE PURCHASE FLOW PANEL -->
+                <div id="get-key-panel" class="hidden" style="margin-top: 16px; padding: 16px; border-radius: 12px; border: 1px solid rgba(15, 118, 110, 0.28); background: rgba(255, 255, 255, 0.96); box-shadow: 0 8px 24px rgba(0,0,0,0.06);">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid rgba(0,0,0,0.07);">
+                    <div>
+                      <span style="font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--teal);">OFFICIAL LICENSE STORE</span>
+                      <h3 style="margin: 2px 0 0; font-size: 15px; font-weight: 800; color: var(--ink);">💳 Get a SOLVATECH License Key</h3>
+                    </div>
+                    <button type="button" id="close-get-key-btn" style="background: rgba(0,0,0,0.05); border: none; border-radius: 6px; width: 28px; height: 28px; font-size: 16px; cursor: pointer; color: var(--ink); display: flex; align-items: center; justify-content: center;" title="Close">&times;</button>
+                  </div>
+
+                  <!-- STEP 1: CHOOSE PAYMENT METHOD & PLAN -->
+                  <div id="pay-step-select">
+                    <label style="display: block; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 8px;">1. Select Payment Method</label>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px;">
+                      <button type="button" id="pay-method-auto-btn" class="admin-preset-card-btn active" style="padding: 10px; text-align: left; display: flex; flex-direction: column; gap: 2px;">
+                        <span style="font-size: 12.5px; font-weight: 800; color: var(--ink);">⚡ 1. Automatic Payment</span>
+                        <span style="font-size: 10.5px; color: var(--muted);">Pay &amp; upload receipt for direct activation</span>
+                      </button>
+                      <button type="button" id="pay-method-manual-btn" class="admin-preset-card-btn" style="padding: 10px; text-align: left; display: flex; flex-direction: column; gap: 2px;">
+                        <span style="font-size: 12.5px; font-weight: 800; color: var(--ink);">💬 2. Manual Payment</span>
+                        <span style="font-size: 10.5px; color: var(--muted);">Buy directly via WhatsApp vendor</span>
+                      </button>
+                    </div>
+
+                    <label style="display: block; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 8px;">2. Select Official License Plan</label>
+                    <div id="customer-plans-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px;">
+                      <!-- Populated dynamically from trusted backend plans -->
+                    </div>
+
+                    <!-- SELECTED PLAN SUMMARY BOX -->
+                    <div id="selected-plan-summary-box" style="padding: 12px; border-radius: 8px; background: #f0fdf4; border: 1px solid #bbf7d0; margin-bottom: 14px;">
+                      <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; margin-bottom: 4px;">
+                        <span style="color: #166534; font-weight: 600;">Selected Plan:</span>
+                        <strong id="summary-plan-name" style="color: #14532d; font-size: 13px;">1 Day</strong>
+                      </div>
+                      <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; margin-bottom: 4px;">
+                        <span style="color: #166534; font-weight: 600;">Duration:</span>
+                        <strong id="summary-plan-duration" style="color: #14532d;">1 Day (24 Hours)</strong>
+                      </div>
+                      <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px;">
+                        <span style="color: #166534; font-weight: 600;">Amount to Pay:</span>
+                        <strong id="summary-plan-amount" style="color: #0f766e; font-size: 15px; font-family: 'DM Mono', monospace;">₦200</strong>
+                      </div>
+                    </div>
+
+                    <!-- AUTOMATIC PAYMENT START BUTTON -->
+                    <div id="pay-action-auto-wrap">
+                      <button type="button" id="start-auto-pay-session-btn" class="license-btn" style="width: 100%; padding: 11px 16px; font-size: 13px; font-weight: 800;">
+                        ⚡ Proceed to Automatic Payment →
+                      </button>
+                    </div>
+
+                    <!-- MANUAL PAYMENT WHATSAPP BUTTON -->
+                    <div id="pay-action-manual-wrap" class="hidden">
+                      <a id="manual-pay-wa-link" href="https://wa.me/2349049979183" target="_blank" rel="noopener noreferrer" class="get-key-btn" style="width: 100%; justify-content: center; padding: 11px 16px; font-size: 13px; font-weight: 800; text-decoration: none;">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                        <span>Continue Manual Payment on WhatsApp →</span>
+                      </a>
+                    </div>
+                  </div>
+
+                  <!-- STEP 2: ACTIVE 5-MINUTE AUTOMATIC PAYMENT SESSION & RECEIPT UPLOAD -->
+                  <div id="pay-step-session" class="hidden">
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-radius: 8px; background: #fffbeb; border: 1px solid #fde68a; margin-bottom: 12px;">
+                      <span style="font-size: 11px; font-weight: 800; color: #92400e; text-transform: uppercase;">⏱️ Payment Session Timer</span>
+                      <strong id="pay-session-countdown" style="font-family: 'DM Mono', monospace; font-size: 14px; color: #b45309;">05:00</strong>
+                    </div>
+
+                    <div style="padding: 12px; border-radius: 8px; background: #f8fafc; border: 1px solid #e2e8f0; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px;">
+                      <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px;">
+                        <span style="color: var(--muted);">Payment Reference:</span>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                          <strong id="pay-sess-ref" style="font-family: 'DM Mono', monospace; font-size: 13px; color: var(--teal); background: #ccfbf1; padding: 2px 8px; border-radius: 4px;">PAY-XXXXX</strong>
+                          <button type="button" class="admin-copy-key-btn" id="copy-pay-ref-btn">Copy</button>
+                        </div>
+                      </div>
+
+                      <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px;">
+                        <span style="color: var(--muted);">Plan &amp; Duration:</span>
+                        <strong id="pay-sess-plan" style="color: var(--ink);">—</strong>
+                      </div>
+
+                      <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px;">
+                        <span style="color: var(--muted);">Amount to Transfer:</span>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                          <strong id="pay-sess-amount" style="font-family: 'DM Mono', monospace; font-size: 14px; color: #0f766e;">₦0</strong>
+                          <button type="button" class="admin-copy-key-btn" id="copy-pay-amount-btn">Copy</button>
+                        </div>
+                      </div>
+
+                      <hr style="border: 0; border-top: 1px dashed #cbd5e1; margin: 2px 0;" />
+
+                      <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px;">
+                        <span style="color: var(--muted);">Bank / Provider:</span>
+                        <strong id="pay-sess-provider" style="color: var(--ink); font-weight: 800;">OPay</strong>
+                      </div>
+
+                      <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px;">
+                        <span style="color: var(--muted);">Account Number:</span>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                          <strong id="pay-sess-acc-num" style="font-family: 'DM Mono', monospace; font-size: 14px; color: var(--ink);">9049979183</strong>
+                          <button type="button" class="admin-copy-key-btn" id="copy-pay-acc-btn">Copy</button>
+                        </div>
+                      </div>
+
+                      <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px;">
+                        <span style="color: var(--muted);">Account Name:</span>
+                        <strong id="pay-sess-acc-name" style="color: var(--ink); font-weight: 800;">SOLOMON OLADIMEJI</strong>
+                      </div>
+                    </div>
+
+                    <!-- RECEIPT UPLOAD BOX -->
+                    <div id="pay-receipt-upload-box" style="padding: 12px; border-radius: 8px; border: 1.5px dashed #94a3b8; background: #ffffff; text-align: center; margin-bottom: 10px;">
+                      <label for="pay-receipt-file-input" style="display: block; font-size: 12px; font-weight: 700; color: var(--ink); margin-bottom: 6px; cursor: pointer;">
+                        📤 Upload Payment Screenshot / Receipt
+                      </label>
+                      <input id="pay-receipt-file-input" type="file" accept="image/png,image/jpeg,image/webp" style="font-size: 11.5px; max-width: 100%;" />
+                      <p style="font-size: 10.5px; color: var(--muted); margin: 6px 0 0;">Supported formats: JPG, PNG, WEBP (Max 5MB)</p>
+                      <button type="button" id="submit-pay-receipt-btn" class="license-btn" style="width: 100%; margin-top: 10px; padding: 10px 14px; font-size: 12.5px; font-weight: 800;">
+                        ✅ Submit Receipt for Verification
+                      </button>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                      <button type="button" id="cancel-pay-session-btn" class="admin-preset-btn" style="padding: 6px 12px; font-size: 11px;">
+                        ← Change Plan / Cancel
+                      </button>
+                    </div>
+                  </div>
+
+                  <p id="get-key-panel-msg" class="license-msg hidden" style="margin-top: 10px;"></p>
+                </div>
               </article>
             </section>
           </div>
@@ -667,6 +803,10 @@
             <button type="button" class="admin-subnav-btn active" data-subtab="customers" id="admin-subtab-btn-customers">
               <span>👥 Users</span>
               <span id="admin-count-customers" class="admin-subnav-count">0</span>
+            </button>
+            <button type="button" class="admin-subnav-btn" data-subtab="payments" id="admin-subtab-btn-payments">
+              <span>💳 Payments</span>
+              <span id="admin-count-payments" class="admin-subnav-count" style="background:#fef3c7; color:#b45309;">0</span>
             </button>
             <button type="button" class="admin-subnav-btn" data-subtab="generate" id="admin-subtab-btn-generate">
               <span>🔑 Generate Key</span>
@@ -1310,6 +1450,102 @@
               </div>
 
               <div id="admin-railway-alert" class="hidden" style="margin-top: 14px; padding: 10px 14px; border-radius: 6px; font-size: 12px;"></div>
+            </div>
+          </div>
+
+          <!-- SUBTAB: CUSTOMER PAYMENTS & RECEIPT VERIFICATION QUEUE -->
+          <div id="admin-view-payments" class="admin-subview hidden">
+            <!-- 1. Payment Bank Configuration Card (Stored in Supabase system_config) -->
+            <div class="surface" style="padding: 20px; border-radius: 8px; border: 1px solid var(--admin-card-border); margin-bottom: 20px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px;">
+                <div>
+                  <h3 style="font-size: 15px; font-weight: 800; color: var(--ink); margin: 0;">🏦 Automatic Payment Account Configuration</h3>
+                  <p style="font-size: 11.5px; color: var(--muted); margin: 2px 0 0;">Stored in Supabase <code>system_config</code>. All new customer payment sessions use these details.</p>
+                </div>
+                <span class="admin-badge badge-active">Live Bank Config</span>
+              </div>
+
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 12px;">
+                <div>
+                  <label for="admin-pay-provider" style="display:block; font-size:10.5px; font-weight:700; color:var(--muted); text-transform:uppercase; margin-bottom:4px;">Provider / Bank Name</label>
+                  <input id="admin-pay-provider" type="text" class="admin-search-input" value="OPay" placeholder="e.g. OPay" style="padding: 8px 10px;" />
+                </div>
+                <div>
+                  <label for="admin-pay-acc-num" style="display:block; font-size:10.5px; font-weight:700; color:var(--muted); text-transform:uppercase; margin-bottom:4px;">Account Number</label>
+                  <input id="admin-pay-acc-num" type="text" class="admin-search-input" value="9049979183" placeholder="e.g. 9049979183" style="padding: 8px 10px; font-family:'DM Mono', monospace;" />
+                </div>
+                <div>
+                  <label for="admin-pay-acc-name" style="display:block; font-size:10.5px; font-weight:700; color:var(--muted); text-transform:uppercase; margin-bottom:4px;">Account Name</label>
+                  <input id="admin-pay-acc-name" type="text" class="admin-search-input" value="SOLOMON OLADIMEJI" placeholder="e.g. SOLOMON OLADIMEJI" style="padding: 8px 10px;" />
+                </div>
+                <div>
+                  <label for="admin-pay-wa-num" style="display:block; font-size:10.5px; font-weight:700; color:var(--muted); text-transform:uppercase; margin-bottom:4px;">Manual WhatsApp No.</label>
+                  <input id="admin-pay-wa-num" type="text" class="admin-search-input" value="2349049979183" placeholder="e.g. 2349049979183" style="padding: 8px 10px; font-family:'DM Mono', monospace;" />
+                </div>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <button type="button" id="admin-save-pay-config-btn" class="license-btn" style="padding: 8px 18px; font-size: 12px; margin: 0;">
+                  💾 Save Payment Details
+                </button>
+                <span id="admin-pay-config-msg" class="license-msg hidden" style="margin: 0;"></span>
+              </div>
+            </div>
+
+            <!-- 2. Payment Requests Filter & Search Bar -->
+            <div class="admin-controls-bar">
+              <div class="admin-search-wrap">
+                <svg class="admin-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input id="admin-search-payments" type="text" class="admin-search-input" placeholder="Search by reference (PAY-...), customer email, UID, plan, license key..." />
+              </div>
+              <div class="admin-filter-chips">
+                <button type="button" class="admin-chip-btn active" data-filter-payment="all">ALL (<span id="count-pay-all">0</span>)</button>
+                <button type="button" class="admin-chip-btn" data-filter-payment="pending">⏳ PENDING (<span id="count-pay-pending">0</span>)</button>
+                <button type="button" class="admin-chip-btn" data-filter-payment="approved">✅ APPROVED (<span id="count-pay-approved">0</span>)</button>
+                <button type="button" class="admin-chip-btn" data-filter-payment="rejected">❌ REJECTED (<span id="count-pay-rejected">0</span>)</button>
+                <button type="button" class="admin-chip-btn" data-filter-payment="other">AWAITING / EXPIRED (<span id="count-pay-other">0</span>)</button>
+              </div>
+            </div>
+
+            <!-- 3. Payment Requests Table & Mobile Cards -->
+            <div class="admin-table-container">
+              <div class="admin-table-header-row">
+                <div>
+                  <h3 class="admin-table-title">💳 Customer Payment Requests &amp; Receipts</h3>
+                  <p style="font-size: 11.5px; color: var(--muted); margin: 2px 0 0;">Verify uploaded receipts from Supabase Storage. Approving automatically generates &amp; activates the customer's license.</p>
+                </div>
+                <div class="admin-table-actions">
+                  <button id="admin-refresh-payments-btn" type="button" class="admin-preset-btn" style="padding: 5px 12px; font-size: 11px;">
+                    ↻ Refresh Payments
+                  </button>
+                </div>
+              </div>
+
+              <div class="admin-table-scroll">
+                <table class="admin-master-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Reference</th>
+                      <th>Customer</th>
+                      <th>Plan / Duration</th>
+                      <th>Amount</th>
+                      <th>Status</th>
+                      <th>Receipt</th>
+                      <th>Submitted / Created</th>
+                      <th>License / Note</th>
+                      <th style="text-align: center;">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="admin-payments-tbody">
+                    <tr>
+                      <td colspan="10" style="text-align: center; color: var(--muted); padding: 24px;">Loading payment requests...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div id="admin-payments-cards" class="admin-cards-list"></div>
             </div>
           </div>
         </section>
@@ -2606,10 +2842,12 @@
           refresh();
           refreshLicenseStatus();
           refreshReferralStatus();
+          refreshCustomerPayments();
           if (!statusIntervalId) {
             statusIntervalId = setInterval(() => {
               refresh();
               refreshReferralStatus();
+              refreshCustomerPayments(true);
             }, 6000);
           }
         } else {
@@ -3561,6 +3799,9 @@
           if (target === "customers") {
             loadAdminUsers();
           }
+          if (target === "payments") {
+            loadAdminPayments();
+          }
           if (target === "railway") {
             syncRailwayInputs();
             testBackendHealth(false);
@@ -4117,9 +4358,19 @@
 
           const countConn = document.getElementById("admin-count-connected");
           if (countConn) countConn.textContent = String(s.connectedWhatsApp ?? s.whatsappConnectedCount ?? 0);
+
+          const pendingPayCount = (d.payments || []).filter(p => p && p.status === "pending").length;
+          const countPay = document.getElementById("admin-count-payments");
+          if (countPay) countPay.textContent = String(pendingPayCount);
         } catch (kpiErr) {
           console.warn("KPI cards render notice:", kpiErr);
         }
+
+        // 1b. Payments Table & Config (Subtab Payments)
+        try {
+          if (d.paymentConfig) syncAdminPaymentConfigInputs(d.paymentConfig);
+          renderAdminPaymentsTable();
+        } catch (err) { console.warn("Payments table render notice:", err); }
 
         // 2. Tier Breakdown
         try { renderTierBreakdown(); } catch (err) { console.warn("Tier breakdown render notice:", err); }
@@ -5513,6 +5764,957 @@
           loadAdminReferrals();
         });
       }
+
+      // =========================================================================
+      // SOLVATECH BOT — CUSTOMER PAYMENT / LICENSE PURCHASE & ADMIN VERIFICATION
+      // =========================================================================
+      const FALLBACK_CUSTOMER_PLANS = [
+        { id: "1d", days: 1, name: "1 Day", priceNgn: 200 },
+        { id: "3d", days: 3, name: "3 Days", priceNgn: 500 },
+        { id: "7d", days: 7, name: "7 Days", priceNgn: 1000 },
+        { id: "14d", days: 14, name: "14 Days", priceNgn: 2000 },
+        { id: "30d", days: 30, name: "30 Days", priceNgn: 4000 },
+        { id: "60d", days: 60, name: "2 Months", priceNgn: 8000 },
+        { id: "90d", days: 90, name: "3 Months", priceNgn: 12000 },
+        { id: "180d", days: 180, name: "6 Months", priceNgn: 24000 },
+        { id: "365d", days: 365, name: "12 Months", priceNgn: 48000 },
+      ];
+
+      let customerPlans = [...FALLBACK_CUSTOMER_PLANS];
+      let currentPaymentConfig = {
+        provider: "OPay",
+        accountNumber: "9049979183",
+        accountName: "SOLOMON OLADIMEJI",
+        manualWhatsappNumber: "2349049979183",
+      };
+      let selectedPaymentMethod = "automatic"; // 'automatic' | 'manual'
+      let selectedCustomerPlan = customerPlans[0];
+      let activePaymentSession = null;
+      let customerPaymentList = [];
+      let paymentSessionTimerId = null;
+      let lastKnownApprovedRef = null;
+
+      // Admin payment filter state
+      let adminPaymentFilter = "all";
+      let adminPaymentSearch = "";
+
+      const openGetKeyBtn = document.getElementById("open-get-key-btn");
+      const closeGetKeyBtn = document.getElementById("close-get-key-btn");
+      const getKeyPanel = document.getElementById("get-key-panel");
+      const payStepSelect = document.getElementById("pay-step-select");
+      const payStepSession = document.getElementById("pay-step-session");
+      const payMethodAutoBtn = document.getElementById("pay-method-auto-btn");
+      const payMethodManualBtn = document.getElementById("pay-method-manual-btn");
+      const customerPlansGrid = document.getElementById("customer-plans-grid");
+      const summaryPlanName = document.getElementById("summary-plan-name");
+      const summaryPlanDuration = document.getElementById("summary-plan-duration");
+      const summaryPlanAmount = document.getElementById("summary-plan-amount");
+      const payActionAutoWrap = document.getElementById("pay-action-auto-wrap");
+      const payActionManualWrap = document.getElementById("pay-action-manual-wrap");
+      const startAutoPaySessionBtn = document.getElementById("start-auto-pay-session-btn");
+      const manualPayWaLink = document.getElementById("manual-pay-wa-link");
+      const getKeyPanelMsg = document.getElementById("get-key-panel-msg");
+      const customerPaymentStatusBox = document.getElementById("customer-payment-status-box");
+
+      function showGetKeyMessage(text, isError = false) {
+        if (!getKeyPanelMsg) return;
+        if (!text) {
+          getKeyPanelMsg.classList.add("hidden");
+          getKeyPanelMsg.textContent = "";
+          return;
+        }
+        getKeyPanelMsg.className = `license-msg ${isError ? "error" : "success"}`;
+        getKeyPanelMsg.textContent = text;
+        getKeyPanelMsg.classList.remove("hidden");
+      }
+
+      function renderCustomerPlanSelection() {
+        if (!customerPlansGrid) return;
+        // Strictly filter out any Unlimited plan from customer view
+        const safePlans = (customerPlans || FALLBACK_CUSTOMER_PLANS).filter(
+          (p) => p && !p.isUnlimited && !String(p.name || "").toLowerCase().includes("unlimited") && Number(p.days) > 0 && Number(p.days) <= 365
+        );
+        if (!selectedCustomerPlan || !safePlans.find((p) => p.id === selectedCustomerPlan.id)) {
+          selectedCustomerPlan = safePlans[0] || FALLBACK_CUSTOMER_PLANS[0];
+        }
+
+        customerPlansGrid.innerHTML = safePlans
+          .map((p) => {
+            const isSel = selectedCustomerPlan && selectedCustomerPlan.id === p.id;
+            const price = Number(p.priceNgn ?? p.price ?? 0);
+            return `
+              <button type="button" class="admin-preset-card-btn ${isSel ? "active" : ""}" data-cust-plan-id="${escapeHtml(p.id)}" style="padding: 8px 6px;">
+                <span class="admin-preset-days" style="font-size: 12px;">${escapeHtml(p.name)}</span>
+                <span class="admin-preset-price" style="font-size: 11px;">₦${price.toLocaleString()}</span>
+              </button>
+            `;
+          })
+          .join("");
+
+        customerPlansGrid.querySelectorAll("[data-cust-plan-id]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const pid = btn.getAttribute("data-cust-plan-id");
+            const found = safePlans.find((p) => String(p.id) === String(pid));
+            if (found) {
+              selectedCustomerPlan = found;
+              renderCustomerPlanSelection();
+              updateSelectedPlanSummaryUI();
+            }
+          });
+        });
+
+        updateSelectedPlanSummaryUI();
+      }
+
+      function updateSelectedPlanSummaryUI() {
+        if (!selectedCustomerPlan) return;
+        const p = selectedCustomerPlan;
+        const price = Number(p.priceNgn ?? p.price ?? 0);
+        if (summaryPlanName) summaryPlanName.textContent = p.name;
+        if (summaryPlanDuration) summaryPlanDuration.textContent = `${p.days} Day${p.days === 1 ? "" : "s"}`;
+        if (summaryPlanAmount) summaryPlanAmount.textContent = `₦${price.toLocaleString()}`;
+
+        if (selectedPaymentMethod === "automatic") {
+          if (payActionAutoWrap) payActionAutoWrap.classList.remove("hidden");
+          if (payActionManualWrap) payActionManualWrap.classList.add("hidden");
+        } else {
+          if (payActionAutoWrap) payActionAutoWrap.classList.add("hidden");
+          if (payActionManualWrap) payActionManualWrap.classList.remove("hidden");
+          if (manualPayWaLink) {
+            const waNum = (currentPaymentConfig?.manualWhatsappNumber || "2349049979183").replace(/\D+/g, "");
+            const userEm = currentUser?.email ? ` (${currentUser.email})` : "";
+            const msg = `Hello SOLVATECH BOT, I want to purchase a license key via Manual Payment.\n\n• Plan: ${p.name}\n• Duration: ${p.days} Days\n• Amount: ₦${price.toLocaleString()}${userEm}`;
+            manualPayWaLink.href = `https://wa.me/${waNum}?text=${encodeURIComponent(msg)}`;
+          }
+        }
+      }
+
+      if (payMethodAutoBtn) {
+        payMethodAutoBtn.addEventListener("click", () => {
+          selectedPaymentMethod = "automatic";
+          payMethodAutoBtn.classList.add("active");
+          if (payMethodManualBtn) payMethodManualBtn.classList.remove("active");
+          updateSelectedPlanSummaryUI();
+        });
+      }
+
+      if (payMethodManualBtn) {
+        payMethodManualBtn.addEventListener("click", () => {
+          selectedPaymentMethod = "manual";
+          payMethodManualBtn.classList.add("active");
+          if (payMethodAutoBtn) payMethodAutoBtn.classList.remove("active");
+          updateSelectedPlanSummaryUI();
+        });
+      }
+
+      if (openGetKeyBtn) {
+        openGetKeyBtn.addEventListener("click", () => {
+          if (!getKeyPanel) return;
+          const isHidden = getKeyPanel.classList.contains("hidden");
+          if (isHidden) {
+            getKeyPanel.classList.remove("hidden");
+            renderCustomerPlanSelection();
+            refreshCustomerPayments();
+            try {
+              getKeyPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            } catch {}
+          } else {
+            getKeyPanel.classList.add("hidden");
+          }
+        });
+      }
+
+      if (closeGetKeyBtn) {
+        closeGetKeyBtn.addEventListener("click", () => {
+          if (getKeyPanel) getKeyPanel.classList.add("hidden");
+        });
+      }
+
+      function startPaymentSessionCountdown(session) {
+        if (paymentSessionTimerId) {
+          clearInterval(paymentSessionTimerId);
+          paymentSessionTimerId = null;
+        }
+        const countdownEl = document.getElementById("pay-session-countdown");
+        if (!session || session.status !== "awaiting_receipt" || !session.sessionExpiresAt) {
+          if (countdownEl) countdownEl.textContent = "—";
+          return;
+        }
+
+        const expMs = new Date(session.sessionExpiresAt).getTime();
+        const tick = () => {
+          // If receipt was submitted and status is pending, stop the 5-minute timer immediately
+          if (!activePaymentSession || activePaymentSession.status !== "awaiting_receipt") {
+            clearInterval(paymentSessionTimerId);
+            paymentSessionTimerId = null;
+            return;
+          }
+          const nowAdjusted = Date.now() + cachedServerOffset;
+          const leftSec = Math.max(0, Math.floor((expMs - nowAdjusted) / 1000));
+          const mins = String(Math.floor(leftSec / 60)).padStart(2, "0");
+          const secs = String(leftSec % 60).padStart(2, "0");
+          if (countdownEl) countdownEl.textContent = `${mins}:${secs}`;
+
+          if (leftSec <= 0) {
+            clearInterval(paymentSessionTimerId);
+            paymentSessionTimerId = null;
+            activePaymentSession.status = "expired";
+            showGetKeyMessage("⚠️ 5-minute payment session expired before receipt upload. Please select a plan to start a new session.", true);
+            renderActivePaymentSessionUI();
+            renderCustomerPaymentStatusBanner();
+          }
+        };
+        tick();
+        paymentSessionTimerId = setInterval(tick, 1000);
+      }
+
+      function renderActivePaymentSessionUI() {
+        if (!payStepSelect || !payStepSession) return;
+
+        if (activePaymentSession && activePaymentSession.status === "awaiting_receipt") {
+          payStepSelect.classList.add("hidden");
+          payStepSession.classList.remove("hidden");
+
+          const s = activePaymentSession;
+          const refEl = document.getElementById("pay-sess-ref");
+          const planEl = document.getElementById("pay-sess-plan");
+          const amtEl = document.getElementById("pay-sess-amount");
+          const provEl = document.getElementById("pay-sess-provider");
+          const accNumEl = document.getElementById("pay-sess-acc-num");
+          const accNameEl = document.getElementById("pay-sess-acc-name");
+
+          if (refEl) refEl.textContent = s.paymentReference;
+          if (planEl) planEl.textContent = `${s.planName} (${s.durationDays} Day${s.durationDays === 1 ? "" : "s"})`;
+          if (amtEl) amtEl.textContent = `₦${Number(s.amountNgn || 0).toLocaleString()}`;
+          if (provEl) provEl.textContent = s.providerName || currentPaymentConfig.provider || "OPay";
+          if (accNumEl) accNumEl.textContent = s.accountNumber || currentPaymentConfig.accountNumber || "9049979183";
+          if (accNameEl) accNameEl.textContent = s.accountName || currentPaymentConfig.accountName || "SOLOMON OLADIMEJI";
+
+          startPaymentSessionCountdown(s);
+        } else {
+          payStepSession.classList.add("hidden");
+          payStepSelect.classList.remove("hidden");
+          if (paymentSessionTimerId) {
+            clearInterval(paymentSessionTimerId);
+            paymentSessionTimerId = null;
+          }
+        }
+      }
+
+      // Copy buttons inside payment session
+      const copyPayRefBtn = document.getElementById("copy-pay-ref-btn");
+      if (copyPayRefBtn) {
+        copyPayRefBtn.addEventListener("click", () => {
+          const val = activePaymentSession?.paymentReference || "";
+          if (val) navigator.clipboard.writeText(val).then(() => showToast(`Copied Reference: ${val}`));
+        });
+      }
+      const copyPayAmountBtn = document.getElementById("copy-pay-amount-btn");
+      if (copyPayAmountBtn) {
+        copyPayAmountBtn.addEventListener("click", () => {
+          const val = String(activePaymentSession?.amountNgn || "");
+          if (val) navigator.clipboard.writeText(val).then(() => showToast(`Copied Amount: ₦${Number(val).toLocaleString()}`));
+        });
+      }
+      const copyPayAccBtn = document.getElementById("copy-pay-acc-btn");
+      if (copyPayAccBtn) {
+        copyPayAccBtn.addEventListener("click", () => {
+          const val = activePaymentSession?.accountNumber || currentPaymentConfig.accountNumber || "";
+          if (val) navigator.clipboard.writeText(val).then(() => showToast(`Copied Account Number: ${val}`));
+        });
+      }
+
+      // Start Automatic Payment Session
+      if (startAutoPaySessionBtn) {
+        startAutoPaySessionBtn.addEventListener("click", async () => {
+          if (!selectedCustomerPlan) return;
+          showGetKeyMessage("");
+          startAutoPaySessionBtn.disabled = true;
+          startAutoPaySessionBtn.textContent = "Creating Payment Session...";
+
+          try {
+            let authHeader = await getAuthHeader();
+            if (!authHeader) throw new Error("Please sign in first.");
+
+            let res = await fetch(getApiUrl("/payments/session"), {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": authHeader,
+              },
+              body: JSON.stringify({ planId: selectedCustomerPlan.id }),
+            });
+
+            if (res.status === 401) {
+              const refreshed = await getValidIdToken(true);
+              if (refreshed) {
+                authHeader = `Bearer ${refreshed}`;
+                res = await fetch(getApiUrl("/payments/session"), {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": authHeader,
+                  },
+                  body: JSON.stringify({ planId: selectedCustomerPlan.id }),
+                });
+              }
+            }
+
+            const data = await safeFetchJson(res);
+            if (!res.ok) throw new Error(data.error || "Could not create payment session.");
+
+            if (data.serverTime) {
+              cachedServerOffset = new Date(data.serverTime).getTime() - Date.now();
+            }
+            if (data.paymentConfig) {
+              currentPaymentConfig = data.paymentConfig;
+            }
+            activePaymentSession = data.session;
+            renderActivePaymentSessionUI();
+            await refreshCustomerPayments(true);
+          } catch (err) {
+            showGetKeyMessage(err.message || "Failed to start payment session.", true);
+          } finally {
+            startAutoPaySessionBtn.disabled = false;
+            startAutoPaySessionBtn.textContent = "⚡ Proceed to Automatic Payment →";
+          }
+        });
+      }
+
+      // Cancel active unsubmitted payment session
+      const cancelPaySessionBtn = document.getElementById("cancel-pay-session-btn");
+      if (cancelPaySessionBtn) {
+        cancelPaySessionBtn.addEventListener("click", async () => {
+          if (!activePaymentSession) {
+            renderActivePaymentSessionUI();
+            return;
+          }
+          const refToCancel = activePaymentSession.paymentReference;
+          activePaymentSession = null;
+          renderActivePaymentSessionUI();
+          showGetKeyMessage("");
+          try {
+            const authHeader = await getAuthHeader();
+            if (authHeader && refToCancel) {
+              await fetch(getApiUrl("/payments/cancel"), {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": authHeader },
+                body: JSON.stringify({ paymentReference: refToCancel }),
+              });
+            }
+            await refreshCustomerPayments(true);
+          } catch {}
+        });
+      }
+
+      // Upload Receipt Screenshot
+      const submitPayReceiptBtn = document.getElementById("submit-pay-receipt-btn");
+      const payReceiptFileInput = document.getElementById("pay-receipt-file-input");
+      if (submitPayReceiptBtn && payReceiptFileInput) {
+        submitPayReceiptBtn.addEventListener("click", async () => {
+          if (!activePaymentSession || !activePaymentSession.paymentReference) {
+            showGetKeyMessage("No active payment session. Please select a plan first.", true);
+            return;
+          }
+          const file = payReceiptFileInput.files && payReceiptFileInput.files[0];
+          if (!file) {
+            showGetKeyMessage("Please select your payment screenshot/receipt image first.", true);
+            return;
+          }
+          const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+          if (!allowedTypes.includes((file.type || "").toLowerCase())) {
+            showGetKeyMessage("Invalid file type. Only JPG, PNG, or WEBP screenshot images are allowed.", true);
+            return;
+          }
+          if (file.size > 5 * 1024 * 1024) {
+            showGetKeyMessage("Receipt image is too large (max 5MB).", true);
+            return;
+          }
+
+          submitPayReceiptBtn.disabled = true;
+          submitPayReceiptBtn.textContent = "Uploading Receipt to Supabase...";
+          showGetKeyMessage("");
+
+          try {
+            let authHeader = await getAuthHeader();
+            if (!authHeader) throw new Error("Authentication required.");
+
+            const ref = activePaymentSession.paymentReference;
+            const arrayBuffer = await file.arrayBuffer();
+
+            let res = await fetch(getApiUrl(`/payments/upload-receipt/${encodeURIComponent(ref)}`), {
+              method: "POST",
+              headers: {
+                "Content-Type": file.type || "image/jpeg",
+                "Authorization": authHeader,
+              },
+              body: arrayBuffer,
+            });
+
+            if (res.status === 401) {
+              const refreshed = await getValidIdToken(true);
+              if (refreshed) {
+                authHeader = `Bearer ${refreshed}`;
+                res = await fetch(getApiUrl(`/payments/upload-receipt/${encodeURIComponent(ref)}`), {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": file.type || "image/jpeg",
+                    "Authorization": authHeader,
+                  },
+                  body: arrayBuffer,
+                });
+              }
+            }
+
+            const data = await safeFetchJson(res);
+            if (!res.ok) throw new Error(data.error || "Failed to upload receipt.");
+
+            // Stop 5-minute countdown immediately now that status is PENDING
+            activePaymentSession = null;
+            if (payReceiptFileInput) payReceiptFileInput.value = "";
+            renderActivePaymentSessionUI();
+            if (getKeyPanel) getKeyPanel.classList.add("hidden");
+            showToast("✅ Receipt submitted! Your payment is now pending admin verification.");
+            await refreshCustomerPayments();
+          } catch (err) {
+            showGetKeyMessage(err.message || "Receipt upload failed.", true);
+          } finally {
+            submitPayReceiptBtn.disabled = false;
+            submitPayReceiptBtn.textContent = "✅ Submit Receipt for Verification";
+          }
+        });
+      }
+
+      function renderCustomerPaymentStatusBanner() {
+        if (!customerPaymentStatusBox) return;
+        if (!Array.isArray(customerPaymentList) || customerPaymentList.length === 0) {
+          customerPaymentStatusBox.classList.add("hidden");
+          return;
+        }
+
+        // Priority: 1. Pending verification, 2. Active awaiting_receipt, 3. Most recent approved/rejected
+        const pendingItem = customerPaymentList.find((p) => p.status === "pending");
+        const awaitingItem = customerPaymentList.find((p) => p.status === "awaiting_receipt");
+        const latestItem = pendingItem || awaitingItem || customerPaymentList[0];
+
+        if (!latestItem || latestItem.status === "cancelled" || latestItem.status === "expired") {
+          customerPaymentStatusBox.classList.add("hidden");
+          return;
+        }
+
+        customerPaymentStatusBox.classList.remove("hidden");
+
+        if (latestItem.status === "pending") {
+          customerPaymentStatusBox.style.background = "#fffbeb";
+          customerPaymentStatusBox.style.borderColor = "#fde68a";
+          customerPaymentStatusBox.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 6px;">
+              <span style="font-size: 11px; font-weight: 800; color: #92400e; background: #fef3c7; padding: 3px 8px; border-radius: 4px;">⏳ PAYMENT PENDING VERIFICATION</span>
+              <strong style="font-family: 'DM Mono', monospace; font-size: 12px; color: #78350f;">${escapeHtml(latestItem.paymentReference)}</strong>
+            </div>
+            <p style="font-size: 12px; color: #92400e; margin: 0; line-height: 1.45;">
+              Your receipt for <strong>${escapeHtml(latestItem.planName)} (₦${Number(latestItem.amountNgn || 0).toLocaleString()})</strong> has been received and is awaiting admin approval. Your license will activate automatically once verified.
+            </p>
+          `;
+        } else if (latestItem.status === "awaiting_receipt") {
+          customerPaymentStatusBox.style.background = "#f0fdfa";
+          customerPaymentStatusBox.style.borderColor = "#99f6e4";
+          customerPaymentStatusBox.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 6px;">
+              <span style="font-size: 11px; font-weight: 800; color: #0f766e; background: #ccfbf1; padding: 3px 8px; border-radius: 4px;">⚡ ACTIVE PAYMENT SESSION</span>
+              <strong style="font-family: 'DM Mono', monospace; font-size: 12px; color: #0f766e;">${escapeHtml(latestItem.paymentReference)}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+              <span style="font-size: 12px; color: #115e59;">Plan: <strong>${escapeHtml(latestItem.planName)} (₦${Number(latestItem.amountNgn || 0).toLocaleString()})</strong> — Upload your receipt to complete.</span>
+              <button type="button" class="admin-copy-key-btn" onclick="document.getElementById('get-key-panel').classList.remove('hidden')">Upload Receipt →</button>
+            </div>
+          `;
+        } else if (latestItem.status === "approved") {
+          customerPaymentStatusBox.style.background = "#f0fdf4";
+          customerPaymentStatusBox.style.borderColor = "#86efac";
+          customerPaymentStatusBox.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 6px;">
+              <span style="font-size: 11px; font-weight: 800; color: #15803d; background: #dcfce7; padding: 3px 8px; border-radius: 4px;">✅ PAYMENT APPROVED &amp; LICENSE ACTIVE</span>
+              <strong style="font-family: 'DM Mono', monospace; font-size: 12px; color: #166534;">${escapeHtml(latestItem.paymentReference)}</strong>
+            </div>
+            <p style="font-size: 12px; color: #166534; margin: 0;">
+              Your <strong>${escapeHtml(latestItem.planName)}</strong> license (${latestItem.licenseCode ? `<code>${escapeHtml(latestItem.licenseCode)}</code>` : "Activated"}) is active!
+            </p>
+          `;
+        } else if (latestItem.status === "rejected") {
+          customerPaymentStatusBox.style.background = "#fef2f2";
+          customerPaymentStatusBox.style.borderColor = "#fecaca";
+          customerPaymentStatusBox.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 6px;">
+              <span style="font-size: 11px; font-weight: 800; color: #991b1b; background: #fee2e2; padding: 3px 8px; border-radius: 4px;">❌ PAYMENT REJECTED</span>
+              <strong style="font-family: 'DM Mono', monospace; font-size: 12px; color: #991b1b;">${escapeHtml(latestItem.paymentReference)}</strong>
+            </div>
+            <p style="font-size: 12px; color: #991b1b; margin: 0;">
+              ${escapeHtml(latestItem.rejectionReason || "Payment receipt could not be verified.")} You may tap <strong>GET KEY</strong> to submit a valid receipt.
+            </p>
+          `;
+        }
+      }
+
+      async function refreshCustomerPayments(silent = false) {
+        if (!currentUser) return;
+        try {
+          let authHeader = await getAuthHeader();
+          if (!authHeader) return;
+
+          const res = await fetch(getApiUrl("/payments/my"), {
+            headers: {
+              "Accept": "application/json",
+              "Authorization": authHeader,
+            },
+          });
+          if (!res.ok) return;
+          const data = await safeFetchJson(res);
+          if (data.serverTime) {
+            cachedServerOffset = new Date(data.serverTime).getTime() - Date.now();
+          }
+          if (Array.isArray(data.plans) && data.plans.length > 0) {
+            customerPlans = data.plans;
+            renderCustomerPlanSelection();
+          }
+          if (data.paymentConfig) {
+            currentPaymentConfig = data.paymentConfig;
+            updateSelectedPlanSummaryUI();
+          }
+          if (Array.isArray(data.payments)) {
+            customerPaymentList = data.payments;
+
+            // Resume active awaiting_receipt session if present
+            const activeSess = customerPaymentList.find((p) => p.status === "awaiting_receipt");
+            if (activeSess) {
+              activePaymentSession = activeSess;
+              renderActivePaymentSessionUI();
+            } else if (activePaymentSession && activePaymentSession.status === "awaiting_receipt") {
+              activePaymentSession = null;
+              renderActivePaymentSessionUI();
+            }
+
+            // Detect newly approved payment to refresh license status immediately
+            const newestApproved = customerPaymentList.find((p) => p.status === "approved");
+            if (newestApproved && newestApproved.paymentReference !== lastKnownApprovedRef) {
+              if (lastKnownApprovedRef !== null) {
+                refreshLicenseStatus();
+              }
+              lastKnownApprovedRef = newestApproved.paymentReference;
+            }
+
+            renderCustomerPaymentStatusBanner();
+          }
+        } catch (err) {
+          if (!silent) console.debug("Customer payments fetch notice:", err.message);
+        }
+      }
+
+      // =========================================================================
+      // ADMIN PAYMENTS & BANK CONFIGURATION CONTROLLER
+      // =========================================================================
+      function syncAdminPaymentConfigInputs(cfg) {
+        if (!cfg) return;
+        const provInput = document.getElementById("admin-pay-provider");
+        const numInput = document.getElementById("admin-pay-acc-num");
+        const nameInput = document.getElementById("admin-pay-acc-name");
+        const waInput = document.getElementById("admin-pay-wa-num");
+
+        if (provInput && document.activeElement !== provInput && cfg.provider) provInput.value = cfg.provider;
+        if (numInput && document.activeElement !== numInput && cfg.accountNumber) numInput.value = cfg.accountNumber;
+        if (nameInput && document.activeElement !== nameInput && cfg.accountName) nameInput.value = cfg.accountName;
+        if (waInput && document.activeElement !== waInput && cfg.manualWhatsappNumber) waInput.value = cfg.manualWhatsappNumber;
+      }
+
+      const adminSavePayConfigBtn = document.getElementById("admin-save-pay-config-btn");
+      if (adminSavePayConfigBtn) {
+        adminSavePayConfigBtn.addEventListener("click", async () => {
+          const provider = (document.getElementById("admin-pay-provider")?.value || "").trim();
+          const accountNumber = (document.getElementById("admin-pay-acc-num")?.value || "").trim();
+          const accountName = (document.getElementById("admin-pay-acc-name")?.value || "").trim();
+          const manualWhatsappNumber = (document.getElementById("admin-pay-wa-num")?.value || "").trim();
+          const msgEl = document.getElementById("admin-pay-config-msg");
+
+          if (!provider || !accountNumber || !accountName) {
+            if (msgEl) {
+              msgEl.className = "license-msg error";
+              msgEl.textContent = "Provider, account number, and account name are required.";
+              msgEl.classList.remove("hidden");
+            }
+            return;
+          }
+
+          adminSavePayConfigBtn.disabled = true;
+          adminSavePayConfigBtn.textContent = "Saving...";
+          try {
+            const authHeader = await getAuthHeader();
+            const res = await fetch(getApiUrl("/admin/payments/config"), {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": authHeader || "",
+              },
+              body: JSON.stringify({ provider, accountNumber, accountName, manualWhatsappNumber }),
+            });
+            const data = await safeFetchJson(res);
+            if (!res.ok) throw new Error(data.error || "Failed to update payment configuration.");
+
+            currentPaymentConfig = data.paymentConfig || { provider, accountNumber, accountName, manualWhatsappNumber };
+            if (adminOverviewData) adminOverviewData.paymentConfig = currentPaymentConfig;
+            if (msgEl) {
+              msgEl.className = "license-msg success";
+              msgEl.textContent = "✅ Payment details saved to Supabase system_config!";
+              msgEl.classList.remove("hidden");
+              setTimeout(() => msgEl.classList.add("hidden"), 4000);
+            }
+          } catch (err) {
+            if (msgEl) {
+              msgEl.className = "license-msg error";
+              msgEl.textContent = `❌ ${err.message}`;
+              msgEl.classList.remove("hidden");
+            }
+          } finally {
+            adminSavePayConfigBtn.disabled = false;
+            adminSavePayConfigBtn.textContent = "💾 Save Payment Details";
+          }
+        });
+      }
+
+      async function loadAdminPayments() {
+        if (!currentUser || !isUserAdminEmail(currentUser.email)) return;
+        try {
+          const authHeader = await getAuthHeader();
+          if (!authHeader) return;
+          const res = await fetch(getApiUrl("/admin/payments"), {
+            headers: { "Accept": "application/json", "Authorization": authHeader },
+          });
+          const data = await safeFetchJson(res);
+          if (res.ok && data) {
+            if (!adminOverviewData) adminOverviewData = {};
+            adminOverviewData.payments = data.payments || [];
+            adminOverviewData.paymentConfig = data.paymentConfig || currentPaymentConfig;
+            syncAdminPaymentConfigInputs(adminOverviewData.paymentConfig);
+            renderAdminPaymentsTable();
+          }
+        } catch (err) {
+          console.debug("loadAdminPayments error:", err.message);
+        }
+      }
+
+      const adminRefreshPaymentsBtn = document.getElementById("admin-refresh-payments-btn");
+      if (adminRefreshPaymentsBtn) {
+        adminRefreshPaymentsBtn.addEventListener("click", () => loadAdminPayments());
+      }
+
+      const adminSearchPaymentsInput = document.getElementById("admin-search-payments");
+      if (adminSearchPaymentsInput) {
+        adminSearchPaymentsInput.addEventListener("input", (e) => {
+          adminPaymentSearch = (e.target.value || "").trim().toLowerCase();
+          renderAdminPaymentsTable();
+        });
+      }
+
+      document.querySelectorAll("[data-filter-payment]").forEach((chip) => {
+        chip.addEventListener("click", () => {
+          document.querySelectorAll("[data-filter-payment]").forEach((c) => c.classList.remove("active"));
+          chip.classList.add("active");
+          adminPaymentFilter = chip.dataset.filterPayment;
+          renderAdminPaymentsTable();
+        });
+      });
+
+      function getPaymentBadgeHtml(status) {
+        const s = String(status || "").toLowerCase();
+        if (s === "pending") return `<span class="admin-badge badge-expiring"><span class="badge-dot"></span>PENDING</span>`;
+        if (s === "approved") return `<span class="admin-badge badge-active"><span class="badge-dot"></span>APPROVED</span>`;
+        if (s === "rejected") return `<span class="admin-badge badge-expired"><span class="badge-dot"></span>REJECTED</span>`;
+        if (s === "awaiting_receipt") return `<span class="admin-badge badge-unused"><span class="badge-dot"></span>AWAITING RECEIPT</span>`;
+        return `<span class="admin-badge badge-neutral"><span class="badge-dot"></span>${escapeHtml(s.toUpperCase())}</span>`;
+      }
+
+      function renderAdminPaymentsTable() {
+        const tbody = document.getElementById("admin-payments-tbody");
+        const cardsEl = document.getElementById("admin-payments-cards");
+        const allPayments = adminOverviewData?.payments || [];
+
+        const cAll = allPayments.length;
+        const cPending = allPayments.filter((p) => p.status === "pending").length;
+        const cApproved = allPayments.filter((p) => p.status === "approved").length;
+        const cRejected = allPayments.filter((p) => p.status === "rejected").length;
+        const cOther = allPayments.filter((p) => p.status !== "pending" && p.status !== "approved" && p.status !== "rejected").length;
+
+        const elAll = document.getElementById("count-pay-all");
+        if (elAll) elAll.textContent = String(cAll);
+        const elPend = document.getElementById("count-pay-pending");
+        if (elPend) elPend.textContent = String(cPending);
+        const elAppr = document.getElementById("count-pay-approved");
+        if (elAppr) elAppr.textContent = String(cApproved);
+        const elRej = document.getElementById("count-pay-rejected");
+        if (elRej) elRej.textContent = String(cRejected);
+        const elOth = document.getElementById("count-pay-other");
+        if (elOth) elOth.textContent = String(cOther);
+        const navCount = document.getElementById("admin-count-payments");
+        if (navCount) navCount.textContent = String(cPending);
+
+        const filtered = allPayments.filter((p) => {
+          if (!p) return false;
+          if (adminPaymentFilter === "pending" && p.status !== "pending") return false;
+          if (adminPaymentFilter === "approved" && p.status !== "approved") return false;
+          if (adminPaymentFilter === "rejected" && p.status !== "rejected") return false;
+          if (adminPaymentFilter === "other" && (p.status === "pending" || p.status === "approved" || p.status === "rejected")) return false;
+
+          if (adminPaymentSearch) {
+            const hay = `${p.paymentReference || ""} ${p.userEmail || ""} ${p.userUid || ""} ${p.planName || ""} ${p.licenseCode || ""}`.toLowerCase();
+            if (!hay.includes(adminPaymentSearch)) return false;
+          }
+          return true;
+        });
+
+        if (tbody) {
+          if (filtered.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: var(--muted); padding: 24px;">No payment requests match the current filter.</td></tr>`;
+          } else {
+            tbody.innerHTML = filtered
+              .map((p, idx) => {
+                const ref = escapeHtml(p.paymentReference);
+                const badge = getPaymentBadgeHtml(p.status);
+                const dateStr = p.submittedAt
+                  ? new Date(p.submittedAt).toLocaleString()
+                  : p.createdAt
+                  ? new Date(p.createdAt).toLocaleString()
+                  : "—";
+                const receiptBtn = p.hasReceipt
+                  ? `<button type="button" class="admin-copy-key-btn" style="background:#e0f2fe; color:#0369a1; border-color:#bae6fd;" onclick="event.stopPropagation(); openPaymentDetailModal('${ref}')">🖼️ View Receipt</button>`
+                  : `<span style="font-size:11px; color:var(--muted);">No Receipt</span>`;
+
+                const outcomeHtml = p.licenseCode
+                  ? `<span class="code-pill" style="color:var(--teal); font-weight:700;">${escapeHtml(p.licenseCode)}</span>`
+                  : p.rejectionReason
+                  ? `<span style="font-size:11px; color:#b91c1c;">${escapeHtml(p.rejectionReason)}</span>`
+                  : `<span style="font-size:11px; color:var(--muted);">—</span>`;
+
+                const actionsHtml =
+                  p.status === "pending"
+                    ? `
+                      <div style="display:flex; gap:6px; justify-content:center; flex-wrap:wrap;" onclick="event.stopPropagation();">
+                        <button type="button" class="admin-action-btn" style="background:#dcfce7; color:#15803d; border-color:#86efac; font-weight:700; font-size:11px;" onclick="adminApprovePayment('${ref}', this)">✅ Approve</button>
+                        <button type="button" class="admin-action-btn" style="background:#fee2e2; color:#991b1b; border-color:#fca5a5; font-weight:700; font-size:11px;" onclick="openPaymentDetailModal('${ref}')">❌ Reject</button>
+                      </div>
+                    `
+                    : `
+                      <div style="display:flex; gap:6px; justify-content:center;" onclick="event.stopPropagation();">
+                        <button type="button" class="admin-copy-key-btn" onclick="openPaymentDetailModal('${ref}')">Details</button>
+                        <button type="button" class="admin-copy-key-btn" style="color:#991b1b;" onclick="adminDeletePayment('${ref}')">🗑️</button>
+                      </div>
+                    `;
+
+                return `
+                  <tr style="cursor: pointer;" onclick="openPaymentDetailModal('${ref}')">
+                    <td>${idx + 1}</td>
+                    <td onclick="event.stopPropagation();">
+                      <div style="display:flex; align-items:center; gap:5px;">
+                        <span class="code-pill" style="font-weight:800; color:var(--teal);">${ref}</span>
+                        <button type="button" class="admin-copy-key-btn" onclick="navigator.clipboard.writeText('${ref}').then(()=>showToast('Copied ${ref}'))">Copy</button>
+                      </div>
+                    </td>
+                    <td>
+                      <strong>${escapeHtml(p.userEmail || "Customer")}</strong>
+                      <div style="font-size:10px; color:var(--muted); font-family:'DM Mono', monospace;">${escapeHtml((p.userUid || "").slice(0, 12))}</div>
+                    </td>
+                    <td><strong>${escapeHtml(p.planName)}</strong> (${p.durationDays}D)</td>
+                    <td style="font-family:'DM Mono', monospace; font-weight:800; color:var(--teal);">₦${Number(p.amountNgn || 0).toLocaleString()}</td>
+                    <td>${badge}</td>
+                    <td>${receiptBtn}</td>
+                    <td style="font-size:11px;">${dateStr}</td>
+                    <td>${outcomeHtml}</td>
+                    <td style="text-align:center;">${actionsHtml}</td>
+                  </tr>
+                `;
+              })
+              .join("");
+          }
+        }
+
+        if (cardsEl) {
+          if (filtered.length === 0) {
+            cardsEl.innerHTML = `<div style="text-align: center; color: var(--muted); padding: 20px;">No payment requests found.</div>`;
+          } else {
+            cardsEl.innerHTML = filtered
+              .map((p) => {
+                const ref = escapeHtml(p.paymentReference);
+                const badge = getPaymentBadgeHtml(p.status);
+                return `
+                  <div class="admin-card-row" style="cursor: pointer;" onclick="openPaymentDetailModal('${ref}')">
+                    <div class="admin-card-row-top">
+                      <div>
+                        <span class="code-pill" style="font-weight: 800; color: var(--teal);">${ref}</span>
+                        <strong style="margin-left: 6px; font-size: 13px;">₦${Number(p.amountNgn || 0).toLocaleString()}</strong>
+                      </div>
+                      ${badge}
+                    </div>
+                    <div class="admin-card-grid-meta">
+                      <div><span class="admin-card-label">Customer:</span> <strong>${escapeHtml(p.userEmail || p.userUid)}</strong></div>
+                      <div><span class="admin-card-label">Plan:</span> <strong>${escapeHtml(p.planName)} (${p.durationDays}D)</strong></div>
+                    </div>
+                    <div style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap;" onclick="event.stopPropagation();">
+                      ${p.hasReceipt ? `<button type="button" class="admin-copy-key-btn" style="background:#e0f2fe; color:#0369a1;" onclick="openPaymentDetailModal('${ref}')">🖼️ View Receipt</button>` : ""}
+                      ${
+                        p.status === "pending"
+                          ? `
+                            <button type="button" class="admin-action-btn" style="background:#dcfce7; color:#15803d; border-color:#86efac; font-weight:700; font-size:11px;" onclick="adminApprovePayment('${ref}', this)">✅ Approve &amp; Activate</button>
+                            <button type="button" class="admin-action-btn" style="background:#fee2e2; color:#991b1b; border-color:#fca5a5; font-weight:700; font-size:11px;" onclick="openPaymentDetailModal('${ref}')">❌ Reject</button>
+                          `
+                          : ""
+                      }
+                    </div>
+                  </div>
+                `;
+              })
+              .join("");
+          }
+        }
+      }
+
+      window.openPaymentDetailModal = async function(ref) {
+        const allPayments = adminOverviewData?.payments || [];
+        const p = allPayments.find((item) => item.paymentReference === ref);
+        if (!p) return;
+
+        const token = await getValidIdToken(false);
+        const receiptUrl = p.hasReceipt
+          ? `${getApiUrl(`/payments/receipt/${encodeURIComponent(p.paymentReference)}`)}?token=${encodeURIComponent(token || "")}&t=${Date.now()}`
+          : null;
+
+        if (adminModalTitle) adminModalTitle.textContent = `Payment Request: ${p.paymentReference}`;
+        if (adminModalBody) {
+          adminModalBody.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--admin-card-border);">
+              <div>
+                <span class="code-pill" style="font-size: 15px; font-weight: 800; color: var(--teal);">${escapeHtml(p.paymentReference)}</span>
+                <button type="button" class="admin-copy-key-btn" style="margin-left: 6px;" onclick="navigator.clipboard.writeText('${escapeHtml(p.paymentReference)}').then(()=>showToast('Copied ${escapeHtml(p.paymentReference)}'))">Copy</button>
+              </div>
+              <div>${getPaymentBadgeHtml(p.status)}</div>
+            </div>
+
+            <div class="admin-detail-row"><span class="admin-detail-label">Customer Email:</span> <span class="admin-detail-value"><strong>${escapeHtml(p.userEmail || "—")}</strong></span></div>
+            <div class="admin-detail-row"><span class="admin-detail-label">Customer UID:</span> <span class="admin-detail-value" style="font-family:'DM Mono', monospace; font-size:11px;">${escapeHtml(p.userUid)}</span></div>
+            <div class="admin-detail-row"><span class="admin-detail-label">Selected Plan:</span> <span class="admin-detail-value"><strong>${escapeHtml(p.planName)} (${p.durationDays} Days)</strong></span></div>
+            <div class="admin-detail-row"><span class="admin-detail-label">Amount:</span> <span class="admin-detail-value" style="color:var(--teal); font-weight:800;">₦${Number(p.amountNgn || 0).toLocaleString()}</span></div>
+            <div class="admin-detail-row"><span class="admin-detail-label">Bank Details Shown:</span> <span class="admin-detail-value">${escapeHtml(p.providerName)} • ${escapeHtml(p.accountNumber)} (${escapeHtml(p.accountName)})</span></div>
+            <div class="admin-detail-row"><span class="admin-detail-label">Created At:</span> <span class="admin-detail-value">${p.createdAt ? new Date(p.createdAt).toLocaleString() : "—"}</span></div>
+            <div class="admin-detail-row"><span class="admin-detail-label">Submitted At:</span> <span class="admin-detail-value">${p.submittedAt ? new Date(p.submittedAt).toLocaleString() : "Not Submitted"}</span></div>
+            ${p.licenseCode ? `<div class="admin-detail-row"><span class="admin-detail-label">Activated License:</span> <span class="admin-detail-value"><span class="code-pill" style="color:var(--teal); font-weight:800;">${escapeHtml(p.licenseCode)}</span></span></div>` : ""}
+            ${p.rejectionReason ? `<div class="admin-detail-row"><span class="admin-detail-label">Rejection Reason:</span> <span class="admin-detail-value" style="color:#b91c1c;">${escapeHtml(p.rejectionReason)}</span></div>` : ""}
+
+            <h4 style="font-size: 12px; text-transform: uppercase; color: var(--muted); letter-spacing: 0.05em; margin: 16px 0 8px;">Uploaded Payment Receipt</h4>
+            ${
+              receiptUrl
+                ? `
+                  <div style="border: 1px solid var(--admin-card-border); border-radius: 8px; padding: 8px; background: #f8fafc; text-align: center; margin-bottom: 14px;">
+                    <img src="${receiptUrl}" alt="Payment Receipt ${escapeHtml(p.paymentReference)}" style="max-width: 100%; max-height: 380px; border-radius: 6px; object-fit: contain;" />
+                  </div>
+                `
+                : `<div style="padding: 16px; border-radius: 8px; background: #f8fafc; text-align: center; color: var(--muted); font-size: 12px; margin-bottom: 14px;">No receipt image uploaded for this session.</div>`
+            }
+
+            ${
+              p.status !== "approved"
+                ? `
+                  <div style="padding: 12px; border-radius: 8px; background: #f8fafc; border: 1px solid #e2e8f0; margin-top: 12px;">
+                    <label for="admin-reject-reason-input" style="display:block; font-size:11px; font-weight:700; color:var(--muted); margin-bottom:6px;">Rejection Note (Optional if rejecting):</label>
+                    <input id="admin-reject-reason-input" type="text" class="admin-search-input" placeholder="e.g. Payment not received or unclear screenshot" value="${escapeHtml(p.rejectionReason || "")}" style="margin-bottom: 10px; padding: 8px 10px;" />
+                    <div style="display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap;">
+                      <button type="button" class="admin-action-btn" style="background:#fee2e2; color:#991b1b; border-color:#fca5a5; padding: 8px 14px; font-weight:700;" onclick="adminRejectPayment('${escapeHtml(p.paymentReference)}', document.getElementById('admin-reject-reason-input')?.value, this)">
+                        ❌ Reject Payment
+                      </button>
+                      <button type="button" class="admin-action-btn" style="background:#dcfce7; color:#15803d; border-color:#86efac; padding: 8px 16px; font-weight:800;" onclick="adminApprovePayment('${escapeHtml(p.paymentReference)}', this)">
+                        ✅ Approve &amp; Activate License
+                      </button>
+                    </div>
+                  </div>
+                `
+                : ""
+            }
+          `;
+          if (adminDetailModal) adminDetailModal.classList.remove("hidden");
+        }
+      };
+
+      window.adminApprovePayment = async function(ref, btnEl) {
+        if (btnEl) {
+          btnEl.disabled = true;
+          btnEl.textContent = "Approving...";
+        }
+        try {
+          const authHeader = await getAuthHeader();
+          const res = await fetch(getApiUrl("/admin/payments/approve"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": authHeader || "" },
+            body: JSON.stringify({ paymentReference: ref }),
+          });
+          const data = await safeFetchJson(res);
+          if (!res.ok) throw new Error(data.error || "Approval failed.");
+
+          showToast(data.message || `Payment ${ref} approved!`);
+          closeAdminDetailModal();
+          await loadAdminPayments();
+          await loadAdminOverview(true);
+        } catch (err) {
+          showToast(`Error: ${err.message}`);
+          if (btnEl) {
+            btnEl.disabled = false;
+            btnEl.textContent = "✅ Approve";
+          }
+        }
+      };
+
+      window.adminRejectPayment = async function(ref, reason, btnEl) {
+        if (btnEl) {
+          btnEl.disabled = true;
+          btnEl.textContent = "Rejecting...";
+        }
+        try {
+          const authHeader = await getAuthHeader();
+          const res = await fetch(getApiUrl("/admin/payments/reject"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": authHeader || "" },
+            body: JSON.stringify({ paymentReference: ref, reason: reason || "Payment receipt could not be verified." }),
+          });
+          const data = await safeFetchJson(res);
+          if (!res.ok) throw new Error(data.error || "Rejection failed.");
+
+          showToast(`Payment ${ref} rejected.`);
+          closeAdminDetailModal();
+          await loadAdminPayments();
+          await loadAdminOverview(true);
+        } catch (err) {
+          showToast(`Error: ${err.message}`);
+          if (btnEl) {
+            btnEl.disabled = false;
+            btnEl.textContent = "❌ Reject Payment";
+          }
+        }
+      };
+
+      window.adminDeletePayment = async function(ref) {
+        try {
+          const authHeader = await getAuthHeader();
+          const res = await fetch(getApiUrl("/admin/payments/delete"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": authHeader || "" },
+            body: JSON.stringify({ paymentReference: ref }),
+          });
+          const data = await safeFetchJson(res);
+          if (!res.ok) throw new Error(data.error || "Delete failed.");
+          showToast(`Payment ${ref} removed.`);
+          await loadAdminPayments();
+        } catch (err) {
+          showToast(`Error: ${err.message}`);
+        }
+      };
+
+      // Initial load of customer plans & payment config
+      renderCustomerPlanSelection();
 
       // =========================================================================
       // SOLVATECH BOT - PROGRESSIVE WEB APP (PWA) CONTROLLER

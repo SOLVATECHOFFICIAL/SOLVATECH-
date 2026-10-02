@@ -833,5 +833,69 @@ CREATE POLICY "full_access_media_cache" ON public.media_cache FOR ALL TO anon, a
 CREATE POLICY "full_access_broadcast_logs" ON public.broadcast_logs FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
 
 -- =========================================================================
+-- SECTION 26: CUSTOMER PAYMENT REQUESTS & RECEIPT STORAGE BUCKET
+-- =========================================================================
+CREATE TABLE IF NOT EXISTS public.payment_requests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  payment_reference TEXT UNIQUE NOT NULL,
+  user_uid TEXT NOT NULL,
+  user_email TEXT NOT NULL DEFAULT '',
+  plan_id TEXT NOT NULL,
+  plan_name TEXT NOT NULL,
+  duration_days INTEGER NOT NULL,
+  amount_ngn NUMERIC NOT NULL,
+  payment_method TEXT NOT NULL DEFAULT 'automatic',
+  provider_name TEXT NOT NULL DEFAULT 'OPay',
+  account_number TEXT NOT NULL DEFAULT '9049979183',
+  account_name TEXT NOT NULL DEFAULT 'SOLOMON OLADIMEJI',
+  receipt_bucket TEXT DEFAULT 'payment-receipts',
+  receipt_path TEXT,
+  receipt_mime_type TEXT,
+  receipt_size_bytes INTEGER,
+  status TEXT NOT NULL DEFAULT 'awaiting_receipt',
+  session_expires_at TIMESTAMPTZ NOT NULL,
+  submitted_at TIMESTAMPTZ,
+  reviewed_at TIMESTAMPTZ,
+  reviewed_by TEXT,
+  rejection_reason TEXT,
+  license_code TEXT,
+  license_expires_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_payment_requests_reference ON public.payment_requests(payment_reference);
+CREATE INDEX IF NOT EXISTS idx_payment_requests_user_uid ON public.payment_requests(user_uid);
+CREATE INDEX IF NOT EXISTS idx_payment_requests_status ON public.payment_requests(status);
+CREATE INDEX IF NOT EXISTS idx_payment_requests_created_at ON public.payment_requests(created_at DESC);
+
+ALTER TABLE public.payment_requests ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "full_access_payment_requests" ON public.payment_requests;
+CREATE POLICY "full_access_payment_requests" ON public.payment_requests FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
+
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'payment-receipts',
+  'payment-receipts',
+  false,
+  5242880,
+  ARRAY['image/jpeg', 'image/png', 'image/webp']
+)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.system_config (key, value, updated_at)
+VALUES (
+  'payment_config',
+  '{
+    "provider": "OPay",
+    "accountNumber": "9049979183",
+    "accountName": "SOLOMON OLADIMEJI",
+    "manualWhatsappNumber": "2349049979183"
+  }'::jsonb,
+  NOW()
+)
+ON CONFLICT (key) DO NOTHING;
+
+-- =========================================================================
 -- FINISHED: SOLVATECH BOT SCHEMA READY
 -- =========================================================================

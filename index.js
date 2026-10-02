@@ -39,6 +39,21 @@ import {
   claimReferralReward,
   getAdminReferralAudit,
 } from "./lib/referral.js";
+import {
+  getCustomerPaymentPlans,
+  getPaymentConfig,
+  updatePaymentConfig,
+  createCustomerPaymentSession,
+  submitPaymentReceipt,
+  cancelCustomerPaymentSession,
+  getPaymentByReference,
+  listCustomerPayments,
+  listAllPaymentRequests,
+  approvePaymentRequest,
+  rejectPaymentRequest,
+  getPaymentReceiptBinary,
+  deletePaymentRequest,
+} from "./lib/payments.js";
 
 const origConsoleError = console.error;
 console.error = (...args) => {
@@ -549,12 +564,14 @@ for (const p of prefixes) {
   app.get(`${p}/admin/overview`, requireAuth, requireAdmin, async (_request, response) => {
     try {
       const authToken = _request.headers.authorization || null;
-      const [licenses, numberLocks, referralAudit, whatsappList, fullUserRecords] = await Promise.all([
+      const [licenses, numberLocks, referralAudit, whatsappList, fullUserRecords, paymentRequests, paymentConfig] = await Promise.all([
         listAllLicenses(authToken).catch(e => { logger.debug("listAllLicenses err:", e.message); return []; }),
         getAllNumberLocks().catch(e => { logger.debug("getAllNumberLocks err:", e.message); return {}; }),
         getAdminReferralAudit(authToken).catch(e => { logger.debug("getAdminReferralAudit err:", e.message); return {}; }),
         Promise.resolve(getAllWhatsAppStatuses()).catch(() => []),
         listAllUsersWithLicenses(authToken).catch(e => { logger.debug("listAllUsersWithLicenses err:", e.message); return []; }),
+        listAllPaymentRequests().catch(e => { logger.debug("listAllPaymentRequests err:", e.message); return []; }),
+        getPaymentConfig().catch(e => { logger.debug("getPaymentConfig err:", e.message); return {}; }),
       ]);
 
       const locksByUid = {};
@@ -833,6 +850,8 @@ for (const p of prefixes) {
         else disconnectedWhatsApp++;
       }
 
+      const pendingPaymentsCount = (paymentRequests || []).filter((p) => p && p.status === "pending").length;
+
       response.json({
         success: true,
         overview: {
@@ -846,6 +865,7 @@ for (const p of prefixes) {
           totalRevenueNgn,
           connectedWhatsApp,
           disconnectedWhatsApp,
+          pendingPayments: pendingPaymentsCount,
           totalReferrals: referralAudit?.summary?.totalReferredCustomers || 0,
           totalReferrers: referralAudit?.summary?.totalReferrers || 0,
           totalQualifyingSalesNgn: referralAudit?.summary?.totalQualifyingSalesNgn || 0,
@@ -855,6 +875,8 @@ for (const p of prefixes) {
         },
         licenses: enrichedLicenses,
         customers: customersList,
+        payments: paymentRequests || [],
+        paymentConfig: paymentConfig || {},
         referrals: referralAudit,
         whatsappSessions: whatsappList,
         recentActivity: activityEvents.slice(0, 50),
@@ -1153,6 +1175,223 @@ for (const p of prefixes) {
       response.status(400).json({ error: error.message || "Failed to update global plans." });
     }
   });
+
+  // --------------------------------------------------------------------------
+  // CUSTOMER PAYMENT & LICENSE PURCHASE SYSTEM ROUTES
+  // --------------------------------------------------------------------------
+  app.get(`${p}/payments/config`, async (_request, response) => {
+    try {
+      const [plans, paymentConfig] = await Promise.all([
+        getCustomerPaymentPlans(),
+        getPaymentConfig(),
+      ]);
+      response.json({
+        success: true,
+        plans,
+        paymentConfig,
+        serverTime: new Date().toISOString(),
+      });
+    } catch (error) {
+      logger.error("Failed to fetch payment config", error.stack || error.message);
+      response.status(500).json({ error: "Failed to load payment plans and configuration." });
+    }
+  });
+
+  app.get(`${p}/payments/my`, requireAuth, async (request, response) => {
+    try {
+      const [payments, paymentConfig, plans] = await Promise.all([
+        listCustomerPayments(request.verifiedUid),
+        getPaymentConfig(),
+        getCustomerPaymentPlans(),
+      ]);
+      response.json({
+        success: true,
+        payments,
+        paymentConfig,
+        plans,
+        serverTime: new Date().toISOString(),
+      });
+    } catch (error) {
+      logger.error("Failed to fetch customer payments", error.stack || error.message);
+      response.status(500).json({ error: "Failed to load your payment requests." });
+    }
+  });
+
+  app.post(`${p}/payments/session`, requireAuth, async (request, response) => {
+    try {
+      const planId = request.body?.planId || request.body?.days;
+      if (!planId) {
+        return response.status(400).json({ error: "Please select a valid license plan." });
+      }
+      const result = await createCustomerPaymentSession({
+        uid: request.verifiedUid,
+        email: request.auth.email,
+        planId,
+      });
+      response.json({
+        success: true,
+        ...result,
+      });
+    } catch (error) {
+      logger.warn(`Create payment session error for user ${request.verifiedUid}: ${error.message}`);
+      response.status(400).json({ error: error.message || "Could not create payment session." });
+    }
+  });
+
+  app.get(`${p}/payments/status/:reference`, requireAuth, async (request, response) => {
+    try {
+      const ref = request.params.reference;
+      const payment = await getPaymentByReference(ref);
+      if (!payment) {
+        return response.status(404).json({ error: "Payment session not found." });
+      }
+      const bareUid = String(request.verifiedUid || "").replace(/^user_/, "").trim();
+      if (!isAdminEmail(request.auth.email) && payment.userUid !== bareUid) {
+        return response.status(403).json({ error: "Forbidden." });
+      }
+      response.json({
+        success: true,
+        payment,
+        serverTime: new Date().toISOString(),
+      });
+    } catch (error) {
+      response.status(500).json({ error: error.message || "Failed to fetch payment status." });
+    }
+  });
+
+  app.post(`${p}/payments/cancel`, requireAuth, async (request, response) => {
+    try {
+      const ref = request.body?.paymentReference || request.body?.reference;
+      const result = await cancelCustomerPaymentSession(ref, request.verifiedUid);
+      response.json(result);
+    } catch (error) {
+      response.status(400).json({ error: error.message || "Could not cancel payment session." });
+    }
+  });
+
+  app.post(
+    `${p}/payments/upload-receipt/:reference`,
+    requireAuth,
+    express.raw({
+      type: ["image/jpeg", "image/jpg", "image/png", "image/webp", "application/octet-stream"],
+      limit: "6mb",
+    }),
+    async (request, response) => {
+      try {
+        const ref = request.params.reference;
+        const fileBuffer = Buffer.isBuffer(request.body) ? request.body : null;
+        const result = await submitPaymentReceipt({
+          paymentReference: ref,
+          uid: request.verifiedUid,
+          email: request.auth.email,
+          fileBuffer,
+        });
+        response.json(result);
+      } catch (error) {
+        logger.warn(`Receipt upload rejected for ${request.verifiedUid}: ${error.message}`);
+        response.status(400).json({ error: error.message || "Receipt upload failed." });
+      }
+    }
+  );
+
+  app.get(`${p}/payments/receipt/:reference`, requireAuth, async (request, response) => {
+    try {
+      const ref = request.params.reference;
+      const isAdm = isAdminEmail(request.auth.email);
+      const { buffer, contentType } = await getPaymentReceiptBinary(ref, request.verifiedUid, isAdm);
+      response.setHeader("Content-Type", contentType);
+      response.setHeader("Cache-Control", "private, max-age=300");
+      response.send(buffer);
+    } catch (error) {
+      const status = error.statusCode || 404;
+      response.status(status).json({ error: error.message || "Receipt image not found." });
+    }
+  });
+
+  // --------------------------------------------------------------------------
+  // ADMIN PAYMENT VERIFICATION & CONFIGURATION ROUTES
+  // --------------------------------------------------------------------------
+  app.get(`${p}/admin/payments`, requireAuth, requireAdmin, async (_request, response) => {
+    try {
+      const [payments, paymentConfig, plans] = await Promise.all([
+        listAllPaymentRequests(),
+        getPaymentConfig(),
+        getCustomerPaymentPlans(),
+      ]);
+      response.json({
+        success: true,
+        payments,
+        paymentConfig,
+        plans,
+        serverTime: new Date().toISOString(),
+      });
+    } catch (error) {
+      logger.error("Admin list payments error", error.stack || error.message);
+      response.status(500).json({ error: "Failed to load payment requests." });
+    }
+  });
+
+  app.post(`${p}/admin/payments/config`, requireAuth, requireAdmin, async (request, response) => {
+    try {
+      const updated = await updatePaymentConfig(request.body || {});
+      response.json({
+        success: true,
+        paymentConfig: updated,
+        message: "Payment configuration updated in Supabase system_config.",
+      });
+    } catch (error) {
+      response.status(400).json({ error: error.message || "Failed to update payment configuration." });
+    }
+  });
+
+  app.post(`${p}/admin/payments/approve`, requireAuth, requireAdmin, async (request, response) => {
+    try {
+      const ref = request.body?.paymentReference || request.body?.reference;
+      const result = await approvePaymentRequest(ref, request.auth.email, request.headers.authorization);
+
+      // Auto-reconnect customer's saved WhatsApp session if present
+      if (result.payment?.userUid) {
+        const safeId = "user_" + String(result.payment.userUid).replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 96);
+        const controller = getWhatsAppController(safeId, {
+          verifiedUid: result.payment.userUid,
+          userEmail: result.payment.userEmail,
+        });
+        if (controller.hasSavedSession() && !controller.isConnected()) {
+          controller.start().catch(() => {});
+        }
+      }
+
+      response.json(result);
+    } catch (error) {
+      logger.error("Admin approve payment error", error.stack || error.message);
+      response.status(400).json({ error: error.message || "Failed to approve payment." });
+    }
+  });
+
+  app.post(`${p}/admin/payments/reject`, requireAuth, requireAdmin, async (request, response) => {
+    try {
+      const ref = request.body?.paymentReference || request.body?.reference;
+      const reason = request.body?.reason || "";
+      const result = await rejectPaymentRequest(ref, reason, request.auth.email);
+      response.json(result);
+    } catch (error) {
+      logger.error("Admin reject payment error", error.stack || error.message);
+      response.status(400).json({ error: error.message || "Failed to reject payment." });
+    }
+  });
+
+  app.post(`${p}/admin/payments/delete`, requireAuth, requireAdmin, async (request, response) => {
+    try {
+      const ref = request.body?.paymentReference || request.body?.reference;
+      const result = await deletePaymentRequest(ref, request.auth.email);
+      response.json({
+        ...result,
+        message: `Payment request ${ref} and receipt removed.`,
+      });
+    } catch (error) {
+      response.status(400).json({ error: error.message || "Failed to delete payment request." });
+    }
+  });
 }
 
 app.use((request, response, next) => {
@@ -1160,6 +1399,7 @@ app.use((request, response, next) => {
     request.path.startsWith("/bot-api") ||
     request.path.startsWith("/api") ||
     request.path.startsWith("/admin") ||
+    request.path.startsWith("/payments") ||
     request.path.startsWith("/license") ||
     request.path.startsWith("/referral") ||
     request.path.startsWith("/user") ||
