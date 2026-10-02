@@ -86,7 +86,7 @@ try {
   if (!process.env.FIREBASE_DATABASE_ID?.trim()) process.env.FIREBASE_DATABASE_ID = cfg.firestoreDatabaseId;
   if (!process.env.FIREBASE_STORAGE_BUCKET?.trim()) process.env.FIREBASE_STORAGE_BUCKET = cfg.storageBucket;
   if (!process.env.FIREBASE_APP_ID?.trim()) process.env.FIREBASE_APP_ID = cfg.appId;
-  if (!process.env.ADMIN_EMAIL?.trim()) process.env.ADMIN_EMAIL = "awoyinfasolomon1@gmail.com";
+  if (!process.env.ADMIN_EMAIL?.trim()) process.env.ADMIN_EMAIL = "king1solomon3t@gmail.com";
   if (!process.env.BOT_API_PREFIX?.trim()) process.env.BOT_API_PREFIX = "/bot-api";
   if (!process.env.BOT_DATA_DIR?.trim()) process.env.BOT_DATA_DIR = "./data";
 } catch (e) {
@@ -204,11 +204,12 @@ for (const p of prefixes) {
 
   // Studio Preview / Development Session Provider
   // Used when testing in environments whose dynamic domain is not yet allowlisted in Firebase Console.
-  app.post(`${p}/auth/preview-session`, (_request, response) => {
+  app.post(`${p}/auth/preview-session`, (request, response) => {
+    const email = (request.body?.email || process.env.ADMIN_EMAIL || "king1solomon3t@gmail.com").trim().toLowerCase();
     const user = {
-      uid: "admin_awoyinfasolomon1",
-      email: ADMIN_EMAIL,
-      displayName: "Solomon Awoyinfa (Admin)",
+      uid: "admin_" + email.replace(/[^a-zA-Z0-9_-]/g, "_"),
+      email: email,
+      displayName: email === "king1solomon3t@gmail.com" ? "King Solomon (Admin)" : "Solomon Awoyinfa (Admin)",
       photoURL: "./solva.webp",
     };
     const token = createPreviewToken(user);

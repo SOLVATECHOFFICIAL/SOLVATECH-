@@ -1377,6 +1377,7 @@
       }
 
       const ADMIN_EMAILS = [
+        "king1solomon3t@gmail.com",
         "awoyinfasolomon1@gmail.com",
         "awoyinfasunday40@gmail.com",
         "solomontech00@gmail.com",
@@ -2821,23 +2822,28 @@
             provider.setCustomParameters({ prompt: 'select_account' });
             await signInWithPopup(auth, provider);
           } catch (err) {
-            const isUnauthorizedDomain = err.code === "auth/unauthorized-domain" || 
-              String(err?.message || "").toLowerCase().includes("unauthorized-domain");
+            console.warn("Google sign-in attempt notice:", err?.code, err?.message);
+            const errCode = String(err?.code || "");
+            const errMsg = String(err?.message || "").toLowerCase();
+            const isUnauthorizedDomain = errCode === "auth/unauthorized-domain" || errMsg.includes("unauthorized-domain");
+            const isIframeOrBlocked = errCode === "auth/popup-blocked" || 
+                                     errCode === "auth/operation-not-supported-in-this-environment" || 
+                                     errMsg.includes("operation-not-supported") ||
+                                     errMsg.includes("third-party cookie") ||
+                                     errMsg.includes("iframe");
 
-            if (isUnauthorizedDomain) {
-              console.warn(`[Firebase Auth] Domain "${currentHost}" not yet authorized in Firebase Console. Seamlessly establishing studio preview session.`);
+            if (isUnauthorizedDomain || isIframeOrBlocked) {
+              console.warn(`[Firebase Auth] Environment restriction detected (${errCode || errMsg}). Seamlessly establishing studio preview session.`);
               if (domainNoticeBox) domainNoticeBox.classList.remove("hidden");
               const connected = await startPreviewSession();
               if (connected) return;
 
-              showAuthError(`Firebase Authorized Domains Notice: "${currentHost}" is not in your Firebase Authorized Domains list. Please add "${currentHost}" to Firebase Console -> Authentication -> Settings -> Authorized domains, or click Quick Preview Access.`);
-            } else if (err.code === "auth/popup-closed-by-user") {
+              showAuthError(`Domain Notice: "${currentHost}" cannot complete popups inside this frame. Click "⚡ Quick Preview Access (Admin)" below.`);
+            } else if (errCode === "auth/popup-closed-by-user") {
               showAuthError("Google Sign-In popup was closed before completing.");
-            } else if (err.code === "auth/popup-blocked") {
-              showAuthError("Sign-in popup was blocked by the browser. Please allow popups or open in a new tab.");
             } else {
-              console.warn("Google sign-in attempt notice:", err.message);
-              showAuthError(err.message || "Failed to sign in with Google. Please try again.");
+              showAuthError(err?.message || "Failed to sign in with Google. Please try again or use Quick Preview Access.");
+              if (domainNoticeBox) domainNoticeBox.classList.remove("hidden");
             }
           } finally {
             googleSignInBtn.disabled = false;
@@ -4227,7 +4233,6 @@
         });
 
         // 1. Desktop Table
-        const tbody = document.getElementById("admin-licenses-tbody");
         if (tbody) {
           if (filtered.length === 0) {
             const emptyNotice = allLicenses.length === 0
@@ -4283,7 +4288,6 @@
         }
 
         // 2. Mobile Cards
-        const cardsEl = document.getElementById("admin-licenses-cards");
         if (cardsEl) {
           if (filtered.length === 0) {
             cardsEl.innerHTML = `<div style="text-align: center; color: var(--muted); padding: 20px;">No licenses found.</div>`;

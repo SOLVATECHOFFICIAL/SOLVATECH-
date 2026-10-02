@@ -743,6 +743,93 @@ html, body {
   transition: all 0.2s ease;
 }
 
+.google-auth-button {
+  background: #ffffff !important;
+  color: #1f2937 !important;
+  border: 1.5px solid #d1d5db !important;
+  font-size: 13.5px !important;
+  font-weight: 700 !important;
+  padding: 10px 16px !important;
+  border-radius: 8px !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08) !important;
+  cursor: pointer !important;
+  touch-action: manipulation !important;
+  user-select: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+  position: relative !important;
+  z-index: 10 !important;
+  min-height: 44px !important;
+}
+
+.google-auth-button:hover {
+  background: #f8fafc !important;
+  border-color: #9ca3af !important;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12) !important;
+  transform: translateY(-1px);
+}
+
+.google-auth-button:active {
+  background: #f1f5f9 !important;
+  transform: translateY(0);
+}
+
+.domain-notice-box {
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 10px;
+  font-size: 12px;
+}
+
+.domain-notice-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  color: #10b981;
+  margin-bottom: 6px;
+}
+
+.domain-notice-box p {
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+
+.domain-notice-box code {
+  background: rgba(0, 0, 0, 0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+  color: var(--ink);
+}
+
+.preview-signin-button {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+  color: #ffffff !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  padding: 10px 16px !important;
+  border-radius: 8px !important;
+  border: none !important;
+  cursor: pointer !important;
+  touch-action: manipulation !important;
+  min-height: 44px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3) !important;
+  transition: all 0.2s ease !important;
+}
+
+.preview-signin-button:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 10px rgba(16, 185, 129, 0.4) !important;
+}
+
 #pair-button:hover, .license-btn:hover {
   background: linear-gradient(135deg, #059669 0%, #047857 100%);
   transform: translateY(-1px);
