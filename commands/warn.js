@@ -1,6 +1,6 @@
-import { addWarning, getGroupSettings, setWarningLimit } from "../lib/database.js";
+import { addWarning, clearWarning, setWarningLimit } from "../lib/database.js";
 import { requireAdmin } from "../lib/command-tools.js";
-import { assertAdmin, isAdmin, resolveGroupTargetJids } from "../lib/permissions.js";
+import { isAdmin, isBotAdmin, isOwner, resolveGroupTargetJids } from "../lib/permissions.js";
 
 export default async function warn({
   sock,
@@ -16,13 +16,13 @@ export default async function warn({
   const sub = String(args[0] || "").toLowerCase();
   const val = String(args[1] || "").toLowerCase();
   if (sub === "limit" || sub === "setlimit") {
-    const metadata = await requireAdmin(sock, chatId, sender, false, senderJids, senderIsLinkedAccount);
+    await requireAdmin(sock, chatId, sender, false, senderJids, senderIsLinkedAccount);
     const limitNum = parseInt(val, 10);
     if (!limitNum || isNaN(limitNum) || limitNum < 1 || limitNum > 10) {
       return reply("❌ *Invalid parameter:* Please specify a valid warning limit between *1* and *10*.\n_Example: *.warn limit 3* or *.warns limit 4*_");
     }
     const newLimit = await setWarningLimit(chatId, limitNum, userId);
-    return reply(`✅ *Group Warning Threshold Updated:* *${newLimit}* violations before removal.\n_Synced to Firebase Firestore._`);
+    return reply(`✅ *Group Warning Threshold Updated:* *${newLimit}* violations before removal.\n_Synced to group cloud settings._`);
   }
 
   const metadata = await requireAdmin(sock, chatId, sender, false, senderJids, senderIsLinkedAccount);
@@ -36,20 +36,34 @@ export default async function warn({
   const targetClean = targetJid.split("@")[0].split(":")[0];
   const targetAliases = resolved.allJids;
 
-  // Cannot warn admins
-  if (isAdmin(metadata, targetAliases)) {
-    return reply("❌ *Admin Immune:* Group administrators cannot receive warnings.");
+  // Cannot warn admins or group owner
+  if (isAdmin(metadata, targetAliases) || isOwner(metadata, targetAliases)) {
+    return reply("❌ *Admin Immune:* Group administrators and owners cannot receive warnings.");
   }
 
   const reason = args.filter((a) => !a.startsWith("@")).join(" ").trim() || "Violation of group rules";
-  const result = await addWarning(chatId, targetJid, userId, reason);
+  const result = await addWarning(chatId, targetJid, userId, reason, targetAliases);
 
   const adminClean = sender.split("@")[0].split(":")[0];
   const mentions = [...new Set([targetJid, sender, resolved.mentionJid].filter(Boolean))];
 
   if (result.exceeded) {
+    const botJids = [
+      sock.user?.id,
+      sock.user?.lid,
+      sock.user?.phoneNumber,
+    ].filter(Boolean);
+
+    if (!isBotAdmin(metadata, botJids)) {
+      return reply(
+        `⚠️ @${targetClean} reached *${result.count}/${result.limit}* warnings, but the bot is not a group admin to remove them.\n_Issued on behalf of Admin: @${adminClean}_`,
+        { mentions }
+      );
+    }
+
     try {
       await sock.groupParticipantsUpdate(chatId, [targetJid], "remove");
+      await clearWarning(chatId, targetAliases, userId);
       return reply(
         `🚨 *Warning Threshold Exceeded:* @${targetClean} reached *${result.count}/${result.limit}* warnings and has been removed from the group.\n_Action enforced on behalf of Admin: @${adminClean}_\n_Reason: ${reason}_`,
         { mentions }

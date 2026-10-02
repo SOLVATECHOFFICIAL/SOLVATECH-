@@ -17,18 +17,28 @@ function formatDuration(ms) {
   return parts.join(" ");
 }
 
-export default async function expire({ reply, userId = "default" }) {
+export default async function expire({ reply, userId = "default", verifiedUid = "", userEmail = "" }) {
   try {
-    // Read permanent license status directly from Firebase / authoritative license manager
-    const licenseStatus = await getUserLicenseStatus(userId);
+    const cleanUid = (verifiedUid && verifiedUid !== "default")
+      ? String(verifiedUid).replace(/^user_/, "")
+      : String(userId || "default").replace(/^user_/, "");
 
-    if (licenseStatus.isAdmin) {
+    // Read permanent license status directly from authoritative license manager
+    const licenseStatus = await getUserLicenseStatus(cleanUid, userEmail);
+
+    if (
+      licenseStatus.isAdmin ||
+      licenseStatus.isUnlimited ||
+      licenseStatus.status === "unlimited" ||
+      licenseStatus.status === "lifetime"
+    ) {
       return reply([
         "🔑 *SOLVATECH BOT LICENSE STATUS*",
         "────────────────────────────",
-        "┃ 🛡️ *License Type:* Admin Unlimited",
+        `┃ 🛡️ *License Type:* ${licenseStatus.isAdmin ? "Admin Unlimited" : "Unlimited Lifetime"}`,
         "┃ 🟢 *Status:* Active (Permanent)",
         "┃ ⏳ *Remaining:* Unlimited (No Expiration)",
+        ...(licenseStatus.preservedNotice ? [`┃ 💾 *Note:* ${licenseStatus.preservedNotice}`] : []),
         "╰────────────────────────────",
       ].join("\n"));
     }

@@ -9,8 +9,7 @@ export default async function add({ sock, chatId, sender, senderJids, senderIsLi
     await sock.groupParticipantsUpdate(chatId, [`${number}@s.whatsapp.net`], "add");
     await reply(`✅ Added ${number} to the group.`);
   } catch (error) {
-    await reply("❌ I couldn't add that number.");
-    throw error;
+    throw new Error("❌ I couldn't add that number. They may have group privacy restrictions enabled.");
   }
   return metadata;
 }

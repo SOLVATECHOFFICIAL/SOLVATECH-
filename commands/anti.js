@@ -28,14 +28,15 @@ export default async function anti({ sock, chatId, sender, senderJids, senderIsL
   const commandSetting = settingByCommand[command];
   const first = String(args[0] || "").toLowerCase();
   const second = String(args[1] || "").toLowerCase();
-  const setting = commandSetting || settingByName[first] || "antiLink";
-  const value = commandSetting ? first : settingByName[first] ? second : first;
+  const explicitSetting = commandSetting || settingByName[first] || null;
+  const setting = explicitSetting || "antiLink";
+  const value = commandSetting ? first : settingByName[first] ? second : "";
 
-  // For welcome/goodbye, bot does not strictly need to be group admin
-  const botRequired = !["welcome", "goodbye"].includes(setting);
+  // For welcome/goodbye or inspecting status, bot does not strictly need to be group admin
+  const botRequired = Boolean(explicitSetting && ["on", "off"].includes(value) && !["welcome", "goodbye"].includes(setting));
   await requireAdmin(sock, chatId, sender, botRequired, senderJids, senderIsLinkedAccount);
 
-  if (!["on", "off"].includes(value)) {
+  if (!explicitSetting || !["on", "off"].includes(value)) {
     const current = await getGroupSettings(chatId, userId);
     return reply([
       "╭━━〔 🛡️ *SOLVATECH ANTI-PROTECTION SUITE* 〕━━╮",

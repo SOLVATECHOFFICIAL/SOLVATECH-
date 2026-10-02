@@ -1,6 +1,6 @@
 import { clearWarning, getGroupSettings } from "../lib/database.js";
 import { requireAdmin } from "../lib/command-tools.js";
-import { assertAdmin, resolveGroupTargetJids } from "../lib/permissions.js";
+import { resolveGroupTargetJids } from "../lib/permissions.js";
 
 export default async function clearwarns({
   sock,
@@ -13,12 +13,7 @@ export default async function clearwarns({
   reply,
   userId = "default",
 }) {
-  const metadata = await requireAdmin(sock, chatId, sender, true, senderJids, senderIsLinkedAccount);
-  assertAdmin(metadata, [sender, ...(Array.isArray(senderJids) ? senderJids : [])], true, [
-    sock.user?.id,
-    sock.user?.lid,
-    sock.user?.phoneNumber,
-  ].filter(Boolean));
+  const metadata = await requireAdmin(sock, chatId, sender, false, senderJids, senderIsLinkedAccount);
 
   const resolved = resolveGroupTargetJids(metadata, message, args);
   if (!resolved || !resolved.canonicalJid) {
@@ -30,5 +25,5 @@ export default async function clearwarns({
   const limit = settings.warningLimit || 3;
   const num = resolved.canonicalJid.split("@")[0].split(":")[0];
   const mentions = [...new Set([resolved.canonicalJid, resolved.mentionJid].filter(Boolean))];
-  await reply(`✅ *Warnings Cleared:* @${num} is now at *0/${limit}* warnings.\n_Record updated and synchronized to Firebase._`, { mentions });
+  await reply(`✅ *Warnings Cleared:* @${num} is now at *0/${limit}* warnings.\n_Record updated and synchronized._`, { mentions });
 }

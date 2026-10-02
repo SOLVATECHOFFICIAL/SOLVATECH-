@@ -6,18 +6,24 @@ export default async function pin({ sock, message, chatId, sender, senderJids, s
     return reply("❌ This command only works in groups.");
   }
 
-  const quoted = getQuotedMessage(message);
-  if (!quoted?.key) {
+  const quoted = getQuotedMessage(message, sock);
+  if (!quoted?.key?.id) {
     return reply("❌ Reply to a message with *.pin* to pin it in the group.");
   }
 
   await requireAdmin(sock, chatId, sender, true, senderJids, senderIsLinkedAccount);
 
   try {
+    const pinKey = {
+      remoteJid: chatId,
+      fromMe: Boolean(quoted.key.fromMe),
+      id: quoted.key.id,
+      ...(quoted.key.participant ? { participant: quoted.key.participant } : {}),
+    };
+
     // Pin message for 7 days (604800 seconds)
-    // In Baileys: sock.relayMessage or sock.sendMessage with pin
     await sock.sendMessage(chatId, {
-      pin: quoted.key,
+      pin: pinKey,
       type: 1, // 1 = PIN, 2 = UNPIN
       time: 604800, // 7 days in seconds
     });

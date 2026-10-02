@@ -3,13 +3,17 @@ import { downloadViewOnceRobust, guessViewOnceType, viewOncePayload } from "../l
 import { getQuotedMessage, isGroup, participantNumber } from "../lib/helpers.js";
 import { getCachedIncomingMessage } from "../lib/deleted-messages.js";
 
-export default async function open({ sock, message, reply, userId = "default", chatId }) {
+export default async function open({ sock, message, senderIsLinkedAccount, userId = "default", chatId }) {
+  if (!senderIsLinkedAccount) {
+    return;
+  }
+
   // 1. Instantly delete the user's .vv / .open trigger message from the group/chat so zero trace is left!
   if (message?.key) {
     await sock.sendMessage(chatId, { delete: message.key }).catch(() => {});
   }
 
-  const quoted = getQuotedMessage(message);
+  const quoted = getQuotedMessage(message, sock);
   const source = quoted || message;
 
   // Retrieve cached incoming message if quoted
@@ -50,12 +54,24 @@ export default async function open({ sock, message, reply, userId = "default", c
       } catch {}
     }
 
+    const mentions = [sender].filter(Boolean);
+
+    // Audio and sticker messages do not render captions in WhatsApp, so send the metadata header alongside the media
+    if (type === "audio" || type === "sticker") {
+      await sock.sendMessage(ownerJid, {
+        text: contextHeader,
+        mentions,
+      });
+      await sock.sendMessage(ownerJid, payload);
+      return;
+    }
+
     if (payload.caption) {
       payload.caption = `${contextHeader}\n💬 *Original Caption:* ${payload.caption}`;
     } else {
       payload.caption = contextHeader;
     }
-    payload.mentions = [sender].filter(Boolean);
+    payload.mentions = mentions;
 
     // Send solely to the owner's personal DM with NO trace left in group
     await sock.sendMessage(ownerJid, payload);

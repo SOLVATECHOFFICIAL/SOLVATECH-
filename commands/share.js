@@ -10,12 +10,13 @@ export default async function share({
 }) {
   let referralLink = "https://solvatech.name.ng/";
 
-  const effectiveUid =
+  const rawUid =
     verifiedUid && verifiedUid !== "default"
       ? verifiedUid
       : userId && userId !== "default"
       ? userId
       : "";
+  const effectiveUid = String(rawUid || "").replace(/^user_/, "");
 
   if (effectiveUid) {
     try {
