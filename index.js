@@ -8,7 +8,7 @@ import { logger } from "./lib/logger.js";
 import { getWhatsAppController, restoreAllSessions, auditActiveSessions, getAllWhatsAppStatuses } from "./lib/whatsapp.js";
 import { getLockedNumberForUid, getAllNumberLocks, unlinkNumberFromUser, unlinkPhoneNumber } from "./lib/number-lock.js";
 import { requireAuth, requireAdmin, isAdminEmail, createPreviewToken, getFirebaseServerFirestore } from "./lib/auth.js";
-import { isSupabaseConfigured, getSupabasePublicConfig, supabaseUpsert } from "./lib/supabase.js";
+import { isSupabaseConfigured, getSupabasePublicConfig, supabaseUpsert, checkSupabaseSchemaStatus } from "./lib/supabase.js";
 import { getUserPreferences, setUserPreferences } from "./lib/database.js";
 import {
   createLicenseRecord,
@@ -171,11 +171,18 @@ const prefixes = Array.from(new Set([apiPrefix, "/api", "/bot-api", ""]));
 
 for (const p of prefixes) {
   // Public Health, Firebase, and Supabase Config endpoints
-  app.get(`${p}/health`, (_request, response) => {
+  app.get(`${p}/health`, async (_request, response) => {
+    const schemaStatus = await checkSupabaseSchemaStatus();
     response.json({
       status: "ok",
-      database: isSupabaseConfigured() ? "supabase" : "local-durable-fallback",
-      supabaseConfigured: isSupabaseConfigured(),
+      database: schemaStatus.schemaReady ? "supabase" : "local-durable-fallback",
+      supabaseConfigured: schemaStatus.configured,
+      supabaseSchemaReady: schemaStatus.schemaReady,
+      notice: schemaStatus.schemaReady
+        ? "Supabase schema is live and verified."
+        : schemaStatus.configured
+        ? "Supabase credentials detected, but database tables are not yet created in Supabase. Run supabase-schema.sql in the Supabase SQL Editor. Operating in safe local fallback."
+        : "Supabase credentials not configured in environment. Operating in safe local fallback.",
     });
   });
 
@@ -544,11 +551,11 @@ for (const p of prefixes) {
     try {
       const authToken = _request.headers.authorization || null;
       const [licenses, numberLocks, referralAudit, whatsappList, fullUserRecords] = await Promise.all([
-        listAllLicenses(authToken),
-        getAllNumberLocks(),
-        getAdminReferralAudit(authToken),
-        Promise.resolve(getAllWhatsAppStatuses()),
-        listAllUsersWithLicenses(authToken),
+        listAllLicenses(authToken).catch(e => { logger.debug("listAllLicenses err:", e.message); return []; }),
+        getAllNumberLocks().catch(e => { logger.debug("getAllNumberLocks err:", e.message); return {}; }),
+        getAdminReferralAudit(authToken).catch(e => { logger.debug("getAdminReferralAudit err:", e.message); return {}; }),
+        Promise.resolve(getAllWhatsAppStatuses()).catch(() => []),
+        listAllUsersWithLicenses(authToken).catch(e => { logger.debug("listAllUsersWithLicenses err:", e.message); return []; }),
       ]);
 
       const db = getFirebaseServerFirestore();
