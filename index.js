@@ -56,12 +56,42 @@ import {
 } from "./lib/payments.js";
 
 const origConsoleError = console.error;
+const origConsoleWarn = console.warn;
+const origConsoleLog = console.log;
+
+function isNoisyInternalLog(args) {
+  const text = args
+    .map((a) => {
+      if (typeof a === "string") return a;
+      if (a && typeof a === "object") return a.message || a.name || "";
+      return "";
+    })
+    .join(" ");
+  return (
+    text.includes("Disconnecting idle stream") ||
+    text.includes("Timed out waiting for new targets") ||
+    text.includes("Closing session:") ||
+    text.includes("Closing open session in favor of incoming prekey bundle") ||
+    text.includes("Removing old closed session:") ||
+    text.includes("Failed to decrypt message with any known session") ||
+    text.includes("Session error:") ||
+    text.includes("Bad MAC") ||
+    text.includes("Key used already or never filled") ||
+    text.includes("MessageCounterError")
+  );
+}
+
 console.error = (...args) => {
-  const text = args.map((a) => (typeof a === "string" ? a : a?.message || "")).join(" ");
-  if (text.includes("Disconnecting idle stream") || text.includes("Timed out waiting for new targets")) {
-    return;
-  }
+  if (isNoisyInternalLog(args)) return;
   origConsoleError.apply(console, args);
+};
+console.warn = (...args) => {
+  if (isNoisyInternalLog(args)) return;
+  origConsoleWarn.apply(console, args);
+};
+console.log = (...args) => {
+  if (isNoisyInternalLog(args)) return;
+  origConsoleLog.apply(console, args);
 };
 
 process.on("uncaughtException", (error) => {
