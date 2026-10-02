@@ -629,14 +629,39 @@
                       </div>
                     </div>
 
-                    <!-- RECEIPT UPLOAD BOX -->
-                    <div id="pay-receipt-upload-box" style="padding: 12px; border-radius: 8px; border: 1.5px dashed #94a3b8; background: #ffffff; text-align: center; margin-bottom: 10px;">
-                      <label for="pay-receipt-file-input" style="display: block; font-size: 12px; font-weight: 700; color: var(--ink); margin-bottom: 6px; cursor: pointer;">
-                        📤 Upload Payment Screenshot / Receipt
-                      </label>
-                      <input id="pay-receipt-file-input" type="file" accept="image/png,image/jpeg,image/webp" style="font-size: 11.5px; max-width: 100%;" />
-                      <p style="font-size: 10.5px; color: var(--muted); margin: 6px 0 0;">Supported formats: JPG, PNG, WEBP (Max 5MB)</p>
-                      <button type="button" id="submit-pay-receipt-btn" class="license-btn" style="width: 100%; margin-top: 10px; padding: 10px 14px; font-size: 12.5px; font-weight: 800;">
+                    <!-- RECEIPT UPLOAD BOX (Professional Plus Button + Live Preview) -->
+                    <div id="pay-receipt-upload-box" style="padding: 14px; border-radius: 10px; border: 1.5px dashed #0f766e; background: #f8fafc; text-align: center; margin-bottom: 10px; transition: all 0.2s ease;">
+                      <input id="pay-receipt-file-input" type="file" accept="image/png,image/jpeg,image/webp" class="hidden" />
+
+                      <!-- Empty State: Sleek Plus (+) Button Trigger -->
+                      <div id="pay-receipt-dropzone" style="cursor: pointer; padding: 14px 10px; border-radius: 8px; background: #ffffff; border: 1px solid #e2e8f0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; transition: all 0.15s ease;">
+                        <div style="width: 46px; height: 46px; border-radius: 50%; background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%); color: #ffffff; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(15, 118, 110, 0.25);">
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                          </svg>
+                        </div>
+                        <div>
+                          <div style="font-size: 13px; font-weight: 800; color: var(--ink);">Tap to Add Payment Receipt</div>
+                          <div style="font-size: 11px; color: var(--muted); margin-top: 2px;">Upload screenshot of your transfer (JPG, PNG, WEBP • Max 5MB)</div>
+                        </div>
+                      </div>
+
+                      <!-- Selected State: Live Receipt Image Preview -->
+                      <div id="pay-receipt-preview-wrap" class="hidden" style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; margin-bottom: 4px;">
+                        <div style="position: relative; border-radius: 6px; overflow: hidden; background: #0f172a; max-height: 220px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px;">
+                          <img id="pay-receipt-preview-img" src="" alt="Receipt Preview" style="max-width: 100%; max-height: 210px; object-fit: contain; display: block;" />
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
+                          <span id="pay-receipt-file-meta" style="font-size: 11px; font-weight: 700; color: #0f766e; font-family: 'DM Mono', monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 190px;">receipt.jpg</span>
+                          <div style="display: flex; gap: 6px;">
+                            <button type="button" id="change-pay-receipt-btn" class="admin-copy-key-btn" style="font-size: 11px; padding: 4px 9px;">↻ Change</button>
+                            <button type="button" id="remove-pay-receipt-btn" class="admin-copy-key-btn" style="font-size: 11px; padding: 4px 9px; color: #b91c1c; border-color: #fecaca; background: #fef2f2;">✕ Remove</button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <button type="button" id="submit-pay-receipt-btn" class="license-btn" style="width: 100%; margin-top: 10px; padding: 11px 14px; font-size: 12.5px; font-weight: 800;">
                         ✅ Submit Receipt for Verification
                       </button>
                     </div>
@@ -5907,8 +5932,34 @@
         });
       }
 
+      function syncGetKeyButtonPendingState() {
+        if (!openGetKeyBtn) return;
+        const hasPending = Array.isArray(customerPaymentList) && customerPaymentList.some((p) => p && p.status === "pending");
+        const btnSpan = openGetKeyBtn.querySelector("span");
+        if (hasPending) {
+          openGetKeyBtn.disabled = true;
+          openGetKeyBtn.style.opacity = "0.55";
+          openGetKeyBtn.style.cursor = "not-allowed";
+          openGetKeyBtn.title = "Payment pending admin verification — disabled until approved or rejected.";
+          if (btnSpan) btnSpan.textContent = "PENDING...";
+          if (getKeyPanel) getKeyPanel.classList.add("hidden");
+        } else {
+          openGetKeyBtn.disabled = false;
+          openGetKeyBtn.style.opacity = "1";
+          openGetKeyBtn.style.cursor = "pointer";
+          openGetKeyBtn.title = "Purchase a license key via Automatic or Manual Payment";
+          if (btnSpan) btnSpan.textContent = "GET KEY";
+        }
+      }
+
       if (openGetKeyBtn) {
         openGetKeyBtn.addEventListener("click", () => {
+          const hasPending = Array.isArray(customerPaymentList) && customerPaymentList.some((p) => p && p.status === "pending");
+          if (hasPending) {
+            showToast("⏳ Your payment is pending verification. GET KEY is locked until admin approves or rejects it.");
+            if (getKeyPanel) getKeyPanel.classList.add("hidden");
+            return;
+          }
           if (!getKeyPanel) return;
           const isHidden = getKeyPanel.classList.contains("hidden");
           if (isHidden) {
@@ -6107,9 +6158,75 @@
         });
       }
 
-      // Upload Receipt Screenshot
+      // Upload Receipt Screenshot (Plus Button + Live Image Preview)
       const submitPayReceiptBtn = document.getElementById("submit-pay-receipt-btn");
       const payReceiptFileInput = document.getElementById("pay-receipt-file-input");
+      const payReceiptDropzone = document.getElementById("pay-receipt-dropzone");
+      const payReceiptPreviewWrap = document.getElementById("pay-receipt-preview-wrap");
+      const payReceiptPreviewImg = document.getElementById("pay-receipt-preview-img");
+      const payReceiptFileMeta = document.getElementById("pay-receipt-file-meta");
+      const changePayReceiptBtn = document.getElementById("change-pay-receipt-btn");
+      const removePayReceiptBtn = document.getElementById("remove-pay-receipt-btn");
+      let currentReceiptPreviewObjectUrl = null;
+
+      function clearReceiptPreviewUI() {
+        if (currentReceiptPreviewObjectUrl) {
+          try { URL.revokeObjectURL(currentReceiptPreviewObjectUrl); } catch {}
+          currentReceiptPreviewObjectUrl = null;
+        }
+        if (payReceiptFileInput) payReceiptFileInput.value = "";
+        if (payReceiptPreviewImg) payReceiptPreviewImg.src = "";
+        if (payReceiptPreviewWrap) payReceiptPreviewWrap.classList.add("hidden");
+        if (payReceiptDropzone) payReceiptDropzone.classList.remove("hidden");
+      }
+
+      function handleReceiptFileSelected(file) {
+        if (!file) {
+          clearReceiptPreviewUI();
+          return;
+        }
+        const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+        if (!allowedTypes.includes((file.type || "").toLowerCase())) {
+          showGetKeyMessage("Invalid file type. Only JPG, PNG, or WEBP screenshot images are allowed.", true);
+          clearReceiptPreviewUI();
+          return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+          showGetKeyMessage("Receipt image is too large (max 5MB).", true);
+          clearReceiptPreviewUI();
+          return;
+        }
+        showGetKeyMessage("");
+        if (currentReceiptPreviewObjectUrl) {
+          try { URL.revokeObjectURL(currentReceiptPreviewObjectUrl); } catch {}
+        }
+        currentReceiptPreviewObjectUrl = URL.createObjectURL(file);
+        if (payReceiptPreviewImg) payReceiptPreviewImg.src = currentReceiptPreviewObjectUrl;
+        if (payReceiptFileMeta) {
+          const kb = Math.max(1, Math.round(file.size / 1024));
+          const sizeStr = kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb} KB`;
+          payReceiptFileMeta.textContent = `${file.name} (${sizeStr})`;
+        }
+        if (payReceiptDropzone) payReceiptDropzone.classList.add("hidden");
+        if (payReceiptPreviewWrap) payReceiptPreviewWrap.classList.remove("hidden");
+      }
+
+      if (payReceiptDropzone && payReceiptFileInput) {
+        payReceiptDropzone.addEventListener("click", () => payReceiptFileInput.click());
+      }
+      if (changePayReceiptBtn && payReceiptFileInput) {
+        changePayReceiptBtn.addEventListener("click", () => payReceiptFileInput.click());
+      }
+      if (removePayReceiptBtn) {
+        removePayReceiptBtn.addEventListener("click", () => clearReceiptPreviewUI());
+      }
+      if (payReceiptFileInput) {
+        payReceiptFileInput.addEventListener("change", () => {
+          const file = payReceiptFileInput.files && payReceiptFileInput.files[0];
+          handleReceiptFileSelected(file);
+        });
+      }
+
       if (submitPayReceiptBtn && payReceiptFileInput) {
         submitPayReceiptBtn.addEventListener("click", async () => {
           if (!activePaymentSession || !activePaymentSession.paymentReference) {
@@ -6118,7 +6235,7 @@
           }
           const file = payReceiptFileInput.files && payReceiptFileInput.files[0];
           if (!file) {
-            showGetKeyMessage("Please select your payment screenshot/receipt image first.", true);
+            showGetKeyMessage("Tap the + button above to select your payment screenshot first.", true);
             return;
           }
           const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
@@ -6171,7 +6288,7 @@
 
             // Stop 5-minute countdown immediately now that status is PENDING
             activePaymentSession = null;
-            if (payReceiptFileInput) payReceiptFileInput.value = "";
+            clearReceiptPreviewUI();
             renderActivePaymentSessionUI();
             if (getKeyPanel) getKeyPanel.classList.add("hidden");
             showToast("✅ Receipt submitted! Your payment is now pending admin verification.");
@@ -6186,6 +6303,7 @@
       }
 
       function renderCustomerPaymentStatusBanner() {
+        syncGetKeyButtonPendingState();
         if (!customerPaymentStatusBox) return;
         if (!Array.isArray(customerPaymentList) || customerPaymentList.length === 0) {
           customerPaymentStatusBox.classList.add("hidden");
@@ -6581,9 +6699,10 @@
         if (!p) return;
 
         const token = await getValidIdToken(false);
-        const receiptUrl = p.hasReceipt
+        const apiReceiptUrl = p.hasReceipt
           ? `${getApiUrl(`/payments/receipt/${encodeURIComponent(p.paymentReference)}`)}?token=${encodeURIComponent(token || "")}&t=${Date.now()}`
           : null;
+        const primaryReceiptUrl = p.receiptUrl || apiReceiptUrl;
 
         if (adminModalTitle) adminModalTitle.textContent = `Payment Request: ${p.paymentReference}`;
         if (adminModalBody) {
@@ -6608,10 +6727,11 @@
 
             <h4 style="font-size: 12px; text-transform: uppercase; color: var(--muted); letter-spacing: 0.05em; margin: 16px 0 8px;">Uploaded Payment Receipt</h4>
             ${
-              receiptUrl
+              primaryReceiptUrl
                 ? `
-                  <div style="border: 1px solid var(--admin-card-border); border-radius: 8px; padding: 8px; background: #f8fafc; text-align: center; margin-bottom: 14px;">
-                    <img src="${receiptUrl}" alt="Payment Receipt ${escapeHtml(p.paymentReference)}" style="max-width: 100%; max-height: 380px; border-radius: 6px; object-fit: contain;" />
+                  <div style="border: 1px solid var(--admin-card-border); border-radius: 8px; padding: 10px; background: #0f172a; text-align: center; margin-bottom: 14px;">
+                    <img id="admin-modal-receipt-img" src="${primaryReceiptUrl}" alt="Payment Receipt ${escapeHtml(p.paymentReference)}" style="max-width: 100%; max-height: 400px; border-radius: 6px; object-fit: contain; display: inline-block;" />
+                    <div id="admin-modal-receipt-status" style="font-size: 11px; color: #94a3b8; margin-top: 6px;">Payment Receipt • ${escapeHtml(p.paymentReference)}</div>
                   </div>
                 `
                 : `<div style="padding: 16px; border-radius: 8px; background: #f8fafc; text-align: center; color: var(--muted); font-size: 12px; margin-bottom: 14px;">No receipt image uploaded for this session.</div>`
@@ -6637,6 +6757,33 @@
             }
           `;
           if (adminDetailModal) adminDetailModal.classList.remove("hidden");
+
+          // Fallback loader: if direct URL fails or requires Bearer header, fetch binary with Authorization header
+          if (p.hasReceipt) {
+            const imgEl = document.getElementById("admin-modal-receipt-img");
+            const statusEl = document.getElementById("admin-modal-receipt-status");
+            if (imgEl) {
+              imgEl.onerror = async () => {
+                imgEl.onerror = null;
+                if (apiReceiptUrl && imgEl.src !== apiReceiptUrl) {
+                  imgEl.src = apiReceiptUrl;
+                  return;
+                }
+                try {
+                  const authHeader = await getAuthHeader();
+                  const r = await fetch(getApiUrl(`/payments/receipt/${encodeURIComponent(p.paymentReference)}`), {
+                    headers: { "Authorization": authHeader || "" },
+                  });
+                  if (r.ok) {
+                    const blob = await r.blob();
+                    imgEl.src = URL.createObjectURL(blob);
+                  } else if (statusEl) {
+                    statusEl.textContent = "Receipt image could not be loaded from storage.";
+                  }
+                } catch {}
+              };
+            }
+          }
         }
       };
 

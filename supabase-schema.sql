@@ -871,17 +871,36 @@ CREATE INDEX IF NOT EXISTS idx_payment_requests_created_at ON public.payment_req
 
 ALTER TABLE public.payment_requests ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "full_access_payment_requests" ON public.payment_requests;
-CREATE POLICY "full_access_payment_requests" ON public.payment_requests FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
+CREATE POLICY "full_access_payment_requests" ON public.payment_requests FOR ALL TO public, anon, authenticated, service_role USING (true) WITH CHECK (true);
 
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES (
   'payment-receipts',
   'payment-receipts',
-  false,
+  true,
   5242880,
-  ARRAY['image/jpeg', 'image/png', 'image/webp']
+  ARRAY['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
 )
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO UPDATE SET
+  public = true,
+  file_size_limit = 5242880,
+  allowed_mime_types = ARRAY['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+
+DROP POLICY IF EXISTS "payment_receipts_bucket_access" ON storage.buckets;
+CREATE POLICY "payment_receipts_bucket_access"
+ON storage.buckets
+FOR ALL
+TO public, anon, authenticated, service_role
+USING (id = 'payment-receipts')
+WITH CHECK (id = 'payment-receipts');
+
+DROP POLICY IF EXISTS "payment_receipts_objects_access" ON storage.objects;
+CREATE POLICY "payment_receipts_objects_access"
+ON storage.objects
+FOR ALL
+TO public, anon, authenticated, service_role
+USING (bucket_id = 'payment-receipts')
+WITH CHECK (bucket_id = 'payment-receipts');
 
 INSERT INTO public.system_config (key, value, updated_at)
 VALUES (
