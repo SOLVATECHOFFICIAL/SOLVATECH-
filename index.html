@@ -1854,14 +1854,16 @@
       }
 
       const isSelfHosted = isBackendHost();
-      const FALLBACK_PRODUCTION_BACKEND = "https://web-production-1f4c4.up.railway.app";
+      const FALLBACK_PRODUCTION_BACKEND = "https://web-production-55def.up.railway.app";
+      const DEFAULT_BACKEND_URL = FALLBACK_PRODUCTION_BACKEND;
       let customApiUrl = localStorage.getItem("solvatech_backend_url") || FALLBACK_PRODUCTION_BACKEND;
       if (customApiUrl && (
+        customApiUrl.includes("1f4c4") ||
+        customApiUrl.includes("45c0") ||
         customApiUrl.includes("3c1de8") ||
         customApiUrl.includes("215ab") ||
         customApiUrl.includes("c6f21") ||
         customApiUrl.includes("localhost:5000") ||
-        customApiUrl.includes("solvatech.name.ng") ||
         customApiUrl.includes("github.io")
       )) {
         try { localStorage.removeItem("solvatech_backend_url"); } catch (e) {}
@@ -2020,20 +2022,8 @@
         let trimmed = String(newUrl || "").trim();
         const targetAlert = alertTargetId ? $(alertTargetId) : null;
 
-        if (!trimmed || trimmed === DEFAULT_BACKEND_URL) {
-          try { localStorage.removeItem("solvatech_backend_url"); } catch (e) {}
-          customApiUrl = "";
-          syncRailwayInputs();
-          if (targetAlert) {
-            targetAlert.className = "";
-            targetAlert.style.display = "block";
-            targetAlert.style.background = "#f1f5f9";
-            targetAlert.style.border = "1px solid #cbd5e1";
-            targetAlert.style.color = "#334155";
-            targetAlert.innerHTML = `<strong>↺ Restored default backend:</strong> <code>${DEFAULT_BACKEND_URL}</code>`;
-          }
-          await testBackendHealth(true, alertTargetId);
-          return;
+        if (!trimmed) {
+          trimmed = DEFAULT_BACKEND_URL;
         }
 
         if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
@@ -2061,18 +2051,18 @@
           }
         }
 
-        // 2. Also notify backend server
+        // 2. Also notify backend server asynchronously
         try {
           const authHeader = await getAuthHeader();
           if (authHeader) {
-            await fetch(getApiUrl("/admin/backend-url"), {
+            fetch(getApiUrl("/admin/backend-url"), {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
                 "Authorization": authHeader,
               },
               body: JSON.stringify({ railwayUrl: trimmed, backendUrl: trimmed }),
-            });
+            }).catch(() => {});
           }
         } catch (e) {
           console.debug("Backend URL save error:", e.message);
@@ -2084,7 +2074,7 @@
           targetAlert.style.background = "#dcfce7";
           targetAlert.style.border = "1px solid #86efac";
           targetAlert.style.color = "#15803d";
-          targetAlert.innerHTML = `<strong>✓ Saved to Cloud Firestore!</strong> Real-time synced to all users worldwide: <code>${trimmed}</code>.`;
+          targetAlert.innerHTML = `<strong>✓ Saved to Cloud Firestore!</strong> Active backend updated: <code>${trimmed}</code>.`;
         }
 
         await testBackendHealth(true, alertTargetId);
