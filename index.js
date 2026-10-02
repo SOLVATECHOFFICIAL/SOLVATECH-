@@ -31,6 +31,7 @@ import {
   getMaintenanceDiagnostics,
   performSafeMaintenanceCleanup,
   getOfficialLicensePrice,
+  syncAllLicensesFromCloud,
   ADMIN_EMAIL,
 } from "./lib/license.js";
 import {
@@ -53,6 +54,7 @@ import {
   rejectPaymentRequest,
   getPaymentReceiptBinary,
   deletePaymentRequest,
+  syncAllPaymentsFromCloud,
 } from "./lib/payments.js";
 import {
   getVapidPublicKey,
@@ -1555,6 +1557,19 @@ try {
 } catch (err) {
   logger.warn(`Could not start server on port ${listenPort}: ${err.message}`);
 }
+
+// Cloud Hydration on Startup (Protects Railway restarts from wiping data)
+syncAllLicensesFromCloud().then((res) => {
+  logger.info(`[Cloud Hydration] Hydrated ${res?.totalLicenses || 0} license keys and ${res?.totalUsers || 0} user records from cloud storage.`);
+}).catch((err) => {
+  logger.debug("[Cloud Hydration] License hydration notice:", err.message);
+});
+
+syncAllPaymentsFromCloud().then((res) => {
+  logger.info(`[Cloud Hydration] Hydrated ${res?.totalPayments || 0} payment requests from cloud storage.`);
+}).catch((err) => {
+  logger.debug("[Cloud Hydration] Payment hydration notice:", err.message);
+});
 
 // Background auto-restore & license audits
 restoreAllSessions().catch((error) => {

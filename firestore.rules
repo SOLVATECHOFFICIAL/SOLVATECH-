@@ -181,6 +181,20 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // 22. Payment Requests & Manual Transfer Receipts
+    match /payment_requests/{reference} {
+      allow get: if isSignedIn() && (resource.data.customerUid == request.auth.uid || isAdmin());
+      allow list: if isAdmin() || (isSignedIn() && resource.data.customerUid == request.auth.uid);
+      allow create: if isSignedIn() && incoming().customerUid == request.auth.uid;
+      allow update: if isAdmin() || (isSignedIn() && existing().customerUid == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
+    // 23. Web Push Subscriptions for Admin Alerts
+    match /web_push_subscriptions/{subId} {
+      allow read, write: if isAdmin();
+    }
+
     // Administrative roles collection
     match /admins/{adminId} {
       allow read: if isSignedIn();

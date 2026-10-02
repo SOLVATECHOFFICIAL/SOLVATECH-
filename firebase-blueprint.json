@@ -348,6 +348,44 @@
         "createdAt": { "type": "string", "description": "ISO timestamp when broadcast dispatched" }
       },
       "required": ["id", "senderEmail", "messageText"]
+    },
+    "PaymentRequest": {
+      "title": "PaymentRequest",
+      "description": "Customer manual payment and bank transfer receipt submission record",
+      "type": "object",
+      "properties": {
+        "reference": { "type": "string", "description": "Unique payment reference e.g. PAY-1234" },
+        "customerUid": { "type": "string", "description": "Customer user UID" },
+        "customerEmail": { "type": "string", "description": "Customer email address" },
+        "customerPhone": { "type": "string", "description": "Customer phone number" },
+        "planId": { "type": "string", "description": "Payment plan identifier" },
+        "planName": { "type": "string", "description": "Payment plan name" },
+        "durationDays": { "type": "string", "description": "Plan duration in days" },
+        "amountNgn": { "type": "number", "description": "Amount paid in NGN" },
+        "status": { "type": "string", "description": "pending, awaiting_receipt, approved, rejected, expired" },
+        "receiptUrl": { "type": "string", "description": "Uploaded receipt screenshot URL" },
+        "generatedCode": { "type": "string", "description": "Auto-generated license code on approval" },
+        "createdAt": { "type": "string", "description": "ISO timestamp of payment request creation" },
+        "submittedAt": { "type": "string", "description": "ISO timestamp of receipt submission" },
+        "approvedAt": { "type": "string", "description": "ISO timestamp of approval" },
+        "rejectedAt": { "type": "string", "description": "ISO timestamp of rejection" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp of last update" }
+      },
+      "required": ["reference", "customerUid", "amountNgn"]
+    },
+    "WebPushSubscription": {
+      "title": "WebPushSubscription",
+      "description": "Admin web push notification subscription endpoint for closed browser alerts",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Hashed subscription identifier" },
+        "endpoint": { "type": "string", "description": "Browser push service endpoint URL" },
+        "keys": { "type": "object", "description": "Client p256dh and auth crypto keys" },
+        "adminEmail": { "type": "string", "description": "Admin email associated with subscription" },
+        "createdAt": { "type": "string", "description": "ISO timestamp of subscription" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp of last update" }
+      },
+      "required": ["id", "endpoint"]
     }
   },
   "firestore": {
@@ -434,6 +472,14 @@
     "/broadcast_logs/{broadcastId}": {
       "schema": "BroadcastLog",
       "description": "Admin broadcast notification records"
+    },
+    "/payment_requests/{reference}": {
+      "schema": "PaymentRequest",
+      "description": "Manual bank transfer payments and receipt approval records"
+    },
+    "/web_push_subscriptions/{subId}": {
+      "schema": "WebPushSubscription",
+      "description": "Web push subscription endpoints for administrative notifications"
     }
   }
 }
