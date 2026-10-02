@@ -3432,6 +3432,8 @@
       // SOLVATECH BOT — SUPER ADMIN COMMAND CENTER CONTROLLER
       // =========================================================================
       let adminOverviewData = null;
+      let adminOverviewLoading = false;
+      let adminOverviewError = null;
       let adminUsersList = null;
       let adminUsersLoading = false;
       let adminUsersError = null;
@@ -3816,9 +3818,14 @@
         const lastSyncEl = document.getElementById("admin-last-sync-time");
         if (lastSyncEl) lastSyncEl.textContent = "Syncing with cloud...";
 
+        adminOverviewLoading = true;
+        adminOverviewError = null;
+
         try {
           let authHeader = await getAuthHeader();
-          if (!authHeader) return;
+          if (!authHeader) {
+            throw new Error("Authentication session missing. Please sign in again.");
+          }
 
           let res = await fetch(getApiUrl("/admin/overview"), {
             headers: {
@@ -3841,14 +3848,19 @@
           }
 
           const data = await safeFetchJson(res);
-          if (res.ok && data) {
+          if (!res.ok) {
+            throw new Error(data?.error || `HTTP ${res.status} error from server`);
+          }
+
+          if (data) {
             adminOverviewData = data;
+            adminOverviewError = null;
+            adminOverviewLoading = false;
+
             if (data.serverTime || data.systemHealth?.serverTime) {
               const serverMs = new Date(data.serverTime || data.systemHealth?.serverTime).getTime();
               cachedServerOffset = serverMs - Date.now();
             }
-            // Authoritative customer data is directly from Supabase via backend API
-
 
             if (lastSyncEl) {
               lastSyncEl.textContent = `Synced: ${new Date().toLocaleTimeString()}`;
@@ -3857,8 +3869,14 @@
             renderAdminDashboard();
           }
         } catch (err) {
+          adminOverviewLoading = false;
+          adminOverviewError = err.message || "Failed to load admin overview data";
           console.debug("Failed to load admin overview:", err.message);
-          if (lastSyncEl) lastSyncEl.textContent = "Sync failed";
+          if (lastSyncEl) {
+            const shortErr = err.message.length > 25 ? err.message.slice(0, 25) + "..." : err.message;
+            lastSyncEl.textContent = `Sync failed (${shortErr})`;
+          }
+          renderLicensesTable();
         }
       }
 
@@ -4145,6 +4163,23 @@
 
       // Render Licenses Table (Subtab 2)
       function renderLicensesTable() {
+        const tbody = document.getElementById("admin-licenses-tbody");
+        const cardsEl = document.getElementById("admin-licenses-cards");
+
+        if (adminOverviewLoading && !adminOverviewData) {
+          if (tbody) tbody.innerHTML = `<tr><td colspan="13" style="text-align: center; color: var(--muted); padding: 24px;">Loading license inventory...</td></tr>`;
+          if (cardsEl) cardsEl.innerHTML = `<div style="text-align: center; color: var(--muted); padding: 20px;">Loading license inventory...</div>`;
+          return;
+        }
+
+        if (adminOverviewError && !adminOverviewData) {
+          const errMsg = escapeHtml(adminOverviewError);
+          const errRow = `<tr><td colspan="13" style="text-align: center; color: #ef4444; padding: 24px;">⚠️ Error: ${errMsg}<br><button type="button" class="admin-preset-btn" style="margin-top:10px; padding:4px 12px; font-size:11px;" onclick="loadAdminLicenses()">↻ Retry</button></td></tr>`;
+          if (tbody) tbody.innerHTML = errRow;
+          if (cardsEl) cardsEl.innerHTML = `<div style="text-align: center; color: #ef4444; padding: 20px;">⚠️ Error: ${errMsg}<br><button type="button" class="admin-preset-btn" style="margin-top:10px; padding:4px 12px; font-size:11px;" onclick="loadAdminLicenses()">↻ Retry</button></div>`;
+          return;
+        }
+
         if (!adminOverviewData) return;
         const allLicenses = adminOverviewData.licenses || [];
 
@@ -4195,10 +4230,13 @@
         const tbody = document.getElementById("admin-licenses-tbody");
         if (tbody) {
           if (filtered.length === 0) {
+            const emptyNotice = allLicenses.length === 0
+              ? "No license keys generated yet. Click 'Generate Key' above to create one."
+              : "No licenses match the selected filter or search term.";
             tbody.innerHTML = `
               <tr>
                 <td colspan="13" style="text-align: center; color: var(--muted); padding: 24px;">
-                  No licenses match the selected filter or search term.
+                  ${emptyNotice}
                 </td>
               </tr>
             `;
