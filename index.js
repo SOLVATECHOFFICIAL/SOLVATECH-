@@ -8,6 +8,7 @@ import { logger } from "./lib/logger.js";
 import { getWhatsAppController, restoreAllSessions, auditActiveSessions, getAllWhatsAppStatuses } from "./lib/whatsapp.js";
 import { getLockedNumberForUid, getAllNumberLocks, unlinkNumberFromUser, unlinkPhoneNumber } from "./lib/number-lock.js";
 import { requireAuth, requireAdmin, isAdminEmail, createPreviewToken, getFirebaseServerFirestore } from "./lib/auth.js";
+import { isSupabaseConfigured, getSupabasePublicConfig, supabaseUpsert } from "./lib/supabase.js";
 import { getUserPreferences, setUserPreferences } from "./lib/database.js";
 import {
   createLicenseRecord,
@@ -169,9 +170,17 @@ app.get("/healthz", (_req, res) => res.json({ status: "ok" }));
 const prefixes = Array.from(new Set([apiPrefix, "/api", "/bot-api", ""]));
 
 for (const p of prefixes) {
-  // Public Health & Firebase Config endpoints
+  // Public Health, Firebase, and Supabase Config endpoints
   app.get(`${p}/health`, (_request, response) => {
-    response.json({ status: "ok" });
+    response.json({
+      status: "ok",
+      database: isSupabaseConfigured() ? "supabase" : "local-durable-fallback",
+      supabaseConfigured: isSupabaseConfigured(),
+    });
+  });
+
+  app.get(`${p}/supabase-config`, (_request, response) => {
+    response.json(getSupabasePublicConfig());
   });
 
   app.get(`${p}/firebase-config`, (_request, response) => {
@@ -225,6 +234,17 @@ for (const p of prefixes) {
 
     const latestStatus = controller.getStatus();
     const preferences = await getUserPreferences(safeUserId);
+
+    if (isSupabaseConfigured() && verifiedUid) {
+      supabaseUpsert("users", {
+        id: verifiedUid,
+        email: userEmail || "",
+        display_name: request.auth.displayName || "",
+        photo_url: request.auth.photoURL || "",
+        last_login_at: new Date().toISOString(),
+      }, "id").catch(() => {});
+    }
+
     response.json({
       ...latestStatus,
       phoneNumber: latestStatus.botNumber || lockedNumber || "",
