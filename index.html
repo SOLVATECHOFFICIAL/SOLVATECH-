@@ -1624,6 +1624,39 @@
 
           <!-- SUBTAB: CUSTOMER PAYMENTS & RECEIPT VERIFICATION QUEUE -->
           <div id="admin-view-payments" class="admin-subview hidden">
+            <!-- Native Chrome / Desktop Web Push Notifications Card -->
+            <div class="surface" style="padding: 16px 20px; border-radius: 8px; border: 1px solid #bfdbfe; background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 100%); margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.03);">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                  <div style="width: 42px; height: 42px; border-radius: 10px; background: #dbeafe; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">
+                    🔔
+                  </div>
+                  <div>
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                      <h3 style="font-size: 15px; font-weight: 800; color: #0f172a; margin: 0;">
+                        Chrome &amp; Desktop Web Push Notifications
+                      </h3>
+                      <span id="admin-push-status-badge" class="admin-badge" style="background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; font-weight:800;">
+                        INACTIVE 🔴
+                      </span>
+                    </div>
+                    <p style="font-size: 11.5px; color: #475569; margin: 3px 0 0; line-height: 1.4;">
+                      Receive instant system alerts when a payment or receipt is submitted, <strong>even when Chrome or the website is closed</strong>. Clicking takes you directly to the receipt.
+                    </p>
+                  </div>
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                  <button type="button" id="admin-push-toggle-btn" class="license-btn" style="padding: 8px 18px; font-size: 12px; margin: 0; background: #0284c7; color: #fff;">
+                    🔔 Enable Push Alerts
+                  </button>
+                  <button type="button" id="admin-push-test-btn" class="admin-preset-btn" style="padding: 7px 14px; font-size: 11px; font-weight: 700; background:#f0fdf4; color:#15803d; border-color:#86efac;">
+                    ⚡ Test Push Alert
+                  </button>
+                </div>
+              </div>
+              <div id="admin-push-msg" class="license-msg hidden" style="margin-top: 10px;"></div>
+            </div>
+
             <!-- 1. Payment Bank Configuration Card (Stored in Supabase system_config) -->
             <div class="surface" style="padding: 20px; border-radius: 8px; border: 1px solid var(--admin-card-border); margin-bottom: 20px;">
               <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px;">
@@ -5122,7 +5155,7 @@
         }
       };
 
-      // Safe Storage / Maintenance Diagnostics & Cleanup (500MB Live Meter + Recycling Bin)
+      // Safe Storage / Maintenance Diagnostics & Cleanup (500MB Live High-Precision Meter + Recycling Bin)
       function applyMaintenanceDiagnosticsToUI(diag) {
         if (!diag) return;
         const actEl = $("admin-diag-active");
@@ -5138,26 +5171,30 @@
         const cats = diag.categories || {};
 
         const usedLabel = $("admin-storage-used-label");
-        if (usedLabel) usedLabel.textContent = st.usedFormatted || "0.00 MB";
+        if (usedLabel) {
+          usedLabel.innerHTML = `${st.usedFormatted || "0 B"} <span style="font-size:12px; font-weight:700; color:#0284c7; margin-left:4px;">(${st.usedMicroMb || "0.00000000 MB"})</span>`;
+        }
         const quotaLabel = $("admin-storage-quota-label");
         if (quotaLabel) quotaLabel.textContent = st.quotaFormatted || "500.00 MB";
         const pctLabel = $("admin-storage-pct-label");
-        if (pctLabel) pctLabel.textContent = `${Number(st.usagePercent || 0).toFixed(2)}%`;
+        if (pctLabel) pctLabel.textContent = st.usagePercentFormatted || `${Number(st.usagePercent || 0).toFixed(6)}%`;
         const freeLabel = $("admin-storage-free-label");
-        if (freeLabel) freeLabel.textContent = st.freeFormatted || "500.00 MB";
+        if (freeLabel) {
+          freeLabel.innerHTML = `${st.freeFormatted || "500.00 MB"} <span style="font-size:11px; font-weight:700; color:#059669; display:block;">${st.freeMicroMb || "500.00000000 MB"} free</span>`;
+        }
 
         const protBytesEl = $("admin-storage-protected-bytes");
-        if (protBytesEl) protBytesEl.textContent = st.protectedFormatted || "0 KB";
+        if (protBytesEl) protBytesEl.textContent = `${st.protectedFormatted || "0 KB"} (${st.protectedMicroMb || "0.00000000 MB"})`;
         const picsBytesEl = $("admin-storage-pics-bytes");
-        if (picsBytesEl) picsBytesEl.textContent = cats.receiptPics?.clearableFormatted || "0 B";
+        if (picsBytesEl) picsBytesEl.textContent = `${cats.receiptPics?.clearableFormatted || "0 B"} (${cats.receiptPics?.clearableMicroMb || "0.00000000 MB"})`;
         const histBytes = (cats.messageHistory?.bytes || 0) + (cats.commandHistory?.bytes || 0) + (cats.aiHistory?.bytes || 0) + (cats.rejectedExpiredPayments?.bytes || 0);
         const histBytesEl = $("admin-storage-history-bytes");
         if (histBytesEl) {
-          const kb = histBytes >= 1048576 ? `${(histBytes / 1048576).toFixed(2)} MB` : histBytes >= 1024 ? `${(histBytes / 1024).toFixed(1)} KB` : `${histBytes} B`;
-          histBytesEl.textContent = kb;
+          const kb = histBytes >= 1048576 ? `${(histBytes / 1048576).toFixed(4)} MB` : histBytes >= 1024 ? `${(histBytes / 1024).toFixed(2)} KB` : `${histBytes} B`;
+          histBytesEl.textContent = `${kb} (${((histBytes / 1048576)).toFixed(8)} MB)`;
         }
         const clearableEl = $("admin-storage-clearable-bytes");
-        if (clearableEl) clearableEl.textContent = st.clearableFormatted || "0 B";
+        if (clearableEl) clearableEl.textContent = `${st.clearableFormatted || "0 B"} (${st.clearableMicroMb || "0.00000000 MB"})`;
 
         // Update multi-segment bar widths relative to 500MB (with minimum visible width when non-zero)
         const quotaBytes = Number(st.quotaBytes || 524288000);
@@ -5176,7 +5213,7 @@
         const barHist = $("admin-storage-bar-history");
         if (barHist) barHist.style.width = `${histPct}%`;
 
-        // Update category cards
+        // Update category cards with micro-MB precision
         const clearablePicsEl = $("admin-diag-clearable-pics");
         if (clearablePicsEl) {
           clearablePicsEl.textContent = `${cats.receiptPics?.clearableCount || 0} (${cats.receiptPics?.clearableFormatted || "0 B"})`;
@@ -5187,16 +5224,203 @@
         }
 
         const catPicsSize = $("admin-cat-pics-size");
-        if (catPicsSize) catPicsSize.textContent = `${cats.receiptPics?.clearableCount || 0} pics (${cats.receiptPics?.clearableFormatted || "0 B"})`;
+        if (catPicsSize) catPicsSize.textContent = `${cats.receiptPics?.clearableCount || 0} pics (${cats.receiptPics?.clearableMicroMb || "0.00000000 MB"})`;
         const catMsgSize = $("admin-cat-msg-size");
-        if (catMsgSize) catMsgSize.textContent = `${cats.messageHistory?.count || 0} rows (${cats.messageHistory?.formatted || "0 B"})`;
+        if (catMsgSize) catMsgSize.textContent = `${cats.messageHistory?.count || 0} rows (${cats.messageHistory?.microMb || "0.00000000 MB"})`;
         const catCmdSize = $("admin-cat-cmd-size");
-        if (catCmdSize) catCmdSize.textContent = `${cats.commandHistory?.count || 0} rows (${cats.commandHistory?.formatted || "0 B"})`;
+        if (catCmdSize) catCmdSize.textContent = `${cats.commandHistory?.count || 0} rows (${cats.commandHistory?.microMb || "0.00000000 MB"})`;
         const catAiSize = $("admin-cat-ai-size");
-        if (catAiSize) catAiSize.textContent = `${cats.aiHistory?.count || 0} rows (${cats.aiHistory?.formatted || "0 B"})`;
+        if (catAiSize) catAiSize.textContent = `${cats.aiHistory?.count || 0} rows (${cats.aiHistory?.microMb || "0.00000000 MB"})`;
         const catPaySize = $("admin-cat-pay-size");
-        if (catPaySize) catPaySize.textContent = `${cats.rejectedExpiredPayments?.count || 0} rows (${cats.rejectedExpiredPayments?.formatted || "0 B"})`;
+        if (catPaySize) catPaySize.textContent = `${cats.rejectedExpiredPayments?.count || 0} rows (${cats.rejectedExpiredPayments?.microMb || "0.00000000 MB"})`;
       }
+
+      // ----------------------------------------------------------------------
+      // WEB PUSH NOTIFICATIONS CONTROLLER (CHROME / DESKTOP / ANDROID PWA)
+      // ----------------------------------------------------------------------
+      let pushRegistration = null;
+      let activePushSubscription = null;
+
+      function urlBase64ToUint8Array(base64String) {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) {
+          outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
+      }
+
+      async function updatePushUiState() {
+        const badge = $("admin-push-status-badge");
+        const btn = $("admin-push-toggle-btn");
+        if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+          if (badge) {
+            badge.textContent = "UNSUPPORTED ⚠️";
+            badge.style.background = "#f1f5f9";
+            badge.style.color = "#64748b";
+          }
+          if (btn) btn.disabled = true;
+          return;
+        }
+
+        try {
+          const reg = await navigator.serviceWorker.getRegistration("/sw.js");
+          const sub = reg ? await reg.pushManager.getSubscription() : null;
+          activePushSubscription = sub;
+
+          if (sub && Notification.permission === "granted") {
+            if (badge) {
+              badge.textContent = "ACTIVE 🟢";
+              badge.style.background = "#dcfce7";
+              badge.style.color = "#15803d";
+              badge.style.borderColor = "#86efac";
+            }
+            if (btn) {
+              btn.textContent = "🔕 Disable Push Alerts";
+              btn.style.background = "#64748b";
+            }
+          } else {
+            if (badge) {
+              badge.textContent = "INACTIVE 🔴";
+              badge.style.background = "#fee2e2";
+              badge.style.color = "#991b1b";
+              badge.style.borderColor = "#fca5a5";
+            }
+            if (btn) {
+              btn.textContent = "🔔 Enable Push Alerts";
+              btn.style.background = "#0284c7";
+            }
+          }
+        } catch {}
+      }
+
+      async function initWebPushServiceWorker() {
+        if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+        try {
+          pushRegistration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+          await updatePushUiState();
+        } catch (err) {
+          console.debug("Service Worker registration notice:", err.message);
+        }
+      }
+
+      async function togglePushNotifications() {
+        const msgEl = $("admin-push-msg");
+        const btn = $("admin-push-toggle-btn");
+        if (btn) btn.disabled = true;
+
+        try {
+          if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+            throw new Error("Push notifications are not supported on this browser.");
+          }
+
+          const reg = pushRegistration || await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+          const existingSub = await reg.pushManager.getSubscription();
+
+          if (existingSub) {
+            // Unsubscribe
+            let authHeader = await getAuthHeader();
+            await fetch(getApiUrl("/push/unsubscribe"), {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "Authorization": authHeader || "" },
+              body: JSON.stringify({ endpoint: existingSub.endpoint }),
+            }).catch(() => {});
+
+            await existingSub.unsubscribe();
+            activePushSubscription = null;
+            if (msgEl) {
+              msgEl.className = "license-msg";
+              msgEl.textContent = "🔕 Push notifications disabled.";
+              msgEl.classList.remove("hidden");
+            }
+          } else {
+            // Subscribe
+            const perm = await Notification.requestPermission();
+            if (perm !== "granted") {
+              throw new Error("Notification permission was denied in your browser settings. Please allow notifications for this site.");
+            }
+
+            const vapidRes = await fetch(getApiUrl("/push/vapid-public-key"));
+            const vapidData = await safeFetchJson(vapidRes);
+            if (!vapidData.publicKey) {
+              throw new Error("Could not retrieve VAPID public key from server.");
+            }
+
+            const appServerKey = urlBase64ToUint8Array(vapidData.publicKey);
+            const newSub = await reg.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: appServerKey,
+            });
+
+            let authHeader = await getAuthHeader();
+            const subRes = await fetch(getApiUrl("/push/subscribe"), {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "Authorization": authHeader || "" },
+              body: JSON.stringify({ subscription: newSub }),
+            });
+            const subData = await safeFetchJson(subRes);
+            if (!subRes.ok) throw new Error(subData.error || "Failed to save push subscription.");
+
+            activePushSubscription = newSub;
+            if (msgEl) {
+              msgEl.className = "license-msg success";
+              msgEl.textContent = "✅ Chrome Push Notifications active! You will receive instant system alerts even when Chrome is closed.";
+              msgEl.classList.remove("hidden");
+            }
+          }
+        } catch (err) {
+          if (msgEl) {
+            msgEl.className = "license-msg error";
+            msgEl.textContent = `❌ ${err.message}`;
+            msgEl.classList.remove("hidden");
+          }
+        } finally {
+          if (btn) btn.disabled = false;
+          await updatePushUiState();
+        }
+      }
+
+      async function testPushNotification() {
+        const msgEl = $("admin-push-msg");
+        const btn = $("admin-push-test-btn");
+        if (btn) btn.disabled = true;
+
+        try {
+          let authHeader = await getAuthHeader();
+          if (!authHeader) throw new Error("Admin authentication required.");
+
+          const res = await fetch(getApiUrl("/push/test"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": authHeader },
+          });
+          const data = await safeFetchJson(res);
+          if (!res.ok) throw new Error(data.error || "Failed to send test push notification.");
+
+          if (msgEl) {
+            msgEl.className = "license-msg success";
+            msgEl.textContent = `⚡ Test notification dispatched to ${data.sent || 0} active device(s)! Check your screen.`;
+            msgEl.classList.remove("hidden");
+          }
+        } catch (err) {
+          if (msgEl) {
+            msgEl.className = "license-msg error";
+            msgEl.textContent = `❌ ${err.message}`;
+            msgEl.classList.remove("hidden");
+          }
+        } finally {
+          if (btn) btn.disabled = false;
+        }
+      }
+
+      const pushToggleBtn = $("admin-push-toggle-btn");
+      if (pushToggleBtn) pushToggleBtn.onclick = togglePushNotifications;
+      const pushTestBtn = $("admin-push-test-btn");
+      if (pushTestBtn) pushTestBtn.onclick = testPushNotification;
+
+      // Initialize Web Push service worker on startup
+      initWebPushServiceWorker().catch(() => {});
 
       async function loadMaintenanceDiagnostics() {
         try {

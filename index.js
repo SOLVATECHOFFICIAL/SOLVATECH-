@@ -54,6 +54,12 @@ import {
   getPaymentReceiptBinary,
   deletePaymentRequest,
 } from "./lib/payments.js";
+import {
+  getVapidPublicKey,
+  savePushSubscription,
+  removePushSubscription,
+  sendAdminPushNotification,
+} from "./lib/web-push.js";
 
 const origConsoleError = console.error;
 const origConsoleWarn = console.warn;
@@ -1422,7 +1428,72 @@ for (const p of prefixes) {
       response.status(400).json({ error: error.message || "Failed to delete payment request." });
     }
   });
+
+  // --------------------------------------------------------------------------
+  // WEB PUSH NOTIFICATION ROUTES (NATIVE CHROME / DESKTOP / MOBILE PWA)
+  // --------------------------------------------------------------------------
+  app.get(`${p}/push/vapid-public-key`, async (_request, response) => {
+    try {
+      const publicKey = await getVapidPublicKey();
+      response.json({ success: true, publicKey });
+    } catch (error) {
+      logger.error("Failed to get VAPID public key", error.stack || error.message);
+      response.status(500).json({ error: "Failed to load VAPID public key." });
+    }
+  });
+
+  app.post(`${p}/push/subscribe`, requireAuth, async (request, response) => {
+    try {
+      const subscription = request.body?.subscription || request.body;
+      if (!subscription || !subscription.endpoint) {
+        return response.status(400).json({ error: "Invalid push subscription payload." });
+      }
+      const result = await savePushSubscription(subscription, request.auth.email, request.verifiedUid);
+      response.json({ success: true, message: "Push notification subscription activated.", ...result });
+    } catch (error) {
+      logger.error("Push subscribe error", error.stack || error.message);
+      response.status(400).json({ error: error.message || "Failed to save push subscription." });
+    }
+  });
+
+  app.post(`${p}/push/unsubscribe`, requireAuth, async (request, response) => {
+    try {
+      const endpoint = request.body?.endpoint;
+      if (endpoint) {
+        await removePushSubscription(endpoint);
+      }
+      response.json({ success: true, message: "Push notification subscription removed." });
+    } catch (error) {
+      response.status(400).json({ error: error.message || "Failed to unsubscribe." });
+    }
+  });
+
+  app.post(`${p}/push/test`, requireAuth, requireAdmin, async (request, response) => {
+    try {
+      const result = await sendAdminPushNotification({
+        title: "🔔 SOLVATECH Test Alert",
+        body: "Chrome Web Push is active and working! You will receive instant payment alerts here.",
+        url: "/?tab=admin&view=payments",
+      });
+      response.json({ success: true, ...result, message: "Test push notification sent." });
+    } catch (error) {
+      logger.error("Push test error", error.stack || error.message);
+      response.status(500).json({ error: error.message || "Failed to send test push notification." });
+    }
+  });
 }
+
+// Serve Service Worker at root for proper Service Worker Scope
+app.get(["/sw.js", "/service-worker.js"], (_request, response) => {
+  const swPath = path.join(rootDir, "sw.js");
+  if (fs.existsSync(swPath)) {
+    response.setHeader("Content-Type", "application/javascript");
+    response.setHeader("Service-Worker-Allowed", "/");
+    response.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    return response.sendFile(swPath);
+  }
+  response.status(404).send("Service Worker not found.");
+});
 
 app.use((request, response, next) => {
   const isApiRequest =
