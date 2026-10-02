@@ -810,27 +810,27 @@ DROP POLICY IF EXISTS "full_access_media_cache" ON public.media_cache;
 DROP POLICY IF EXISTS "full_access_broadcast_logs" ON public.broadcast_logs;
 
 -- Create unified full access policies for backend bot service & frontend users
-CREATE POLICY "full_access_users" ON public.users FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
-CREATE POLICY "full_access_licenses" ON public.licenses FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
-CREATE POLICY "full_access_user_licenses" ON public.user_licenses FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
-CREATE POLICY "full_access_group_settings" ON public.group_settings FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
-CREATE POLICY "full_access_group_rules" ON public.group_rules FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
-CREATE POLICY "full_access_number_locks" ON public.number_locks FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
-CREATE POLICY "full_access_user_number_locks" ON public.user_number_locks FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
-CREATE POLICY "full_access_referral_purchases" ON public.referral_purchases FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
-CREATE POLICY "full_access_referral_rewards" ON public.referral_rewards FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
-CREATE POLICY "full_access_referral_claims" ON public.referral_claims FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
-CREATE POLICY "full_access_system_config" ON public.system_config FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
-CREATE POLICY "full_access_whatsapp_sessions" ON public.whatsapp_sessions FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
-CREATE POLICY "full_access_deleted_messages" ON public.deleted_messages FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
-CREATE POLICY "full_access_bot_command_logs" ON public.bot_command_logs FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
-CREATE POLICY "full_access_group_warnings" ON public.group_warnings FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
-CREATE POLICY "full_access_anti_spam_events" ON public.anti_spam_events FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
-CREATE POLICY "full_access_ai_chat_memories" ON public.ai_chat_memories FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
-CREATE POLICY "full_access_ai_deep_facts" ON public.ai_deep_facts FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
-CREATE POLICY "full_access_audit_logs" ON public.audit_logs FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
-CREATE POLICY "full_access_media_cache" ON public.media_cache FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
-CREATE POLICY "full_access_broadcast_logs" ON public.broadcast_logs FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
+CREATE POLICY "full_access_users" ON public.users FOR ALL TO public, anon, authenticated, service_role USING (true) WITH CHECK (true);
+CREATE POLICY "full_access_licenses" ON public.licenses FOR ALL TO public, anon, authenticated, service_role USING (true) WITH CHECK (true);
+CREATE POLICY "full_access_user_licenses" ON public.user_licenses FOR ALL TO public, anon, authenticated, service_role USING (true) WITH CHECK (true);
+CREATE POLICY "full_access_group_settings" ON public.group_settings FOR ALL TO public, anon, authenticated, service_role USING (true) WITH CHECK (true);
+CREATE POLICY "full_access_group_rules" ON public.group_rules FOR ALL TO public, anon, authenticated, service_role USING (true) WITH CHECK (true);
+CREATE POLICY "full_access_number_locks" ON public.number_locks FOR ALL TO public, anon, authenticated, service_role USING (true) WITH CHECK (true);
+CREATE POLICY "full_access_user_number_locks" ON public.user_number_locks FOR ALL TO public, anon, authenticated, service_role USING (true) WITH CHECK (true);
+CREATE POLICY "full_access_referral_purchases" ON public.referral_purchases FOR ALL TO public, anon, authenticated, service_role USING (true) WITH CHECK (true);
+CREATE POLICY "full_access_referral_rewards" ON public.referral_rewards FOR ALL TO public, anon, authenticated, service_role USING (true) WITH CHECK (true);
+CREATE POLICY "full_access_referral_claims" ON public.referral_claims FOR ALL TO public, anon, authenticated, service_role USING (true) WITH CHECK (true);
+CREATE POLICY "full_access_system_config" ON public.system_config FOR ALL TO public, anon, authenticated, service_role USING (true) WITH CHECK (true);
+CREATE POLICY "full_access_whatsapp_sessions" ON public.whatsapp_sessions FOR ALL TO public, anon, authenticated, service_role USING (true) WITH CHECK (true);
+CREATE POLICY "full_access_deleted_messages" ON public.deleted_messages FOR ALL TO public, anon, authenticated, service_role USING (true) WITH CHECK (true);
+CREATE POLICY "full_access_bot_command_logs" ON public.bot_command_logs FOR ALL TO public, anon, authenticated, service_role USING (true) WITH CHECK (true);
+CREATE POLICY "full_access_group_warnings" ON public.group_warnings FOR ALL TO public, anon, authenticated, service_role USING (true) WITH CHECK (true);
+CREATE POLICY "full_access_anti_spam_events" ON public.anti_spam_events FOR ALL TO public, anon, authenticated, service_role USING (true) WITH CHECK (true);
+CREATE POLICY "full_access_ai_chat_memories" ON public.ai_chat_memories FOR ALL TO public, anon, authenticated, service_role USING (true) WITH CHECK (true);
+CREATE POLICY "full_access_ai_deep_facts" ON public.ai_deep_facts FOR ALL TO public, anon, authenticated, service_role USING (true) WITH CHECK (true);
+CREATE POLICY "full_access_audit_logs" ON public.audit_logs FOR ALL TO public, anon, authenticated, service_role USING (true) WITH CHECK (true);
+CREATE POLICY "full_access_media_cache" ON public.media_cache FOR ALL TO public, anon, authenticated, service_role USING (true) WITH CHECK (true);
+CREATE POLICY "full_access_broadcast_logs" ON public.broadcast_logs FOR ALL TO public, anon, authenticated, service_role USING (true) WITH CHECK (true);
 
 -- =========================================================================
 -- SECTION 26: CUSTOMER PAYMENT REQUESTS & RECEIPT STORAGE BUCKET
@@ -916,5 +916,27 @@ VALUES (
 ON CONFLICT (key) DO NOTHING;
 
 -- =========================================================================
--- FINISHED: SOLVATECH BOT SCHEMA READY
+-- SECTION 27: LIVE 500MB STORAGE METRICS RPC (NON-DESTRUCTIVE)
+-- =========================================================================
+CREATE OR REPLACE FUNCTION public.get_database_storage_stats()
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  db_bytes BIGINT;
+BEGIN
+  SELECT pg_database_size(current_database()) INTO db_bytes;
+  RETURN jsonb_build_object(
+    'database_size_bytes', COALESCE(db_bytes, 0),
+    'quota_bytes', 524288000,
+    'measured_at', NOW()
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_database_storage_stats() TO public, anon, authenticated, service_role;
+
+-- =========================================================================
+-- FINISHED: SOLVATECH BOT SCHEMA READY (100% NON-DESTRUCTIVE)
 -- =========================================================================

@@ -457,7 +457,7 @@ for (const p of prefixes) {
     try {
       const verifiedUid = request.verifiedUid;
       const userEmail = request.auth.email;
-      const status = await getUserLicenseStatus(verifiedUid, userEmail);
+      const status = await getUserLicenseStatus(verifiedUid, userEmail, request.headers.authorization);
       response.json({
         ...status,
         userId: verifiedUid,
@@ -941,7 +941,7 @@ for (const p of prefixes) {
 
   app.get(`${p}/admin/licenses`, requireAuth, requireAdmin, async (_request, response) => {
     try {
-      const licenses = await listAllLicenses();
+      const licenses = await listAllLicenses(_request.headers.authorization || null);
       response.json({
         licenses,
         total: licenses.length,
@@ -1007,7 +1007,7 @@ for (const p of prefixes) {
   app.post(`${p}/admin/maintenance/cleanup`, requireAuth, requireAdmin, async (request, response) => {
     try {
       const { action } = request.body || {};
-      const res = await performSafeMaintenanceCleanup(action);
+      const res = await performSafeMaintenanceCleanup(action, request.headers.authorization || null);
       response.json(res);
     } catch (err) {
       response.status(400).json({ error: err.message || "Failed to run maintenance cleanup." });
