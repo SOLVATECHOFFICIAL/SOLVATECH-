@@ -196,6 +196,12 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // 24. User Preferences (Anti-Delete DM & Auto-View Status)
+    match /user_preferences/{userId} {
+      allow get, write: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+    }
+
     // Administrative roles collection
     match /admins/{adminId} {
       allow read: if isSignedIn();

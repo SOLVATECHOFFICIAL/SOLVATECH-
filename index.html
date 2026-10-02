@@ -311,24 +311,48 @@
           </div>
         </div>
 
-        <!-- Privacy & Auto Message Recovery Switch -->
-        <div class="privacy-controls-surface" style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 16px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <div style="font-size: 22px; line-height: 1;">🛡️</div>
-            <div>
-              <div style="font-weight: 700; font-size: 13px; color: var(--text); display: flex; align-items: center; gap: 6px;">
-                <span>Auto Deleted-Message Recovery</span>
-                <span style="font-size: 9.5px; background: rgba(16,185,129,0.2); color: #34d399; padding: 2px 6px; border-radius: 4px; font-weight: 800;">PERSONAL DM</span>
+        <!-- Privacy & Automation Switches: Anti-Delete DM & Auto Status View -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 10px; margin-bottom: 14px;">
+          <!-- 1. Auto Deleted-Message Recovery Switch -->
+          <div class="privacy-controls-surface" style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div style="font-size: 22px; line-height: 1;">🛡️</div>
+              <div>
+                <div style="font-weight: 700; font-size: 13px; color: var(--text); display: flex; align-items: center; gap: 6px;">
+                  <span>Auto Deleted Recovery</span>
+                  <span style="font-size: 9.5px; background: rgba(16,185,129,0.2); color: #34d399; padding: 2px 6px; border-radius: 4px; font-weight: 800;">PERSONAL DM</span>
+                </div>
+                <div style="font-size: 11px; color: var(--muted); margin-top: 1px;">Deleted messages are sent silently to your DM.</div>
               </div>
-              <div style="font-size: 11px; color: var(--muted); margin-top: 1px;">Deleted messages & media are restored silently to your personal WhatsApp DM.</div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span id="auto-deleted-status-label" style="font-size: 10px; font-weight: 700; letter-spacing: 0.05em; color: #10b981; background: rgba(16,185,129,0.12); padding: 3px 7px; border-radius: 6px;">ENABLED</span>
+              <label class="switch-toggle" style="position: relative; display: inline-block; width: 44px; height: 24px; margin: 0; cursor: pointer;">
+                <input type="checkbox" id="auto-deleted-toggle" checked style="opacity: 0; width: 0; height: 0;">
+                <span class="slider" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #10b981; transition: .3s; border-radius: 24px;"></span>
+              </label>
             </div>
           </div>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <span id="auto-deleted-status-label" style="font-size: 10px; font-weight: 700; letter-spacing: 0.05em; color: #10b981; background: rgba(16,185,129,0.12); padding: 3px 7px; border-radius: 6px;">ENABLED</span>
-            <label class="switch-toggle" style="position: relative; display: inline-block; width: 44px; height: 24px; margin: 0; cursor: pointer;">
-              <input type="checkbox" id="auto-deleted-toggle" checked style="opacity: 0; width: 0; height: 0;">
-              <span class="slider" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #10b981; transition: .3s; border-radius: 24px;"></span>
-            </label>
+
+          <!-- 2. Auto-View WhatsApp Status Switch -->
+          <div class="privacy-controls-surface" style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div style="font-size: 22px; line-height: 1;">👁️</div>
+              <div>
+                <div style="font-weight: 700; font-size: 13px; color: var(--text); display: flex; align-items: center; gap: 6px;">
+                  <span>Auto View Status / Stories</span>
+                  <span style="font-size: 9.5px; background: rgba(56,189,248,0.2); color: #38bdf8; padding: 2px 6px; border-radius: 4px; font-weight: 800;">STATUS</span>
+                </div>
+                <div style="font-size: 11px; color: var(--muted); margin-top: 1px;">Auto-view contacts' status updates in background.</div>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span id="auto-status-status-label" style="font-size: 10px; font-weight: 700; letter-spacing: 0.05em; color: #94a3b8; background: rgba(148,163,184,0.15); padding: 3px 7px; border-radius: 6px;">DISABLED</span>
+              <label class="switch-toggle" style="position: relative; display: inline-block; width: 44px; height: 24px; margin: 0; cursor: pointer;">
+                <input type="checkbox" id="auto-status-toggle" style="opacity: 0; width: 0; height: 0;">
+                <span class="slider" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #64748b; transition: .3s; border-radius: 24px;"></span>
+              </label>
+            </div>
           </div>
         </div>
 
@@ -2114,6 +2138,7 @@
       const error = $("error"), state = $("state"), badge = $("badge"), detail = $("detail"), number = $("connected-number"), disconnect = $("disconnect");
       const copyButton = $("copy-code"), copyFeedback = $("copy-feedback"), timer = $("code-timer"), pairingFor = $("pairing-for");
       const autoDeletedToggle = $("auto-deleted-toggle"), autoDeletedStatusLabel = $("auto-deleted-status-label");
+      const autoStatusToggle = $("auto-status-toggle"), autoStatusStatusLabel = $("auto-status-status-label");
 
       function updateAutoDeletedUI(enabled) {
         if (autoDeletedToggle && autoDeletedToggle !== document.activeElement) autoDeletedToggle.checked = enabled;
@@ -2121,6 +2146,19 @@
           autoDeletedStatusLabel.textContent = enabled ? "ENABLED (TO DM)" : "DISABLED";
           autoDeletedStatusLabel.style.color = enabled ? "#10b981" : "#94a3b8";
           autoDeletedStatusLabel.style.background = enabled ? "rgba(16,185,129,0.1)" : "rgba(148,163,184,0.15)";
+        }
+      }
+
+      function updateAutoStatusUI(enabled) {
+        if (autoStatusToggle && autoStatusToggle !== document.activeElement) autoStatusToggle.checked = enabled;
+        if (autoStatusStatusLabel) {
+          autoStatusStatusLabel.textContent = enabled ? "ENABLED" : "DISABLED";
+          autoStatusStatusLabel.style.color = enabled ? "#38bdf8" : "#94a3b8";
+          autoStatusStatusLabel.style.background = enabled ? "rgba(56,189,248,0.15)" : "rgba(148,163,184,0.15)";
+          const slider = autoStatusToggle?.parentElement?.querySelector(".slider");
+          if (slider) {
+            slider.style.backgroundColor = enabled ? "#0284c7" : "#64748b";
+          }
         }
       }
 
@@ -2143,6 +2181,31 @@
                 method: "POST",
                 headers: { "Content-Type": "application/json", "Authorization": authHeader },
                 body: JSON.stringify({ autoDeletedToDm: enabled })
+              });
+            }
+          } catch {}
+        });
+      }
+
+      if (autoStatusToggle) {
+        autoStatusToggle.addEventListener("change", async () => {
+          const enabled = autoStatusToggle.checked;
+          updateAutoStatusUI(enabled);
+          if (currentUser?.uid && db) {
+            try {
+              await setDoc(doc(db, "user_preferences", currentUser.uid), {
+                autoViewStatus: enabled,
+                updatedAt: new Date().toISOString()
+              }, { merge: true });
+            } catch {}
+          }
+          try {
+            const authHeader = await getAuthHeader();
+            if (authHeader) {
+              await fetch(getApiUrl("/user/preferences"), {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": authHeader },
+                body: JSON.stringify({ autoViewStatus: enabled })
               });
             }
           } catch {}
@@ -2845,6 +2908,7 @@
         }
         if (data.preferences) {
           updateAutoDeletedUI(data.preferences.autoDeletedToDm !== false);
+          updateAutoStatusUI(Boolean(data.preferences.autoViewStatus));
         }
       }
 
