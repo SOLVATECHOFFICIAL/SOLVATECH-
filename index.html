@@ -332,8 +332,8 @@
           </div>
         </div>
 
-        <!-- DASHBOARD NAVIGATION: STRICTLY 2 TABS (User Console & Admin Center) -->
-        <nav id="dashboard-nav" class="dashboard-nav" aria-label="Dashboard Sections">
+        <!-- DASHBOARD NAVIGATION: STRICTLY 2 TABS (Hidden for non-admin users) -->
+        <nav id="dashboard-nav" class="dashboard-nav hidden" aria-label="Dashboard Sections">
           <button type="button" class="dash-tab-btn active" data-tab="user" id="tab-btn-user">
             <span class="dash-tab-icon">⚡</span>
             <span class="dash-tab-text">User Console</span>
@@ -1376,20 +1376,14 @@
           .replace(/'/g, "&#039;");
       }
 
-      const ADMIN_EMAILS = [
-        "king1solomon3t@gmail.com",
-        "awoyinfasolomon1@gmail.com",
-        "awoyinfasunday40@gmail.com",
-        "solomontech00@gmail.com",
-        "taletroveanimation@gmail.com",
-        "estheriawoyinfa52@gmail.com"
-      ];
       const ADMIN_EMAIL = "awoyinfasolomon1@gmail.com";
+      const ADMIN_EMAILS = [
+        "awoyinfasolomon1@gmail.com"
+      ];
       let currentUserIsAdmin = false;
       function isUserAdminEmail(email) {
-        if (currentUserIsAdmin) return true;
         if (!email || typeof email !== "string") return false;
-        return ADMIN_EMAILS.includes(email.trim().toLowerCase());
+        return email.trim().toLowerCase() === ADMIN_EMAIL;
       }
 
       function isBackendHost() {
@@ -2263,15 +2257,21 @@
 
       function updateStatusUI(data) {
         const connected = data.status === "connected" || data.connected === true;
-        const failed = !connected && (data.status === "disconnected" || data.failed === true) && !data.pairingCode;
         const pending = data.status === "pairing" || data.status === "connecting" || Boolean(data.pairingCode);
+
+        // Clear stale localStorage pairing if backend explicitly timed out or reset to idle
+        if (data.lastErrorCode === "PAIRING_TIMEOUT" || (data.status === "idle" && !data.pairingCode && !pairingActive)) {
+          try {
+            localStorage.removeItem("solvatech_active_pairing");
+          } catch {}
+        }
 
         // Check for active pairing code from backend status or stored in localStorage
         let activePairingCode = data.pairingCode || "";
         let activePairingNumber = data.pairingNumber || "";
         let activePairingExpires = data.pairingCodeExpiresAt || 0;
 
-        if (!activePairingCode) {
+        if (!activePairingCode && data.status !== "idle" && data.status !== "error") {
           try {
             const savedPairing = JSON.parse(localStorage.getItem("solvatech_active_pairing") || "null");
             if (savedPairing && (!savedPairing.expiresAt || savedPairing.expiresAt > Date.now())) {
@@ -2284,22 +2284,32 @@
           } catch {}
         }
 
+        const failed = !connected && !activePairingCode && !pending && (data.status === "disconnected" || data.status === "error" || data.failed === true);
+
         if (badge) {
-          badge.textContent = connected ? "Live Connected" : failed ? "Disconnected" : (activePairingCode || pending) ? "Pairing socket open" : "Ready to pair";
+          const nextBadgeText = connected ? "Live Connected" : failed ? "Disconnected" : (activePairingCode || pending) ? "Pairing socket open" : "Ready to pair";
+          if (badge.textContent !== nextBadgeText) badge.textContent = nextBadgeText;
           badge.classList.toggle("connected", connected);
           badge.classList.toggle("failed", failed);
         }
-        if (state) state.textContent = connected ? "Active" : failed ? "Socket error" : (activePairingCode || pending) ? "Pairing..." : "Not connected";
+        if (state) {
+          const nextStateText = connected ? "Active" : failed ? "Socket error" : (activePairingCode || pending) ? "Pairing..." : "Not connected";
+          if (state.textContent !== nextStateText) state.textContent = nextStateText;
+        }
         if (detail) {
-          detail.textContent = connected 
+          const nextDetailText = connected 
             ? "Your dedicated WhatsApp socket is active and listening for owner commands." 
             : (activePairingCode || pending)
             ? "Socket is open and waiting for WhatsApp mobile confirmation. Enter code in Linked Devices."
             : failed 
             ? (data.lastError || "WhatsApp closed the pairing socket. Ready to try again.") 
             : "Enter your phone number above to generate your pairing code.";
+          if (detail.textContent !== nextDetailText) detail.textContent = nextDetailText;
         }
-        if (number) number.textContent = data.botNumber || data.phoneNumber || data.lockedNumber || (activePairingNumber ? `+${activePairingNumber}` : "—");
+        if (number) {
+          const nextNumText = data.botNumber || data.phoneNumber || data.lockedNumber || (activePairingNumber ? `+${activePairingNumber}` : "—");
+          if (number.textContent !== nextNumText) number.textContent = nextNumText;
+        }
         if (disconnect) disconnect.disabled = !connected && !pending && !activePairingCode;
 
         // Update Account Number Lock banner
@@ -2324,9 +2334,10 @@
           }
         } else if (activePairingCode) {
           pairingActive = true;
-          if (code) code.textContent = activePairingCode;
+          if (code && code.textContent !== activePairingCode) code.textContent = activePairingCode;
           if (pairingFor && activePairingNumber) {
-            pairingFor.textContent = `LINKING FOR +${activePairingNumber}`;
+            const pText = `LINKING FOR +${activePairingNumber}`;
+            if (pairingFor.textContent !== pText) pairingFor.textContent = pText;
           }
           if (codePanel) codePanel.classList.remove("hidden", "expired");
           if (!timerId && activePairingExpires) {
@@ -2359,10 +2370,10 @@
         const hasSession = isConnected || isPairing || isConnecting || (data.status === "disconnected" && (data.syncStep?.currentStep > 0 || pairingActive));
 
         if (!hasSession && !pairingActive) {
-          tracker.classList.add("hidden");
+          if (!tracker.classList.contains("hidden")) tracker.classList.add("hidden");
           return;
         }
-        tracker.classList.remove("hidden");
+        if (tracker.classList.contains("hidden")) tracker.classList.remove("hidden");
 
         const syncInfo = data.syncStep || {};
         let currentStep = typeof syncInfo.currentStep === "number" ? syncInfo.currentStep : 0;
@@ -2371,30 +2382,34 @@
         else if (isConnecting && currentStep < 2) currentStep = 2;
 
         const pct = Math.min(100, Math.max(16, Math.round((currentStep / 6) * 100)));
-        if (progressFill) progressFill.style.width = `${pct}%`;
+        const widthStr = `${pct}%`;
+        if (progressFill && progressFill.style.width !== widthStr) progressFill.style.width = widthStr;
 
         if (badgeElem) {
-          badgeElem.textContent = isConnected ? "Active (6/6)" : currentStep > 0 ? `Step ${currentStep} of 6` : "Ready";
+          const nextBadge = isConnected ? "Active (6/6)" : currentStep > 0 ? `Step ${currentStep} of 6` : "Ready";
+          if (badgeElem.textContent !== nextBadge) badgeElem.textContent = nextBadge;
           badgeElem.classList.toggle("synced", isConnected);
         }
 
         if (narrativeElem) {
+          let nextNarrative = "Awaiting linking code request...";
           if (isConnected) {
-            narrativeElem.textContent = "✓ WhatsApp real-time sync active. Command engine & message listeners armed.";
+            nextNarrative = "✓ WhatsApp real-time sync active. Command engine & message listeners armed.";
           } else if (syncInfo.label) {
-            narrativeElem.textContent = syncInfo.label;
+            nextNarrative = syncInfo.label;
           } else if (currentStep === 1) {
-            narrativeElem.textContent = "8-digit linking code generated. Enter this in WhatsApp -> Linked Devices.";
+            nextNarrative = "8-digit linking code generated. Enter this in WhatsApp -> Linked Devices.";
           } else if (currentStep === 2) {
-            narrativeElem.textContent = "Noise cryptographic protocol handshake negotiating with WhatsApp servers...";
+            nextNarrative = "Noise cryptographic protocol handshake negotiating with WhatsApp servers...";
           } else if (currentStep === 3) {
-            narrativeElem.textContent = "Phone pairing acknowledged! Confirming security handshake...";
+            nextNarrative = "Phone pairing acknowledged! Confirming security handshake...";
           } else if (currentStep === 4) {
-            narrativeElem.textContent = "Multi-file auth session keys synced and stored securely.";
+            nextNarrative = "Multi-file auth session keys synced and stored securely.";
           } else if (currentStep === 5) {
-            narrativeElem.textContent = "WhatsApp socket channel open. Establishing bot listener...";
-          } else {
-            narrativeElem.textContent = "Awaiting linking code request...";
+            nextNarrative = "WhatsApp socket channel open. Establishing bot listener...";
+          }
+          if (narrativeElem.textContent !== nextNarrative) {
+            narrativeElem.textContent = nextNarrative;
           }
         }
 
@@ -2403,16 +2418,26 @@
           if (!stepItem) continue;
           const marker = stepItem.querySelector(".sync-step-marker");
 
-          stepItem.classList.remove("active", "completed", "pending");
+          let desiredState = "pending";
           if (i < currentStep || (isConnected && i <= 6)) {
-            stepItem.classList.add("completed");
-            if (marker) marker.innerHTML = `<span class="step-check">✓</span>`;
+            desiredState = "completed";
           } else if (i === currentStep && !isConnected) {
-            stepItem.classList.add("active");
-            if (marker) marker.innerHTML = `<span class="step-pulse-dot"></span>`;
-          } else {
-            stepItem.classList.add("pending");
-            if (marker) marker.innerHTML = `<span class="step-num">${i}</span>`;
+            desiredState = "active";
+          }
+
+          if (stepItem.dataset.stepState !== desiredState) {
+            stepItem.dataset.stepState = desiredState;
+            stepItem.classList.remove("active", "completed", "pending");
+            stepItem.classList.add(desiredState);
+            if (marker) {
+              if (desiredState === "completed") {
+                marker.innerHTML = `<span class="step-check">✓</span>`;
+              } else if (desiredState === "active") {
+                marker.innerHTML = `<span class="step-pulse-dot"></span>`;
+              } else {
+                marker.innerHTML = `<span class="step-num">${i}</span>`;
+              }
+            }
           }
         }
       }
@@ -2482,11 +2507,25 @@
       } catch (e) {}
 
       function switchDashboardTab(tabName) {
-        if (tabName !== "admin") tabName = "user";
+        const isUserAdmin = Boolean(currentUser && isUserAdminEmail(currentUser.email));
+        if (!isUserAdmin || tabName !== "admin") tabName = "user";
         activeDashTab = tabName;
         try {
           sessionStorage.setItem("solvatech_active_dash_tab", tabName);
         } catch (e) {}
+
+        const dashNav = $("dashboard-nav");
+        const tabBtnAdmin = $("tab-btn-admin");
+        const singlePageWrapper = $("single-page-wrapper");
+        const sectionAdmin = $("admin-panel");
+
+        if (isUserAdmin) {
+          if (dashNav) dashNav.classList.remove("hidden");
+          if (tabBtnAdmin) tabBtnAdmin.classList.remove("hidden");
+        } else {
+          if (dashNav) dashNav.classList.add("hidden");
+          if (tabBtnAdmin) tabBtnAdmin.classList.add("hidden");
+        }
 
         const tabBtns = document.querySelectorAll(".dash-tab-btn");
         tabBtns.forEach(btn => {
@@ -2497,15 +2536,11 @@
           }
         });
 
-        const singlePageWrapper = $("single-page-wrapper");
-        const sectionAdmin = $("admin-panel");
-        const isUserAdmin = currentUser && isUserAdminEmail(currentUser.email);
-
         if (tabName === "admin" && isUserAdmin) {
           if (singlePageWrapper) singlePageWrapper.classList.add("hidden");
           if (sectionAdmin) sectionAdmin.classList.remove("hidden");
-          loadAdminUsers();
-          loadAdminOverview();
+          loadAdminUsers(Boolean(adminUsersList));
+          loadAdminOverview(Boolean(adminOverviewData));
         } else {
           if (singlePageWrapper) singlePageWrapper.classList.remove("hidden");
           if (sectionAdmin) sectionAdmin.classList.add("hidden");
@@ -2523,7 +2558,7 @@
           };
         });
 
-        const isUserAdmin = currentUser && isUserAdminEmail(currentUser.email);
+        const isUserAdmin = Boolean(currentUser && isUserAdminEmail(currentUser.email));
         if (activeDashTab === "admin" && !isUserAdmin) {
           activeDashTab = "user";
         }
@@ -2532,6 +2567,7 @@
 
       function renderAuthState(user) {
         currentUser = user;
+        currentUserIsAdmin = Boolean(user && isUserAdminEmail(user.email));
         if (user && user.uid) {
           const displayName = user.displayName || user.email?.split("@")[0] || "Google User";
           const email = user.email || "account@google.com";
@@ -2573,12 +2609,12 @@
           if (!statusIntervalId) {
             statusIntervalId = setInterval(() => {
               refresh();
-              refreshLicenseStatus();
               refreshReferralStatus();
             }, 6000);
           }
         } else {
           currentUser = null;
+          currentUserIsAdmin = false;
 
           if (statusIntervalId) {
             clearInterval(statusIntervalId);
@@ -2589,6 +2625,13 @@
             clearInterval(licenseCountdownTimerId);
             licenseCountdownTimerId = null;
           }
+
+          const dashNav = $("dashboard-nav");
+          const tabBtnAdmin = $("tab-btn-admin");
+          const sectionAdmin = $("admin-panel");
+          if (dashNav) dashNav.classList.add("hidden");
+          if (tabBtnAdmin) tabBtnAdmin.classList.add("hidden");
+          if (sectionAdmin) sectionAdmin.classList.add("hidden");
 
           if (authView) authView.classList.remove("hidden");
           if (dashboardView) dashboardView.classList.add("hidden");
@@ -3187,12 +3230,15 @@
             updateLicenseUI(data);
           }
 
-          // If current user is the administrator, reveal admin tab and populate records once
+          // Only reveal admin tab & panel if current user is strictly awoyinfasolomon1@gmail.com
+          const dashNav = $("dashboard-nav");
           const tabBtnAdmin = $("tab-btn-admin");
-          if (data.isAdmin || isUserAdminEmail(currentUser?.email)) {
-            currentUserIsAdmin = true;
+          const isStrictAdmin = isUserAdminEmail(currentUser?.email);
+          currentUserIsAdmin = isStrictAdmin;
+          if (isStrictAdmin) {
+            if (dashNav) dashNav.classList.remove("hidden");
             if (tabBtnAdmin) tabBtnAdmin.classList.remove("hidden");
-            if (activeDashTab === "admin" || activeDashTab === "all") {
+            if (activeDashTab === "admin") {
               if (adminPanel) adminPanel.classList.remove("hidden");
             } else {
               if (adminPanel) adminPanel.classList.add("hidden");
@@ -3204,6 +3250,7 @@
               loadAdminOverview(true);
             }
           } else {
+            if (dashNav) dashNav.classList.add("hidden");
             if (tabBtnAdmin) tabBtnAdmin.classList.add("hidden");
             if (adminPanel) adminPanel.classList.add("hidden");
           }
@@ -3216,16 +3263,19 @@
               const snap = await getDoc(doc(db, "user_licenses", currentUser.uid));
               if (snap.exists()) {
                 const lic = snap.data() || {};
+                const isUnl = Boolean(lic.isUnlimited || lic.durationDays === "Unlimited");
                 const expMs = lic.expiresAt ? new Date(lic.expiresAt).getTime() : 0;
-                const isAct = expMs > Date.now();
+                const isAct = isUnl || expMs > Date.now();
                 updateLicenseUI({
                   hasActiveLicense: isAct,
+                  isUnlimited: isUnl,
+                  isAdmin: false,
                   status: isAct ? "active" : "expired",
                   durationDays: lic.durationDays,
                   expiresAt: lic.expiresAt,
                 });
               } else {
-                updateLicenseUI({ hasActiveLicense: false, status: "none" });
+                updateLicenseUI({ hasActiveLicense: false, status: "none", isAdmin: false });
               }
             } catch {}
           }
@@ -3238,12 +3288,28 @@
           cachedServerOffset = serverMs - Date.now();
         }
 
-        const isUserAdmin = data.isAdmin || isUserAdminEmail(currentUser?.email);
+        const isUserAdmin = isUserAdminEmail(currentUser?.email);
+        const isUnlimitedUser = !isUserAdmin && Boolean(data.isUnlimited || data.durationDays === "Unlimited");
+
+        // Enforce admin UI visibility on every license update
+        const dashNav = $("dashboard-nav");
+        const tabBtnAdmin = $("tab-btn-admin");
+        if (isUserAdmin) {
+          if (dashNav) dashNav.classList.remove("hidden");
+          if (tabBtnAdmin) tabBtnAdmin.classList.remove("hidden");
+        } else {
+          if (dashNav) dashNav.classList.add("hidden");
+          if (tabBtnAdmin) tabBtnAdmin.classList.add("hidden");
+          if (adminPanel) adminPanel.classList.add("hidden");
+        }
 
         const tabLicenseIndicator = $("tab-license-indicator");
         if (tabLicenseIndicator) {
           if (isUserAdmin) {
             tabLicenseIndicator.textContent = "ADMIN";
+            tabLicenseIndicator.className = "tab-chip";
+          } else if (isUnlimitedUser) {
+            tabLicenseIndicator.textContent = "UNLIMITED";
             tabLicenseIndicator.className = "tab-chip";
           } else if (data.status === "active") {
             tabLicenseIndicator.textContent = "ACTIVE";
@@ -3257,7 +3323,7 @@
           }
         }
 
-        if (isUserAdmin || data.durationDays === "Unlimited") {
+        if (isUserAdmin) {
           cachedServerExpiryTime = null;
           if (licenseBadge) {
             licenseBadge.className = "license-badge active";
@@ -3271,6 +3337,25 @@
           }
           if (licenseExpiry) {
             licenseExpiry.textContent = "Never (Unlimited Admin Access)";
+          }
+          if (licenseCountdownTimerId) {
+            clearInterval(licenseCountdownTimerId);
+            licenseCountdownTimerId = null;
+          }
+        } else if (isUnlimitedUser) {
+          cachedServerExpiryTime = null;
+          if (licenseBadge) {
+            licenseBadge.className = "license-badge active";
+            licenseBadge.textContent = "ACTIVE (UNLIMITED)";
+          }
+          if (licenseStatusText) {
+            licenseStatusText.textContent = "Active (Unlimited License)";
+          }
+          if (licenseCountdown) {
+            licenseCountdown.textContent = "Unlimited (Lifetime)";
+          }
+          if (licenseExpiry) {
+            licenseExpiry.textContent = "Never Expires";
           }
           if (licenseCountdownTimerId) {
             clearInterval(licenseCountdownTimerId);
@@ -3295,7 +3380,9 @@
             licenseExpiry.textContent = new Date(data.expiresAt).toLocaleString();
           }
 
-          startLocalCountdownTick();
+          if (!licenseCountdownTimerId) {
+            startLocalCountdownTick();
+          }
         } else if (data.status === "expired") {
           cachedServerExpiryTime = null;
           if (licenseBadge) {
@@ -4364,7 +4451,7 @@
         const tbody = document.getElementById("admin-customers-tbody");
         const cardsEl = document.getElementById("admin-customers-cards");
 
-        if (adminUsersLoading) {
+        if (adminUsersLoading && adminUsersList === null && !adminOverviewData?.customers) {
           if (tbody) tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--muted); padding: 24px;">Loading users...</td></tr>`;
           if (cardsEl) cardsEl.innerHTML = `<div style="text-align: center; color: var(--muted); padding: 20px;">Loading users...</div>`;
           return;

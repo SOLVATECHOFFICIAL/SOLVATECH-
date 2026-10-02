@@ -1285,15 +1285,7 @@ html, body {
   height: 8px;
   border-radius: 50%;
   background: #10b981;
-  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
-  animation: syncPulseDot 1.6s infinite;
   flex-shrink: 0;
-}
-
-@keyframes syncPulseDot {
-  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-  70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
-  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
 }
 
 .sync-step-badge {
@@ -1417,12 +1409,6 @@ html, body {
   height: 7px;
   background: #ffffff;
   border-radius: 50%;
-  animation: pulseDot 1s infinite alternate;
-}
-
-@keyframes pulseDot {
-  0% { transform: scale(0.6); opacity: 0.7; }
-  100% { transform: scale(1.1); opacity: 1; }
 }
 
 .sync-step-info {

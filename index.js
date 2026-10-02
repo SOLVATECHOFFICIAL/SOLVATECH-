@@ -77,7 +77,7 @@ try {
   if (!process.env.FIREBASE_DATABASE_ID?.trim() && cfg.firestoreDatabaseId) process.env.FIREBASE_DATABASE_ID = cfg.firestoreDatabaseId;
   if (!process.env.FIREBASE_STORAGE_BUCKET?.trim() && cfg.storageBucket) process.env.FIREBASE_STORAGE_BUCKET = cfg.storageBucket;
   if (!process.env.FIREBASE_APP_ID?.trim() && cfg.appId) process.env.FIREBASE_APP_ID = cfg.appId;
-  if (!process.env.ADMIN_EMAIL?.trim()) process.env.ADMIN_EMAIL = "king1solomon3t@gmail.com";
+  process.env.ADMIN_EMAIL = "awoyinfasolomon1@gmail.com";
   if (!process.env.BOT_API_PREFIX?.trim()) process.env.BOT_API_PREFIX = "/bot-api";
   if (!process.env.BOT_DATA_DIR?.trim()) process.env.BOT_DATA_DIR = "./data";
 } catch (e) {
@@ -196,11 +196,12 @@ for (const p of prefixes) {
   // Studio Preview / Development Session Provider
   // Used when testing in environments whose dynamic domain is not yet allowlisted in Firebase Console.
   app.post(`${p}/auth/preview-session`, (request, response) => {
-    const email = (request.body?.email || process.env.ADMIN_EMAIL || "king1solomon3t@gmail.com").trim().toLowerCase();
+    const email = (request.body?.email || ADMIN_EMAIL).trim().toLowerCase();
+    const isAdm = isAdminEmail(email);
     const user = {
-      uid: "admin_" + email.replace(/[^a-zA-Z0-9_-]/g, "_"),
+      uid: (isAdm ? "admin_" : "user_") + email.replace(/[^a-zA-Z0-9_-]/g, "_"),
       email: email,
-      displayName: email === "king1solomon3t@gmail.com" ? "King Solomon (Admin)" : "Solomon Awoyinfa (Admin)",
+      displayName: isAdm ? "Solomon Awoyinfa (Admin)" : email.split("@")[0],
       photoURL: "./solva.webp",
     };
     const token = createPreviewToken(user);
@@ -229,7 +230,8 @@ for (const p of prefixes) {
     const currentStatus = controller.getStatus();
     if (
       license?.hasActiveLicense &&
-      (currentStatus.status === "disconnected" || currentStatus.status === "idle") &&
+      currentStatus.status === "idle" &&
+      !currentStatus.pairingCode &&
       controller.hasSavedSession()
     ) {
       controller.ensureConnected().catch(() => {});
