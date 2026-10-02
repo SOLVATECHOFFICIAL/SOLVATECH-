@@ -996,7 +996,7 @@ for (const p of prefixes) {
       response.json({ success: true, users, count: users.length });
     } catch (error) {
       logger.error("Admin list users error", error.stack || error.message);
-      response.status(500).json({ error: "Failed to list users." });
+      response.status(500).json({ error: error.message || "Failed to list users." });
     }
   });
 

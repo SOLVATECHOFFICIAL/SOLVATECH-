@@ -1366,9 +1366,27 @@
         messagingSenderId: "420914651308",
       };
 
-      const ADMIN_EMAILS = ["awoyinfasolomon1@gmail.com", "awoyinfasunday40@gmail.com"];
+      function escapeHtml(str) {
+        if (!str) return "";
+        return String(str)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+
+      const ADMIN_EMAILS = [
+        "awoyinfasolomon1@gmail.com",
+        "awoyinfasunday40@gmail.com",
+        "solomontech00@gmail.com",
+        "taletroveanimation@gmail.com",
+        "estheriawoyinfa52@gmail.com"
+      ];
       const ADMIN_EMAIL = "awoyinfasolomon1@gmail.com";
+      let currentUserIsAdmin = false;
       function isUserAdminEmail(email) {
+        if (currentUserIsAdmin) return true;
         if (!email || typeof email !== "string") return false;
         return ADMIN_EMAILS.includes(email.trim().toLowerCase());
       }
@@ -2483,6 +2501,8 @@
         if (tabName === "admin" && isUserAdmin) {
           if (singlePageWrapper) singlePageWrapper.classList.add("hidden");
           if (sectionAdmin) sectionAdmin.classList.remove("hidden");
+          loadAdminUsers();
+          loadAdminOverview();
         } else {
           if (singlePageWrapper) singlePageWrapper.classList.remove("hidden");
           if (sectionAdmin) sectionAdmin.classList.add("hidden");
@@ -3162,12 +3182,14 @@
           // If current user is the administrator, reveal admin tab and populate records
           const tabBtnAdmin = $("tab-btn-admin");
           if (data.isAdmin || isUserAdminEmail(currentUser?.email)) {
+            currentUserIsAdmin = true;
             if (tabBtnAdmin) tabBtnAdmin.classList.remove("hidden");
             if (activeDashTab === "admin" || activeDashTab === "all") {
               if (adminPanel) adminPanel.classList.remove("hidden");
             } else {
               if (adminPanel) adminPanel.classList.add("hidden");
             }
+            loadAdminUsers();
             loadAdminOverview();
           } else {
             if (tabBtnAdmin) tabBtnAdmin.classList.add("hidden");
@@ -3410,6 +3432,9 @@
       // SOLVATECH BOT — SUPER ADMIN COMMAND CENTER CONTROLLER
       // =========================================================================
       let adminOverviewData = null;
+      let adminUsersList = null;
+      let adminUsersLoading = false;
+      let adminUsersError = null;
       let adminActiveSubtab = "customers";
       let adminLicenseFilter = "all";
       let adminLicenseSearch = "";
@@ -3431,6 +3456,9 @@
           });
           const viewEl = document.getElementById(`admin-view-${target}`);
           if (viewEl) viewEl.classList.remove("hidden");
+          if (target === "customers") {
+            loadAdminUsers();
+          }
           if (target === "railway") {
             syncRailwayInputs();
             testBackendHealth(false);
@@ -3543,10 +3571,10 @@
 
       // Refresh All Buttons
       const adminRefreshAllBtn = document.getElementById("admin-refresh-all-btn");
-      if (adminRefreshAllBtn) adminRefreshAllBtn.addEventListener("click", () => loadAdminOverview());
+      if (adminRefreshAllBtn) adminRefreshAllBtn.addEventListener("click", () => { loadAdminUsers(); loadAdminOverview(); });
       if (adminRefreshLicensesBtn) adminRefreshLicensesBtn.addEventListener("click", () => loadAdminOverview());
       const adminRefreshCustomersBtn = document.getElementById("admin-refresh-customers-btn");
-      if (adminRefreshCustomersBtn) adminRefreshCustomersBtn.addEventListener("click", () => loadAdminOverview());
+      if (adminRefreshCustomersBtn) adminRefreshCustomersBtn.addEventListener("click", () => loadAdminUsers());
 
       // Search & Filter Listeners: Licenses
       const adminSearchLicensesInput = document.getElementById("admin-search-licenses");
@@ -3834,8 +3862,76 @@
         }
       }
 
+      // Dedicated Admin Users Fetcher from Supabase
+      async function loadAdminUsers() {
+        if (!currentUser || !isUserAdminEmail(currentUser.email)) return;
+        const tbody = document.getElementById("admin-customers-tbody");
+        const cardsEl = document.getElementById("admin-customers-cards");
+
+        adminUsersLoading = true;
+        adminUsersError = null;
+
+        if (tbody) {
+          tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--muted); padding: 24px;">Loading users...</td></tr>`;
+        }
+        if (cardsEl) {
+          cardsEl.innerHTML = `<div style="text-align: center; color: var(--muted); padding: 20px;">Loading users...</div>`;
+        }
+
+        try {
+          let authHeader = await getAuthHeader();
+          if (!authHeader) {
+            throw new Error("Authentication session missing. Please sign in again.");
+          }
+
+          let res = await fetch(getApiUrl("/admin/users"), {
+            headers: {
+              "Accept": "application/json",
+              "Authorization": authHeader,
+            },
+          });
+
+          if (res.status === 401) {
+            const refreshed = await getValidIdToken(true);
+            if (refreshed) {
+              authHeader = `Bearer ${refreshed}`;
+              res = await fetch(getApiUrl("/admin/users"), {
+                headers: {
+                  "Accept": "application/json",
+                  "Authorization": authHeader,
+                },
+              });
+            }
+          }
+
+          const data = await safeFetchJson(res);
+          if (!res.ok) {
+            throw new Error(data?.error || `Failed to fetch users (HTTP ${res.status})`);
+          }
+
+          adminUsersList = Array.isArray(data?.users) ? data.users : [];
+          adminUsersLoading = false;
+          adminUsersError = null;
+
+          if (adminOverviewData) {
+            adminOverviewData.customers = adminUsersList;
+          }
+
+          const countCust = document.getElementById("admin-count-customers");
+          if (countCust) countCust.textContent = String(adminUsersList.length);
+
+          renderCustomersTable();
+        } catch (err) {
+          adminUsersLoading = false;
+          adminUsersError = err.message || "Failed to load users from database";
+          console.error("Admin load users error:", err);
+          renderCustomersTable();
+        }
+      }
+
       // Backward compatible loadAdminLicenses
       async function loadAdminLicenses() {
+        loadAdminUsers();
         return loadAdminOverview();
       }
 
@@ -4207,21 +4303,37 @@
         const tbody = document.getElementById("admin-customers-tbody");
         const cardsEl = document.getElementById("admin-customers-cards");
 
-        if (!adminOverviewData) {
-          if (tbody) tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--muted); padding: 24px;">🔄 Syncing customer records from gen-lang-client-0324946831...</td></tr>`;
-          if (cardsEl) cardsEl.innerHTML = `<div style="text-align: center; color: var(--muted); padding: 20px;">🔄 Syncing customer records...</div>`;
+        if (adminUsersLoading) {
+          if (tbody) tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--muted); padding: 24px;">Loading users...</td></tr>`;
+          if (cardsEl) cardsEl.innerHTML = `<div style="text-align: center; color: var(--muted); padding: 20px;">Loading users...</div>`;
           return;
         }
 
-        const allCustomers = adminOverviewData.customers || [];
+        if (adminUsersError) {
+          const errMsg = escapeHtml(adminUsersError);
+          if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #ef4444; padding: 24px;">⚠️ Error: ${errMsg}<br><button type="button" class="admin-preset-btn" style="margin-top:10px; padding:4px 12px; font-size:11px;" onclick="loadAdminUsers()">↻ Retry</button></td></tr>`;
+          }
+          if (cardsEl) {
+            cardsEl.innerHTML = `<div style="text-align: center; color: #ef4444; padding: 20px;">⚠️ Error: ${errMsg}<br><button type="button" class="admin-preset-btn" style="margin-top:10px; padding:4px 12px; font-size:11px;" onclick="loadAdminUsers()">↻ Retry</button></div>`;
+          }
+          return;
+        }
+
+        const allCustomers = adminUsersList !== null ? adminUsersList : (adminOverviewData?.customers || []);
+
+        if (adminUsersList === null && !adminOverviewData) {
+          if (tbody) tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--muted); padding: 24px;">Loading users...</td></tr>`;
+          if (cardsEl) cardsEl.innerHTML = `<div style="text-align: center; color: var(--muted); padding: 20px;">Loading users...</div>`;
+          return;
+        }
 
         // Count chips
         const cAll = allCustomers.length;
-        const cActive = allCustomers.filter((c) => c.licenseStatus === "active" || c.hasActiveLicense || isLifetimeCustomer(c)).length;
-        const cUnlimited = allCustomers.filter((c) => isLifetimeCustomer(c)).length;
-        const cExpired = allCustomers.filter((c) => c.licenseStatus === "expired" && !isLifetimeCustomer(c)).length;
-        const cNoLicense = allCustomers.filter((c) => !c.hasActiveLicense && !isLifetimeCustomer(c) && c.licenseStatus !== "expired" && c.licenseStatus !== "active" && c.licenseStatus !== "lifetime").length;
-        const cConnected = allCustomers.filter((c) => c.whatsappConnected || c.whatsappStatus === "connected").length;
+        const cActive = allCustomers.filter((c) => c.status === "active" || c.status === "unlimited" || c.isUnlimited).length;
+        const cUnlimited = allCustomers.filter((c) => Boolean(c.isUnlimited)).length;
+        const cExpired = allCustomers.filter((c) => c.status === "expired" && !c.isUnlimited).length;
+        const cNoLicense = allCustomers.filter((c) => !c.isUnlimited && c.status !== "active" && c.status !== "expired").length;
 
         const elCAll = document.getElementById("count-cust-all");
         if (elCAll) elCAll.textContent = String(cAll);
@@ -4233,34 +4345,37 @@
         if (elCExpired) elCExpired.textContent = String(cExpired);
         const elCNoLic = document.getElementById("count-cust-nolicense");
         if (elCNoLic) elCNoLic.textContent = String(cNoLicense);
-        const elCConn = document.getElementById("count-cust-connected");
-        if (elCConn) elCConn.textContent = String(cConnected);
+
+        const countCust = document.getElementById("admin-count-customers");
+        if (countCust) countCust.textContent = String(cAll);
+
+        if (allCustomers.length === 0) {
+          if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--muted); padding: 24px;">No users yet</td></tr>`;
+          }
+          if (cardsEl) {
+            cardsEl.innerHTML = `<div style="text-align: center; color: var(--muted); padding: 20px;">No users yet</div>`;
+          }
+          return;
+        }
 
         // Filter list
         let filtered = allCustomers.filter((cust) => {
-          const isLifetime = isLifetimeCustomer(cust);
-          const isActive = cust.licenseStatus === "active" || cust.hasActiveLicense || isLifetime;
-          const isExpired = cust.licenseStatus === "expired" && !isLifetime;
-          const isConnected = cust.whatsappConnected || cust.whatsappStatus === "connected";
+          const isUnl = Boolean(cust.isUnlimited);
+          const isActive = cust.status === "active" || isUnl;
+          const isExpired = cust.status === "expired" && !isUnl;
 
           if (adminCustomerFilter === "active" && !isActive) return false;
-          if (adminCustomerFilter === "unlimited" && !isLifetime) return false;
+          if (adminCustomerFilter === "unlimited" && !isUnl) return false;
           if (adminCustomerFilter === "expired" && !isExpired) return false;
           if (adminCustomerFilter === "nolicense" && (isActive || isExpired)) return false;
-          if (adminCustomerFilter === "connected" && !isConnected) return false;
 
           if (adminCustomerSearch) {
             const qTerms = adminCustomerSearch.trim().toLowerCase().split(/\s+/).filter(Boolean);
             const email = (cust.email || "").toLowerCase();
             const name = (cust.displayName || "").toLowerCase();
             const uid = (cust.uid || "").toLowerCase();
-            const phone = (cust.phoneNumber || cust.lockedPhoneNumber || cust.connectedPhoneNumber || "").toLowerCase();
-            const ref = (cust.referralCode || "").toLowerCase();
-            const byRef = (cust.referredByCode || "").toLowerCase();
-            const licCode = (cust.activeLicense?.code || cust.activeLicenseCode || "").toLowerCase();
-            const status = (cust.licenseStatus || cust.status || (isLifetime ? "unlimited lifetime" : "")).toLowerCase();
-            const preserved = (cust.preservedNotice || "").toLowerCase();
-            const fullText = `${email} ${name} ${uid} ${phone} ${ref} ${byRef} ${licCode} ${status} ${preserved}`;
+            const fullText = `${email} ${name} ${uid}`;
             const matchesAll = qTerms.every((term) => fullText.includes(term));
             if (!matchesAll) return false;
           }
@@ -4272,21 +4387,16 @@
           if (filtered.length === 0) {
             tbody.innerHTML = `
               <tr>
-                <td colspan="8" style="text-align: center; color: var(--muted); padding: 24px;">
-                  No customer records match the selected filter.
+                <td colspan="4" style="text-align: center; color: var(--muted); padding: 24px;">
+                  No users match the selected filter.
                 </td>
               </tr>
             `;
           } else {
             tbody.innerHTML = filtered.map((cust, idx) => {
-              const waConnected = cust.whatsappConnected || cust.whatsappStatus === "connected";
-              const waBadge = waConnected 
-                ? `<span class="admin-badge badge-connected"><span class="badge-dot"></span>CONNECTED</span>` 
-                : `<span class="admin-badge badge-disconnected"><span class="badge-dot"></span>${(cust.whatsappStatus || "DISCONNECTED").toUpperCase()}</span>`;
-
-              const isLifetime = isLifetimeCustomer(cust);
-              const displayName = cust.displayName || (cust.email ? cust.email.split("@")[0] : "User");
-              const email = cust.email || cust.uid || "—";
+              const isUnl = Boolean(cust.isUnlimited);
+              const displayName = escapeHtml(cust.displayName || (cust.email ? cust.email.split("@")[0] : "User"));
+              const email = escapeHtml(cust.email || cust.uid || "—");
 
               return `
                 <tr>
@@ -4299,11 +4409,11 @@
                   </td>
                   <td style="text-align: center;" onclick="event.stopPropagation();">
                     <button type="button" 
-                      class="admin-unlimited-switch ${isLifetime ? 'is-on' : 'is-off'}" 
-                      onclick="adminToggleUnlimited('${cust.uid}', ${!isLifetime})"
-                      title="Switch Unlimited ${isLifetime ? 'OFF' : 'ON'}">
+                      class="admin-unlimited-switch ${isUnl ? 'is-on' : 'is-off'}" 
+                      onclick="adminToggleUnlimited('${cust.uid}', ${!isUnl})"
+                      title="Switch Unlimited ${isUnl ? 'OFF' : 'ON'}">
                       <span class="switch-slider"></span>
-                      <span class="switch-text">${isLifetime ? 'ON' : 'OFF'}</span>
+                      <span class="switch-text">${isUnl ? 'ON' : 'OFF'}</span>
                     </button>
                   </td>
                 </tr>
@@ -4315,12 +4425,12 @@
         // 2. Mobile Cards (Simplified: Name, Email, Unlimited Switch only)
         if (cardsEl) {
           if (filtered.length === 0) {
-            cardsEl.innerHTML = `<div style="text-align: center; color: var(--muted); padding: 20px;">No users found.</div>`;
+            cardsEl.innerHTML = `<div style="text-align: center; color: var(--muted); padding: 20px;">No users match the selected filter.</div>`;
           } else {
             cardsEl.innerHTML = filtered.map((cust) => {
-              const isLifetime = isLifetimeCustomer(cust);
-              const displayName = cust.displayName || (cust.email ? cust.email.split("@")[0] : "User");
-              const email = cust.email || cust.uid || "—";
+              const isUnl = Boolean(cust.isUnlimited);
+              const displayName = escapeHtml(cust.displayName || (cust.email ? cust.email.split("@")[0] : "User"));
+              const email = escapeHtml(cust.email || cust.uid || "—");
 
               return `
                 <div class="admin-user-simple-card">
@@ -4330,11 +4440,11 @@
                   </div>
                   <div style="flex-shrink: 0;" onclick="event.stopPropagation();">
                     <button type="button" 
-                      class="admin-unlimited-switch ${isLifetime ? 'is-on' : 'is-off'}" 
-                      onclick="adminToggleUnlimited('${cust.uid}', ${!isLifetime})"
-                      title="Switch Unlimited ${isLifetime ? 'OFF' : 'ON'}">
+                      class="admin-unlimited-switch ${isUnl ? 'is-on' : 'is-off'}" 
+                      onclick="adminToggleUnlimited('${cust.uid}', ${!isUnl})"
+                      title="Switch Unlimited ${isUnl ? 'OFF' : 'ON'}">
                       <span class="switch-slider"></span>
-                      <span class="switch-text">${isLifetime ? 'ON' : 'OFF'}</span>
+                      <span class="switch-text">${isUnl ? 'ON' : 'OFF'}</span>
                     </button>
                   </div>
                 </div>
@@ -4400,21 +4510,21 @@
         const setUnl = Boolean(isUnlimited);
 
         // 1. Immediate optimistic UI update (zero delay)
+        if (Array.isArray(adminUsersList)) {
+          const found = adminUsersList.find((c) => c.uid === uid);
+          if (found) {
+            found.isUnlimited = setUnl;
+            found.status = setUnl ? "unlimited" : "active";
+          }
+        }
         if (adminOverviewData && Array.isArray(adminOverviewData.customers)) {
           const found = adminOverviewData.customers.find((c) => c.uid === uid);
           if (found) {
             found.isUnlimited = setUnl;
-            if (found.activeLicense) {
-              found.activeLicense.isUnlimited = setUnl;
-              found.activeLicense.durationDays = setUnl ? "Unlimited" : (found.savedNormalDays || 0);
-              found.activeLicense.status = setUnl ? "active" : (found.savedNormalDays > 0 ? "active" : "expired");
-            }
-            found.durationDays = setUnl ? "Unlimited" : (found.savedNormalDays || 0);
-            found.licenseStatus = setUnl ? "lifetime" : (found.savedNormalDays > 0 ? "active" : "expired");
-            found.status = setUnl ? "unlimited" : (found.savedNormalDays > 0 ? "active" : "expired");
+            found.status = setUnl ? "unlimited" : "active";
           }
-          renderAdminDashboard();
         }
+        renderCustomersTable();
 
         // 2. Persist directly to Supabase via server API
         try {
@@ -4437,10 +4547,10 @@
               }
             }
           }
-          await loadAdminOverview();
+          await loadAdminUsers();
         } catch (err) {
           console.debug("Supabase toggle sync notice:", err.message);
-          await loadAdminOverview();
+          await loadAdminUsers();
         }
       };
 
