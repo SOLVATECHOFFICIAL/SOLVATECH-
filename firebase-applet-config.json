@@ -1,11 +1,11 @@
 {
-  "projectId": "gen-lang-client-0324946831",
-  "appId": "1:420914651308:web:ae4cb5d7632401c1a83f09",
-  "apiKey": "AIzaSyA_g2ek4ziXSE9m4VD5-5PfKpKJjAobYFg",
-  "authDomain": "gen-lang-client-0324946831.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-whatsappbot-da9a52de-41e7-4365-a5b4-8aec9332642c",
-  "storageBucket": "gen-lang-client-0324946831.firebasestorage.app",
-  "messagingSenderId": "420914651308",
+  "projectId": "solvatechbot",
+  "appId": "1:1094113371408:web:fdf3cbdef31413a703b195",
+  "apiKey": "AIzaSyDCVp_T6gO6HeTDeevls9MSb9quEzU5YiM",
+  "authDomain": "solvatechbot.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "solvatechbot.firebasestorage.app",
+  "messagingSenderId": "1094113371408",
   "measurementId": "",
   "oAuthClientId": "",
   "recaptchaSiteKey": ""
