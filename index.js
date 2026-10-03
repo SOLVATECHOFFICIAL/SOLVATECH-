@@ -103,11 +103,26 @@ console.log = (...args) => {
 };
 
 process.on("uncaughtException", (error) => {
-  logger.error("Process uncaught exception handled gracefully", error?.stack || error?.message);
+  const msg = error?.stack || error?.message || String(error);
+  if (msg.includes("Connection Closed") || msg.includes("Stream Errored") || msg.includes("conflict")) {
+    logger.debug?.("Transient socket exception note:", msg);
+    return;
+  }
+  logger.error("Process uncaught exception handled gracefully", msg);
 });
 
 process.on("unhandledRejection", (reason) => {
   const msg = reason instanceof Error ? (reason.stack || reason.message) : String(reason);
+  if (
+    msg.includes("Connection Closed") ||
+    msg.includes("Stream Errored") ||
+    msg.includes("conflict") ||
+    msg.includes("QR refs attempts") ||
+    msg.includes("QR refs timeout")
+  ) {
+    logger.debug?.("Transient socket rejection note:", msg);
+    return;
+  }
   logger.error("Process unhandled rejection handled gracefully", msg);
 });
 
