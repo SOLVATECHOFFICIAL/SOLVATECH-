@@ -1584,3 +1584,18 @@ setInterval(() => {
     logger.debug("Background license audit notice", err.message);
   });
 }, 30000).unref();
+
+// Periodic Garbage Collection & Memory Health Optimizer (Protects Railway from OOM)
+setInterval(() => {
+  try {
+    if (typeof global.gc === "function") {
+      global.gc();
+    }
+    const mem = process.memoryUsage();
+    const heapUsedMb = Math.round(mem.heapUsed / 1024 / 1024);
+    const rssMb = Math.round(mem.rss / 1024 / 1024);
+    if (heapUsedMb > 320) {
+      logger.info(`[Memory Monitor] Heap: ${heapUsedMb}MB, RSS: ${rssMb}MB (Optimized GC)`);
+    }
+  } catch {}
+}, 180000).unref();
