@@ -62,12 +62,67 @@ import {
   removePushSubscription,
   sendAdminPushNotification,
 } from "./lib/web-push.js";
+import libsignal from "libsignal";
+
+// Eliminate libsignal cryptographic session logging & memory leaks at the protocol level
+if (libsignal && libsignal.SessionRecord) {
+  const Proto = libsignal.SessionRecord.prototype;
+  if (Proto) {
+    Proto.closeSession = function(session) {
+      if (this.isClosed(session)) return;
+      session.indexInfo.closed = Date.now();
+    };
+    Proto.openSession = function(session) {
+      session.indexInfo.closed = -1;
+    };
+    Proto.removeOldSessions = function() {
+      const CLOSED_SESSIONS_MAX = 20;
+      while (Object.keys(this.sessions).length > CLOSED_SESSIONS_MAX) {
+        let oldestKey;
+        let oldestSession;
+        for (const [key, session] of Object.entries(this.sessions)) {
+          if (session.indexInfo.closed !== -1 && (!oldestSession || session.indexInfo.closed < oldestSession.indexInfo.closed)) {
+            oldestKey = key;
+            oldestSession = session;
+          }
+        }
+        if (oldestKey) {
+          delete this.sessions[oldestKey];
+        } else {
+          break;
+        }
+      }
+    };
+  }
+}
 
 const origConsoleError = console.error;
 const origConsoleWarn = console.warn;
 const origConsoleLog = console.log;
+const origConsoleInfo = console.info;
 
 function isNoisyInternalLog(args) {
+  if (!args || !args.length) return false;
+  const first = args[0];
+  if (typeof first === "string") {
+    if (
+      first.includes("Closing session") ||
+      first.includes("Opening session") ||
+      first.includes("Session already") ||
+      first.includes("Removing old closed session") ||
+      first.includes("Decrypted message with closed session") ||
+      first.includes("Disconnecting idle stream") ||
+      first.includes("Timed out waiting for new targets") ||
+      first.includes("Closing open session in favor of incoming prekey bundle") ||
+      first.includes("Failed to decrypt message with any known session") ||
+      first.includes("Session error:") ||
+      first.includes("Bad MAC") ||
+      first.includes("Key used already or never filled") ||
+      first.includes("MessageCounterError")
+    ) {
+      return true;
+    }
+  }
   const text = args
     .map((a) => {
       if (typeof a === "string") return a;
@@ -78,9 +133,12 @@ function isNoisyInternalLog(args) {
   return (
     text.includes("Disconnecting idle stream") ||
     text.includes("Timed out waiting for new targets") ||
-    text.includes("Closing session:") ||
+    text.includes("Closing session") ||
+    text.includes("Opening session") ||
+    text.includes("Session already") ||
+    text.includes("Removing old closed session") ||
+    text.includes("Decrypted message with closed session") ||
     text.includes("Closing open session in favor of incoming prekey bundle") ||
-    text.includes("Removing old closed session:") ||
     text.includes("Failed to decrypt message with any known session") ||
     text.includes("Session error:") ||
     text.includes("Bad MAC") ||
@@ -100,6 +158,10 @@ console.warn = (...args) => {
 console.log = (...args) => {
   if (isNoisyInternalLog(args)) return;
   origConsoleLog.apply(console, args);
+};
+console.info = (...args) => {
+  if (isNoisyInternalLog(args)) return;
+  origConsoleInfo.apply(console, args);
 };
 
 process.on("uncaughtException", (error) => {
@@ -1609,8 +1671,8 @@ setInterval(() => {
     const mem = process.memoryUsage();
     const heapUsedMb = Math.round(mem.heapUsed / 1024 / 1024);
     const rssMb = Math.round(mem.rss / 1024 / 1024);
-    if (heapUsedMb > 320) {
+    if (heapUsedMb > 250) {
       logger.info(`[Memory Monitor] Heap: ${heapUsedMb}MB, RSS: ${rssMb}MB (Optimized GC)`);
     }
   } catch {}
-}, 180000).unref();
+}, 60000).unref();
