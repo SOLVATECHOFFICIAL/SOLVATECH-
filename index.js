@@ -214,7 +214,7 @@ try {
   if (!process.env.FIREBASE_DATABASE_ID?.trim() && cfg.firestoreDatabaseId) process.env.FIREBASE_DATABASE_ID = cfg.firestoreDatabaseId;
   if (!process.env.FIREBASE_STORAGE_BUCKET?.trim() && cfg.storageBucket) process.env.FIREBASE_STORAGE_BUCKET = cfg.storageBucket;
   if (!process.env.FIREBASE_APP_ID?.trim() && cfg.appId) process.env.FIREBASE_APP_ID = cfg.appId;
-  process.env.ADMIN_EMAIL = "awoyinfasolomon1@gmail.com";
+  if (!process.env.ADMIN_EMAIL?.trim()) process.env.ADMIN_EMAIL = "awoyinfasolomon1@gmail.com";
   if (!process.env.BOT_API_PREFIX?.trim()) process.env.BOT_API_PREFIX = "/bot-api";
   if (!process.env.BOT_DATA_DIR?.trim()) process.env.BOT_DATA_DIR = "./data";
 } catch (e) {

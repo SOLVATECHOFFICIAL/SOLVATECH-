@@ -1,5 +1,6 @@
 import { getGroupSettings, toggleGroupSetting } from "../lib/command-tools.js";
 import { requireAdmin } from "../lib/command-tools.js";
+import { setWarningLimit } from "../lib/database.js";
 
 const settingByCommand = {
   antilink: "antiLink",
@@ -27,17 +28,42 @@ const settingByName = {
   autogoodbye: "goodbye",
 };
 
-export default async function anti({ sock, chatId, sender, senderJids, senderIsLinkedAccount, args = [], command, reply, userId = "default" }) {
+export default async function anti({
+  sock,
+  chatId,
+  sender,
+  senderJids,
+  senderIsLinkedAccount,
+  args = [],
+  command,
+  reply,
+  userId = "default",
+}) {
   const commandSetting = settingByCommand[command];
   const first = String(args[0] || "").toLowerCase();
   const second = String(args[1] || "").toLowerCase();
+
+  // STRICT REQUIREMENT: Only promoted group administrators can use .anti, .anti limit, or any management
   const explicitSetting = commandSetting || settingByName[first] || null;
   const setting = explicitSetting || "antiLink";
   const value = commandSetting ? first : settingByName[first] ? second : "";
 
-  // For welcome/goodbye or inspecting status, bot does not strictly need to be group admin
   const botRequired = Boolean(explicitSetting && ["on", "off"].includes(value) && !["welcome", "goodbye"].includes(setting));
   await requireAdmin(sock, chatId, sender, botRequired, senderJids, senderIsLinkedAccount);
+
+  // Handle ".anti limit <N>" or ".anti limit"
+  if (first === "limit" || first === "setlimit") {
+    const limitNum = parseInt(second, 10);
+    if (!limitNum || isNaN(limitNum) || limitNum < 1 || limitNum > 10) {
+      const current = await getGroupSettings(chatId, userId);
+      return reply(
+        `⚠️ *Current Warning Threshold:* *${current.warningLimit || 2}* strikes before removal.\n` +
+        `_To update threshold, use: *.anti limit <1-10>* (e.g. *.anti limit 3*)_`
+      );
+    }
+    const newLimit = await setWarningLimit(chatId, limitNum, userId);
+    return reply(`✅ *Group Warning Threshold Updated:* *${newLimit}* strikes before member removal.\n_Saved permanently to Firebase Firestore._`);
+  }
 
   if (!explicitSetting || !["on", "off"].includes(value)) {
     const current = await getGroupSettings(chatId, userId);
@@ -61,7 +87,7 @@ export default async function anti({ sock, chatId, sender, senderJids, senderIsL
       "│ • *.antisticker on/off* — Auto-delete unauthorized stickers & warn",
       "│ • *.welcome on/off* — Auto-greet new members upon joining",
       "│ • *.goodbye on/off* — Auto-farewell members upon leaving",
-      "│ • *.warns limit <1-10>* — Change threshold before removal",
+      "│ • *.anti limit <1-10>* — Change threshold before removal",
       "╰───────────────────────────",
     ].join("\n"));
   }
