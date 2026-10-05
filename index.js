@@ -978,6 +978,11 @@ for (const p of prefixes) {
         const uid = ws.verifiedUid || ws.userId;
         const lock = locksByUid[uid] || "";
         const cust = customersMap[uid] || {};
+        const licStatus = cust.licenseStatus || cust.activeLicense?.status || "none";
+        const isUnlimited = Boolean(cust.isUnlimited || cust.isAdmin || ws.isAdmin);
+        const hasValidLicense = isUnlimited || licStatus === "active" || licStatus === "lifetime" || licStatus === "expiring_soon";
+        const isConn = ws.status === "connected" || ws.isLiveConnected;
+
         return {
           ...ws,
           uid,
@@ -985,7 +990,12 @@ for (const p of prefixes) {
           phoneNumber: lock || ws.botNumber || cust.phoneNumber || "",
           email: ws.userEmail || cust.email || "",
           displayName: cust.displayName || "",
-          licenseStatus: cust.licenseStatus || cust.activeLicense?.status || "none",
+          licenseStatus: isUnlimited ? "lifetime" : (hasValidLicense ? licStatus : "no_license"),
+          isUnlicensedActive: Boolean(isConn && !hasValidLicense),
+          commandsCount: ws.commandsCount || 0,
+          lastCommandAt: ws.lastCommandAt || null,
+          lastCommandName: ws.lastCommandName || "",
+          isAdmin: Boolean(ws.isAdmin || cust.isAdmin || isAdminEmail(cust.email) || isAdminEmail(uid)),
         };
       });
 

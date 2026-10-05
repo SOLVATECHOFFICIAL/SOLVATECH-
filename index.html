@@ -1607,16 +1607,17 @@
                       </th>
                       <th style="width: 40px;">#</th>
                       <th>User Account</th>
-                      <th>Locked Phone</th>
-                      <th>Connection State</th>
-                      <th>Connected Number</th>
-                      <th>Last Active</th>
-                      <th style="text-align: right; width: 110px;">Action</th>
+                      <th>Role</th>
+                      <th>WhatsApp Phone</th>
+                      <th>Socket State</th>
+                      <th>License Status</th>
+                      <th>Commands / Activity</th>
+                      <th style="text-align: right; width: 120px;">Action</th>
                     </tr>
                   </thead>
                   <tbody id="admin-whatsapp-tbody">
                     <tr>
-                      <td colspan="8" style="text-align: center; color: var(--muted); padding: 24px;">Loading WhatsApp session states...</td>
+                      <td colspan="9" style="text-align: center; color: var(--muted); padding: 24px;">Loading WhatsApp session states...</td>
                     </tr>
                   </tbody>
                 </table>
@@ -5907,7 +5908,7 @@
           if (waList.length === 0) {
             tbody.innerHTML = `
               <tr>
-                <td colspan="8" style="text-align: center; color: var(--muted); padding: 24px;">
+                <td colspan="9" style="text-align: center; color: var(--muted); padding: 24px;">
                   No active WhatsApp sessions registered.
                 </td>
               </tr>
@@ -5916,15 +5917,42 @@
             tbody.innerHTML = waList.map((s, idx) => {
               const uid = s.uid || s.userId || "";
               const phone = s.lockedPhoneNumber || s.phoneNumber || s.botNumber || "";
-              const isConn = s.status === "connected" || s.connectionState === "open";
-              const badge = isConn 
-                ? `<span class="admin-badge badge-connected"><span class="badge-dot"></span>CONNECTED</span>` 
-                : `<span class="admin-badge badge-disconnected"><span class="badge-dot"></span>${(s.status || "DISCONNECTED").toUpperCase()}</span>`;
+              const isConn = s.status === "connected" || s.connectionState === "open" || s.isLiveConnected;
+              const isAdm = Boolean(s.isAdmin);
+              const roleBadge = isAdm
+                ? `<span class="admin-badge badge-active" style="background:#e0f2fe; color:#0369a1; border:1px solid #7dd3fc; font-weight:700;"><span class="badge-dot" style="background:#0284c7;"></span>👑 ADMIN</span>`
+                : `<span class="admin-badge" style="background:#f3f4f6; color:#4b5563; border:1px solid #e5e7eb;"><span class="badge-dot" style="background:#9ca3af;"></span>👤 MEMBER</span>`;
+
+              const connBadge = isConn 
+                ? `<span class="admin-badge badge-connected"><span class="badge-dot"></span>CONNECTED 🟢</span>` 
+                : (s.status === "connecting" || s.status === "pairing"
+                  ? `<span class="admin-badge badge-pending"><span class="badge-dot"></span>${s.status.toUpperCase()} 🟡</span>`
+                  : `<span class="admin-badge badge-disconnected"><span class="badge-dot"></span>${(s.status || "DISCONNECTED").toUpperCase()} 🔴</span>`);
+
+              let licBadge = "";
+              if (s.isUnlicensedActive || s.licenseStatus === "no_license" || (!isAdm && s.licenseStatus === "none")) {
+                licBadge = `<span class="admin-badge" style="background:#fee2e2; color:#b91c1c; border:1px solid #f87171; font-weight:700;"><span class="badge-dot" style="background:#dc2626;"></span>⚠️ NO LICENSE</span>`;
+              } else if (s.licenseStatus === "lifetime" || isAdm) {
+                licBadge = `<span class="admin-badge badge-active" style="background:#f3e8ff; color:#6b21a8; border:1px solid #d8b4fe;"><span class="badge-dot" style="background:#9333ea;"></span>LIFETIME</span>`;
+              } else if (s.licenseStatus === "active") {
+                licBadge = `<span class="admin-badge badge-active"><span class="badge-dot"></span>ACTIVE</span>`;
+              } else if (s.licenseStatus === "expiring_soon") {
+                licBadge = `<span class="admin-badge badge-expiring"><span class="badge-dot"></span>EXPIRING</span>`;
+              } else if (s.licenseStatus === "expired") {
+                licBadge = `<span class="admin-badge badge-expired"><span class="badge-dot"></span>EXPIRED</span>`;
+              } else {
+                licBadge = `<span class="admin-badge" style="background:#f3f4f6; color:#6b7280;">—</span>`;
+              }
 
               const userLabel = s.displayName || s.email || (uid ? uid.slice(0, 10) + "..." : "—");
+              const cmdsCount = s.commandsCount || 0;
+              const lastCmdText = s.lastCommandName ? `.${s.lastCommandName}` : "";
+              const activityText = cmdsCount > 0 
+                ? `<strong style="color:var(--ink);">${cmdsCount}</strong> cmds${lastCmdText ? ` <span style="font-size:10px; color:var(--muted);">(${lastCmdText})</span>` : ""}`
+                : `<span style="color:var(--muted); font-size:11px;">No commands yet</span>`;
 
               return `
-                <tr>
+                <tr style="${s.isUnlicensedActive ? "background: #fff5f5;" : ""}">
                   <td style="text-align: center;">
                     <input type="checkbox" class="admin-wa-checkbox" value="${uid}" data-phone="${phone}" onchange="updateSelectedWhatsAppCount()" style="cursor: pointer;" />
                   </td>
@@ -5933,12 +5961,13 @@
                     <div style="font-weight: 600; color: var(--ink); cursor: pointer;" onclick="openCustomerDetail('${uid}')">${userLabel}</div>
                     <span class="code-pill" style="font-size: 10px; opacity: 0.8;">${uid.slice(0, 12)}...</span>
                   </td>
-                  <td><strong style="font-family:'DM Mono', monospace;">${phone ? `+${phone}` : "—"}</strong></td>
-                  <td>${badge}</td>
-                  <td>${s.botNumber ? `+${s.botNumber}` : "—"}</td>
-                  <td style="font-size: 11px;">${s.connectedAt ? new Date(s.connectedAt).toLocaleString() : "—"}</td>
+                  <td>${roleBadge}</td>
+                  <td><strong style="font-family:'DM Mono', monospace; font-size: 12px;">${phone ? `+${phone}` : "—"}</strong></td>
+                  <td>${connBadge}</td>
+                  <td>${licBadge}</td>
+                  <td style="font-size: 11.5px;">${activityText}</td>
                   <td style="text-align: right;">
-                    <button type="button" class="admin-copy-key-btn" style="color: #b91c1c; border-color: #fca5a5; background: #fef2f2; padding: 4px 10px; font-size: 11px; font-weight: 600;" onclick="disconnectSingleSession('${uid}', '${phone}')">
+                    <button type="button" class="admin-copy-key-btn" style="color: #b91c1c; border-color: #fca5a5; background: #fef2f2; padding: 4px 10px; font-size: 11px; font-weight: 600; cursor: pointer;" onclick="disconnectSingleSession('${uid}', '${phone}')" title="Permanently disconnect and unlink session">
                       Disconnect
                     </button>
                   </td>
@@ -5950,6 +5979,36 @@
             updateSelectedWhatsAppCount();
           }
         }
+      }
+
+      window.getAuthToken = async function(forceRefresh = false) {
+        if (typeof getValidIdToken === "function") {
+          try {
+            const token = await getValidIdToken(forceRefresh);
+            if (token) return token;
+          } catch {}
+        }
+        return localStorage.getItem("solvatech_user_token") || 
+               localStorage.getItem("solvatech_preview_token") || 
+               sessionStorage.getItem("solvatech_preview_token") || null;
+      };
+
+      async function resolveAdminAuthHeader() {
+        let authHeader = typeof getAuthHeader === "function" ? await getAuthHeader() : null;
+        if (!authHeader) {
+          const token = await window.getAuthToken(true);
+          if (token) authHeader = `Bearer ${token}`;
+        }
+        if (!authHeader) {
+          const directToken = localStorage.getItem("solvatech_user_token") || 
+                              localStorage.getItem("solvatech_preview_token") || 
+                              sessionStorage.getItem("solvatech_preview_token");
+          if (directToken) authHeader = `Bearer ${directToken}`;
+        }
+        if (!authHeader) {
+          throw new Error("Admin authentication required. Please sign in or refresh your session.");
+        }
+        return authHeader;
       }
 
       window.toggleSelectAllWhatsApp = function(masterCb) {
@@ -5981,23 +6040,25 @@
       window.disconnectSingleSession = async function(uid, phone) {
         if (!uid) return;
         const displayLabel = phone ? `+${phone}` : uid;
-        const confirmMsg = `🔌 Disconnect WhatsApp session for ${displayLabel}?\n\nBefore disconnecting, the bot will send a personal DM instructing them to clear their old linked session in WhatsApp and re-pair with a valid license.\n\nProceed?`;
+        const confirmMsg = `🔌 Permanently disconnect WhatsApp session for ${displayLabel}?\n\nThis will:\n1. Log out the session on WhatsApp servers\n2. Permanently delete all session keys from the server\n3. Release and unlock their phone number\n4. Dispatch an update notice DM to their WhatsApp\n\nThe user will have to pair fresh from scratch.\n\nProceed?`;
         if (!confirm(confirmMsg)) return;
 
         try {
-          const token = await getAuthToken();
-          const res = await fetch("/api/admin/sessions/disconnect", {
+          const authHeader = await resolveAdminAuthHeader();
+          const targetUrl = typeof getApiUrl === "function" ? getApiUrl("/admin/sessions/disconnect") : "/api/admin/sessions/disconnect";
+          const res = await fetch(targetUrl, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: token ? `Bearer ${token}` : "",
+              "Accept": "application/json",
+              "Authorization": authHeader,
             },
             body: JSON.stringify({ userId: uid }),
           });
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || "Failed to disconnect session.");
 
-          alert(`✅ Successfully disconnected ${displayLabel}.\nUpdate notice DM sent to user.`);
+          alert(`✅ Successfully permanently disconnected ${displayLabel}.\nSession keys wiped and number unlinked.`);
           if (typeof loadAdminOverview === "function") loadAdminOverview();
         } catch (err) {
           alert(`❌ Disconnect failed: ${err.message}`);
@@ -6007,27 +6068,29 @@
       window.disconnectSelectedSessions = async function() {
         const checked = [...document.querySelectorAll(".admin-wa-checkbox:checked")].map((cb) => cb.value).filter(Boolean);
         if (checked.length === 0) {
-          alert("Please select at least one session to disconnect.");
+          alert("Please select at least one session from the list using the checkboxes.");
           return;
         }
 
-        const confirmMsg = `🔌 Disconnect ${checked.length} selected WhatsApp session(s)?\n\nEach user will receive a personal DM before logout instructing them to clear their old linked session and re-pair.\n\nProceed?`;
+        const confirmMsg = `🔌 Permanently disconnect ${checked.length} selected WhatsApp session(s)?\n\nEach session will be logged out, wiped from disk, and their phone numbers will be unlinked.\n\nProceed?`;
         if (!confirm(confirmMsg)) return;
 
         try {
-          const token = await getAuthToken();
-          const res = await fetch("/api/admin/sessions/disconnect", {
+          const authHeader = await resolveAdminAuthHeader();
+          const targetUrl = typeof getApiUrl === "function" ? getApiUrl("/admin/sessions/disconnect") : "/api/admin/sessions/disconnect";
+          const res = await fetch(targetUrl, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: token ? `Bearer ${token}` : "",
+              "Accept": "application/json",
+              "Authorization": authHeader,
             },
             body: JSON.stringify({ userIds: checked }),
           });
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || "Failed to disconnect selected sessions.");
 
-          alert(`✅ Successfully disconnected ${data.disconnectedCount || checked.length} session(s).\nUpdate notice DMs dispatched.`);
+          alert(`✅ Successfully permanently disconnected ${data.disconnectedCount || checked.length} session(s).\nAll selected sessions wiped and numbers unlinked.`);
           if (typeof loadAdminOverview === "function") loadAdminOverview();
         } catch (err) {
           alert(`❌ Bulk disconnect failed: ${err.message}`);
@@ -6037,7 +6100,7 @@
       window.disconnectAllActiveSessions = async function() {
         if (!adminOverviewData) return;
         const waList = adminOverviewData.whatsappSessions || [];
-        const activeSessions = waList.filter((s) => s.status === "connected" || s.connectionState === "open");
+        const activeSessions = waList.filter((s) => s.status === "connected" || s.connectionState === "open" || s.isLiveConnected);
         const targetUids = (activeSessions.length > 0 ? activeSessions : waList).map((s) => s.uid || s.userId).filter(Boolean);
 
         if (targetUids.length === 0) {
@@ -6045,23 +6108,25 @@
           return;
         }
 
-        const promptText = `⚡ Disconnect ALL ${targetUids.length} WhatsApp sessions?\n\nTip: You can cancel and tick/untick specific users in the list if you want to leave some updated users connected!\n\nIf you proceed, all ${targetUids.length} users will receive an update notice DM in WhatsApp and will be logged out.`;
+        const promptText = `⚡ Permanently disconnect ALL ${targetUids.length} WhatsApp sessions?\n\nTip: You can cancel and select specific members using the checkboxes instead!\n\nIf you proceed, all ${targetUids.length} sessions will be logged out, wiped from server storage, and their phone numbers unlinked.`;
         if (!confirm(promptText)) return;
 
         try {
-          const token = await getAuthToken();
-          const res = await fetch("/api/admin/sessions/disconnect", {
+          const authHeader = await resolveAdminAuthHeader();
+          const targetUrl = typeof getApiUrl === "function" ? getApiUrl("/admin/sessions/disconnect") : "/api/admin/sessions/disconnect";
+          const res = await fetch(targetUrl, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: token ? `Bearer ${token}` : "",
+              "Accept": "application/json",
+              "Authorization": authHeader,
             },
             body: JSON.stringify({ userIds: targetUids }),
           });
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || "Failed to disconnect all sessions.");
 
-          alert(`✅ Successfully disconnected ${data.disconnectedCount || targetUids.length} session(s).\nUpdate notice DMs sent to all users.`);
+          alert(`✅ Successfully permanently disconnected ${data.disconnectedCount || targetUids.length} session(s).\nAll sessions wiped and numbers unlinked.`);
           if (typeof loadAdminOverview === "function") loadAdminOverview();
         } catch (err) {
           alert(`❌ Disconnect all failed: ${err.message}`);
