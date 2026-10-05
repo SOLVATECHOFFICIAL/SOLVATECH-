@@ -52,29 +52,30 @@ export default async function warn({
   const targetParticipant = quoted?.participant || context?.participant || targetJid;
 
   if (targetQuotedId) {
-    const deleteKey = {
-      remoteJid: chatId,
-      id: targetQuotedId,
-      participant: targetParticipant,
-      fromMe: Boolean(quoted?.fromMe),
-    };
-    try {
-      await sock.sendMessage(chatId, { delete: deleteKey });
-      removeCachedMessage(userId, targetQuotedId);
-    } catch {
-      try {
-        await sock.sendMessage(chatId, {
-          delete: {
-            remoteJid: chatId,
-            id: targetQuotedId,
-            participant: targetParticipant,
-          },
-        });
-        removeCachedMessage(userId, targetQuotedId);
-      } catch (delErr) {
-        logger.debug(`Could not delete quoted warning violation message: ${delErr.message}`);
-      }
-    }
+    removeCachedMessage(userId, targetQuotedId);
+    await Promise.allSettled([
+      sock.sendMessage(chatId, {
+        delete: {
+          remoteJid: chatId,
+          id: targetQuotedId,
+          participant: targetParticipant,
+          fromMe: false,
+        },
+      }),
+      sock.sendMessage(chatId, {
+        delete: {
+          remoteJid: chatId,
+          id: targetQuotedId,
+          participant: targetParticipant,
+        },
+      }),
+      sock.sendMessage(chatId, {
+        delete: {
+          remoteJid: chatId,
+          id: targetQuotedId,
+        },
+      }),
+    ]).catch(() => {});
   } else if (targetJid) {
     // If not quoted directly (e.g. .warn @user reason), delete the offender's most recent message from chat history
     try {
@@ -82,15 +83,23 @@ export default async function warn({
       const targetAliasSet = new Set(targetAliases.flatMap(jidAliases));
       const targetRecentMsg = recent.find((m) => targetAliasSet.has(m.sender));
       if (targetRecentMsg) {
-        await sock.sendMessage(chatId, {
-          delete: {
-            remoteJid: chatId,
-            id: targetRecentMsg.id,
-            participant: targetRecentMsg.sender,
-            fromMe: Boolean(targetRecentMsg.fromMe),
-          },
-        }).catch(() => {});
         removeCachedMessage(userId, targetRecentMsg.id);
+        await Promise.allSettled([
+          sock.sendMessage(chatId, {
+            delete: {
+              remoteJid: chatId,
+              id: targetRecentMsg.id,
+              participant: targetRecentMsg.sender,
+              fromMe: Boolean(targetRecentMsg.fromMe),
+            },
+          }),
+          sock.sendMessage(chatId, {
+            delete: {
+              remoteJid: chatId,
+              id: targetRecentMsg.id,
+            },
+          }),
+        ]).catch(() => {});
       }
     } catch (tagErr) {
       logger.debug(`Could not delete target recent message: ${tagErr.message}`);

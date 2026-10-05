@@ -116,18 +116,19 @@ export default async function del({
   }
 
   // Retrieve cached messages sorted newest first ("from down to up")
+  // getChatRecentMessages automatically crosses / filters out any already-deleted messages!
   const recentMessages = getChatRecentMessages(userId, chatId);
 
-  // Exclude the .del trigger message itself
-  const candidatePool = recentMessages.filter((m) => m.id !== message?.key?.id);
+  // Exclude the .del trigger message itself and any revoked/handled messages
+  const candidatePool = recentMessages.filter((m) => m && m.id && m.id !== message?.key?.id);
 
   let targetsToDelete = [];
 
   if (senderIsAdmin) {
-    // Admin: delete all straight with users' own from down to up
+    // Admin: cross deleted messages and select up to `count` active messages straight from down to up
     targetsToDelete = candidatePool.slice(0, count);
   } else {
-    // Non-admin: delete only own messages from down to up
+    // Non-admin: cross deleted messages and select up to `count` active own messages from down to up
     targetsToDelete = candidatePool.filter((m) => {
       const isSender = senderAliases.has(m.sender) || jidAliases(m.sender).some((a) => senderAliases.has(a));
       const isFromMe = Boolean(m.fromMe && senderIsLinkedAccount);
@@ -151,9 +152,10 @@ export default async function del({
     return;
   }
 
-  // ULTRA FAST PARALLEL BATCH EXECUTION:
-  // Execute deletes in concurrent batches of 8 for light-speed completion
-  const BATCH_SIZE = 8;
+  // LIGHTNING FAST PARALLEL BATCH EXECUTION:
+  // Execute deletes concurrently in optimized chunks of 10.
+  // If any single message was already deleted or fails, it crosses it and continues with all others.
+  const BATCH_SIZE = 10;
   for (let i = 0; i < targetsToDelete.length; i += BATCH_SIZE) {
     const batch = targetsToDelete.slice(i, i + BATCH_SIZE);
     await Promise.allSettled(
@@ -168,8 +170,18 @@ export default async function del({
               fromMe: Boolean(msg.fromMe),
             },
           });
-        } catch (e) {
-          logger.debug(`Could not delete message ${msg.id}:`, e.message);
+        } catch {
+          // Fallback delete attempt without participant in case of private or DM structure
+          try {
+            await sock.sendMessage(chatId, {
+              delete: {
+                remoteJid: chatId,
+                id: msg.id,
+              },
+            });
+          } catch (e) {
+            logger.debug(`Could not delete message ${msg.id}: ${e.message}`);
+          }
         }
       })
     );
