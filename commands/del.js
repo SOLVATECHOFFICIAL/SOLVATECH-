@@ -122,26 +122,20 @@ export default async function del({
   // Exclude the .del trigger message itself and any revoked/handled messages
   const candidatePool = recentMessages.filter((m) => m && m.id && m.id !== message?.key?.id);
 
-  let targetsToDelete = [];
+  // Filter candidate pool according to permissions
+  const eligibleCandidates = candidatePool.filter((m) => {
+    if (senderIsAdmin) return true;
+    const isSender = senderAliases.has(m.sender) || jidAliases(m.sender).some((a) => senderAliases.has(a));
+    const isFromMe = Boolean(m.fromMe && senderIsLinkedAccount);
+    return isSender || isFromMe;
+  });
 
-  if (senderIsAdmin) {
-    // Admin: cross deleted messages and select up to `count` active messages straight from down to up
-    targetsToDelete = candidatePool.slice(0, count);
-  } else {
-    // Non-admin: cross deleted messages and select up to `count` active own messages from down to up
-    targetsToDelete = candidatePool.filter((m) => {
-      const isSender = senderAliases.has(m.sender) || jidAliases(m.sender).some((a) => senderAliases.has(a));
-      const isFromMe = Boolean(m.fromMe && senderIsLinkedAccount);
-      return isSender || isFromMe;
-    }).slice(0, count);
-  }
-
-  if (targetsToDelete.length === 0) {
+  if (eligibleCandidates.length === 0) {
     return;
   }
 
   // If sender is admin and attempting to delete messages from other participants, verify bot is admin
-  const hasOtherMembersMessages = targetsToDelete.some((m) => !senderAliases.has(m.sender) && !m.fromMe);
+  const hasOtherMembersMessages = eligibleCandidates.slice(0, count).some((m) => !senderAliases.has(m.sender) && !m.fromMe);
   if (isGroupChat && hasOtherMembersMessages && !botIsAdmin) {
     const notice = await reply("⚠️ *Bot Admin Required:* I must be a group admin to delete other members' messages.").catch(() => null);
     if (notice?.key) {
@@ -152,14 +146,21 @@ export default async function del({
     return;
   }
 
-  // LIGHTNING FAST PARALLEL BATCH EXECUTION:
-  // Execute deletes concurrently in optimized chunks of 10.
-  // If any single message was already deleted or fails, it crosses it and continues with all others.
-  const BATCH_SIZE = 10;
-  for (let i = 0; i < targetsToDelete.length; i += BATCH_SIZE) {
-    const batch = targetsToDelete.slice(i, i + BATCH_SIZE);
-    await Promise.allSettled(
-      batch.map(async (msg) => {
+  // ULTRA-FAST STREAMLINED BATCH EXECUTION:
+  // If number 3 is already deleted, skip it and continue to number 4, 5, etc. until `count` messages are deleted.
+  let deletedCount = 0;
+  let candidateIndex = 0;
+  const BATCH_SIZE = 15;
+
+  while (deletedCount < count && candidateIndex < eligibleCandidates.length) {
+    const remainingNeeded = count - deletedCount;
+    const batchCandidates = eligibleCandidates.slice(candidateIndex, candidateIndex + Math.min(BATCH_SIZE, remainingNeeded * 2));
+    if (batchCandidates.length === 0) break;
+
+    candidateIndex += batchCandidates.length;
+
+    const results = await Promise.allSettled(
+      batchCandidates.map(async (msg) => {
         removeCachedMessage(userId, msg.id);
         try {
           await sock.sendMessage(chatId, {
@@ -170,8 +171,8 @@ export default async function del({
               fromMe: Boolean(msg.fromMe),
             },
           });
+          return true;
         } catch {
-          // Fallback delete attempt without participant in case of private or DM structure
           try {
             await sock.sendMessage(chatId, {
               delete: {
@@ -179,11 +180,20 @@ export default async function del({
                 id: msg.id,
               },
             });
+            return true;
           } catch (e) {
-            logger.debug(`Could not delete message ${msg.id}: ${e.message}`);
+            // Skipped or already deleted on WhatsApp — continue to next candidate
+            return false;
           }
         }
       })
     );
+
+    for (const res of results) {
+      if (res.status === "fulfilled" && res.value === true) {
+        deletedCount++;
+        if (deletedCount >= count) break;
+      }
+    }
   }
 }
