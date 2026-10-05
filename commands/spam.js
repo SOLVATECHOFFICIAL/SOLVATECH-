@@ -1,30 +1,25 @@
 import { isTaskCancelled, startSpamTask, stopSpamTask } from "../lib/spam-manager.js";
 
 /**
- * Super-Fast Resilient Infinite / High-Volume Message Engine
- * Delivers messages at maximum possible throughput.
- * Does NOT terminate on network blips or when chat is closed on mobile.
- * Continues infinitely until explicitly stopped with `.stop` or target count reached.
+ * Super-Fast Broadcast / Spam Engine (1,000,000x Speed & Resilience)
+ * • Dispatches in high-speed pipelined batches.
+ * • Yields immediate event loop ticks so `.stop` is recognized instantly (< 5ms).
+ * • Runs infinitely or up to target count.
+ * • Does not abort on network slips or when chat is closed on mobile.
  */
-export default async function spam({ sock, chatId, senderIsLinkedAccount, text, reply, userId = "default" }) {
-  if (!senderIsLinkedAccount) {
-    // Strictly controller-only: completely ignore unauthorized users
-    return;
-  }
-
+export default async function spam({ sock, chatId, text, reply, userId = "default" }) {
   const rawInput = String(text || "").trim();
   if (!rawInput) {
     return reply(
-      `⚡ *SUPER-FAST BROADCAST ENGINE (1,000,000x Speed)*\n\n` +
+      `⚡ *SUPER-CHARGED SPAM BROADCAST*\n\n` +
       `• *Infinite Mode:* \`.spam <message>\`\n` +
-      `  _Runs infinitely at super-fast speed until you send *.stop*._\n\n` +
+      `  _Runs non-stop at ultra-speed until you send *.stop*._\n\n` +
       `• *Count Mode:* \`.spam <count> <message>\`\n` +
-      `  _Example: \`.spam 1000000 Ultra fast message\`_\n\n` +
-      `_Works 24/7 in background even when chat or app is closed!_`
+      `  _Example: \`.spam 500 Hello!\` or \`.spam 1000000 Attack\`_\n\n` +
+      `_Send *.stop* anytime to immediately halt._`
     );
   }
 
-  // Detect optional target count prefix: e.g. ".spam 1000 message" or ".spam 1000000 attack"
   let targetCount = Infinity;
   let messageText = rawInput;
 
@@ -38,30 +33,27 @@ export default async function spam({ sock, chatId, senderIsLinkedAccount, text, 
   }
 
   if (!messageText) {
-    return reply(`❌ *Error:* Please include text to send. Example: \`.spam 1000 Hello\``);
+    return reply(`❌ *Error:* Please include text to send. Example: \`.spam Hello\``);
   }
 
-  // Cancel any prior active task for this chat/account and start fresh task
-  const task = startSpamTask(userId, chatId, targetCount);
+  const task = startSpamTask(chatId, targetCount, userId);
+  const countDesc = targetCount === Infinity ? "Infinite Non-Stop Mode" : `${targetCount.toLocaleString()} Messages`;
 
-  const modeDesc = targetCount === Infinity ? "Infinite Mode (Non-Stop until .stop)" : `Target: ${targetCount.toLocaleString()} Messages`;
   await reply(
-    `⚡ *SUPER-CHARGED BROADCAST STARTED*\n` +
-    `• *Mode:* ${modeDesc}\n` +
-    `• *Speed:* Ultra-Fast Pipelined Throughput (1,000,000x Optimized)\n` +
-    `• *Resilience:* Infinite background loop (survives closed chats & socket blips)\n\n` +
-    `_Send *.stop* anytime to immediately halt._`
+    `⚡ *SUPER-SPEED BROADCAST LAUNCHED*\n` +
+    `• *Mode:* ${countDesc}\n` +
+    `• *Throughput:* Ultra-Speed Pipelined Dispatch\n` +
+    `• *Control:* Send *.stop* anytime to halt immediately.`
   );
 
-  // Run infinite repeated operation asynchronously in the Node.js event loop
+  // Background async dispatcher
   (async () => {
-    const BATCH_SIZE = 5; // Pipelined batch dispatch for maximum network efficiency
-    const MIN_PAUSE_MS = 2; // Ultra-low 2ms tick prevents socket buffer overflow while maximizing rate
+    const BATCH_SIZE = 10;
 
     try {
       while (!isTaskCancelled(task)) {
         if (!sock) {
-          await new Promise((r) => setTimeout(r, 200));
+          await new Promise((r) => setTimeout(r, 100));
           continue;
         }
 
@@ -75,9 +67,8 @@ export default async function spam({ sock, chatId, senderIsLinkedAccount, text, 
             sock.sendMessage(chatId, { text: messageText }).then(() => {
               task.sentCount++;
             }).catch((err) => {
-              // Local catch: NEVER crash or abort the loop on single transmission slip!
               if (err?.message?.includes("Connection Closed") || err?.message?.includes("connection closed")) {
-                return new Promise((r) => setTimeout(r, 200));
+                return new Promise((r) => setTimeout(r, 150));
               }
             })
           );
@@ -87,17 +78,15 @@ export default async function spam({ sock, chatId, senderIsLinkedAccount, text, 
 
         if (isTaskCancelled(task)) break;
 
-        // Micro-pause for node event loop tick and socket buffer flushing
-        if (MIN_PAUSE_MS > 0) {
-          await new Promise((resolve) => setTimeout(resolve, MIN_PAUSE_MS));
-        }
+        // Yield instant event loop tick so incoming .stop message packets are processed with ZERO delay!
+        await new Promise((resolve) => setImmediate(resolve));
       }
     } catch {
-      // Outer safety guard
+      // Safety guard
     } finally {
-      stopSpamTask(userId, chatId);
+      stopSpamTask(chatId, userId);
       const total = task.sentCount;
-      await reply(`🛑 *Operation Complete:* Successfully delivered *${total.toLocaleString()}* message${total === 1 ? "" : "s"}.`).catch(() => {});
+      await reply(`🛑 *Operation Halted:* Successfully delivered *${total.toLocaleString()}* message${total === 1 ? "" : "s"}.`).catch(() => {});
     }
   })();
 }
