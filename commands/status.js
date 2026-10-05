@@ -1,22 +1,104 @@
-import { generateWAMessageContent, proto } from "@whiskeysockets/baileys";
-import { isGroup, getMessageContent, unwrapMediaMessage } from "../lib/helpers.js";
+import {
+  generateWAMessageContent,
+  downloadContentFromMessage,
+  downloadMediaMessage,
+  proto,
+} from "@whiskeysockets/baileys";
+import { isGroup, getMessageContent, unwrapMediaMessage, streamToBuffer } from "../lib/helpers.js";
 import { downloadViewOnceRobust } from "../lib/media.js";
-import { downloadMessageMedia } from "../lib/helpers.js";
 import { getCachedIncomingMessage } from "../lib/deleted-messages.js";
 import { generateRichLinkPreview } from "../lib/link-preview.js";
 import { logger } from "../lib/logger.js";
 
 /**
+ * Robustly extract and decrypt media buffer from candidate message structures.
+ */
+async function retrieveMediaBuffer(sock, candidates = [], mediaType = "image") {
+  const streamType = mediaType === "audio" ? "audio" : mediaType === "video" ? "video" : "image";
+
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    const content = unwrapMediaMessage(candidate);
+    const media =
+      content?.imageMessage ||
+      content?.videoMessage ||
+      content?.audioMessage ||
+      content?.documentMessage ||
+      content?.ptvMessage ||
+      content?.stickerMessage;
+
+    if (media && media.mediaKey) {
+      try {
+        const stream = await downloadContentFromMessage(media, streamType);
+        const buf = await streamToBuffer(stream);
+        if (buf && buf.length > 0) {
+          return { buffer: buf, media };
+        }
+      } catch (err) {
+        logger.debug(`[GROUP_STATUS] Direct stream decryption note for ${mediaType}:`, err.message);
+      }
+    }
+  }
+
+  // Fallback 1: downloadViewOnceRobust
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    try {
+      const target = candidate.message ? candidate : { message: candidate };
+      const buf = await downloadViewOnceRobust(sock, target, null);
+      if (buf && buf.length > 0) {
+        const content = unwrapMediaMessage(candidate);
+        const media =
+          content?.imageMessage ||
+          content?.videoMessage ||
+          content?.audioMessage ||
+          content?.documentMessage;
+        return { buffer: buf, media };
+      }
+    } catch {}
+  }
+
+  // Fallback 2: Baileys downloadMediaMessage
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    try {
+      const target = candidate.message ? candidate : { message: candidate };
+      const ctx = sock
+        ? {
+            logger: sock.logger,
+            reuploadRequest: sock.updateMediaMessage ? sock.updateMediaMessage.bind(sock) : undefined,
+          }
+        : undefined;
+      const buf = await downloadMediaMessage(target, "buffer", {}, ctx);
+      if (buf && buf.length > 0) {
+        const content = unwrapMediaMessage(candidate);
+        const media =
+          content?.imageMessage ||
+          content?.videoMessage ||
+          content?.audioMessage ||
+          content?.documentMessage;
+        return { buffer: buf, media };
+      }
+    } catch {}
+  }
+
+  return null;
+}
+
+/**
  * .status command:
- * Reply to any photo, video, audio, link, or text in a group with `.status [optional caption]`.
+ * Reply to any photo, video, audio/music, link, or text in a group with `.status [optional caption]`.
  * Posts the content directly as that group's Group Status update (group story).
  *
  * Requirements:
  * - Only works in groups.
  * - Only the linked owner can trigger it.
  * - NEVER posts to personal status (never uses status@broadcast).
- * - Full Link Previews: When replying to a link, waits to generate and attach rich preview
- *   cards (title, description, and high-quality image thumbnail) so it shows properly.
+ * - Full Link Previews: When replying to a link (web link or WhatsApp group invite link),
+ *   resolves and generates rich preview cards (title, description, and high-quality thumbnail)
+ *   so the status story displays the complete card.
+ * - Full Media Support: Reliably downloads images, videos, audio/music, or documents even if sent
+ *   by the owner themselves.
  * - Silent & stealth: no confirmation messages, no pinning, no text announcements.
  * - Instantly deletes the owner's `.status` message after posting so no one notices.
  */
@@ -28,7 +110,7 @@ export default async function status({
   args = [],
   userId = "default",
 }) {
-  // 1. Group-only & Owner-only
+  // 1. Group-only & Owner-only restriction
   if (!isGroup(chatId) || !senderIsLinkedAccount) {
     return;
   }
@@ -52,15 +134,12 @@ export default async function status({
     const cachedEntry = quotedStanzaId ? getCachedIncomingMessage(userId, quotedStanzaId) : null;
     const customCaption = args.join(" ").trim();
 
-    const quotedSource = {
-      key: {
-        remoteJid: chatId,
-        id: quotedStanzaId || msgKey.id,
-        participant: contextInfo?.participant,
-        fromMe: false,
-      },
-      message: quotedMsg,
-    };
+    // Candidates in order of rich media data availability
+    const candidates = [
+      cachedEntry?.rawMessage,
+      cachedEntry?.content,
+      quotedMsg,
+    ].filter(Boolean);
 
     let mediaPayload = null;
 
@@ -71,26 +150,22 @@ export default async function status({
       unwrapQuoted.imageMessage ||
       unwrapQuoted.viewOnceMessage?.message?.imageMessage ||
       unwrapQuoted.viewOnceMessageV2?.message?.imageMessage ||
-      cachedEntry?.mediaType === "image"
+      cachedEntry?.mediaType === "image" ||
+      cachedEntry?.content?.imageMessage
     );
 
     if (hasImage) {
-      let imageBuffer;
-      try {
-        imageBuffer = await downloadViewOnceRobust(sock, quotedSource, cachedEntry);
-      } catch {
-        imageBuffer = await downloadMessageMedia(quotedSource, "image", sock);
-      }
-
-      if (imageBuffer && imageBuffer.length > 0) {
+      const res = await retrieveMediaBuffer(sock, candidates, "image");
+      if (res && res.buffer) {
         const origCaption =
+          res.media?.caption ||
           unwrapQuoted.imageMessage?.caption ||
           unwrapQuoted.viewOnceMessage?.message?.imageMessage?.caption ||
           "";
         const finalCaption = customCaption || origCaption;
 
         mediaPayload = {
-          image: imageBuffer,
+          image: res.buffer,
           caption: finalCaption || undefined,
         };
       }
@@ -104,27 +179,23 @@ export default async function status({
       unwrapQuoted.ptvMessage ||
       unwrapQuoted.viewOnceMessage?.message?.videoMessage ||
       unwrapQuoted.viewOnceMessageV2?.message?.videoMessage ||
-      cachedEntry?.mediaType === "video"
+      cachedEntry?.mediaType === "video" ||
+      cachedEntry?.content?.videoMessage
     );
 
     if (hasVideo) {
-      let videoBuffer;
-      try {
-        videoBuffer = await downloadViewOnceRobust(sock, quotedSource, cachedEntry);
-      } catch {
-        videoBuffer = await downloadMessageMedia(quotedSource, "video", sock);
-      }
-
-      if (videoBuffer && videoBuffer.length > 0) {
+      const res = await retrieveMediaBuffer(sock, candidates, "video");
+      if (res && res.buffer) {
         const origCaption =
+          res.media?.caption ||
           unwrapQuoted.videoMessage?.caption ||
           unwrapQuoted.viewOnceMessage?.message?.videoMessage?.caption ||
           "";
         const finalCaption = customCaption || origCaption;
-        const mimetype = unwrapQuoted.videoMessage?.mimetype || "video/mp4";
+        const mimetype = res.media?.mimetype || unwrapQuoted.videoMessage?.mimetype || "video/mp4";
 
         mediaPayload = {
-          video: videoBuffer,
+          video: res.buffer,
           caption: finalCaption || undefined,
           mimetype,
         };
@@ -132,29 +203,24 @@ export default async function status({
     }
 
     // ----------------------------------------------------
-    // CASE 3: AUDIO / VOICE NOTE
+    // CASE 3: AUDIO / MUSIC
     // ----------------------------------------------------
     const hasAudio = !mediaPayload && Boolean(
       unwrapQuoted.audioMessage ||
       unwrapQuoted.viewOnceMessage?.message?.audioMessage ||
       unwrapQuoted.viewOnceMessageV2?.message?.audioMessage ||
-      cachedEntry?.mediaType === "audio"
+      cachedEntry?.mediaType === "audio" ||
+      cachedEntry?.content?.audioMessage
     );
 
     if (hasAudio) {
-      let audioBuffer;
-      try {
-        audioBuffer = await downloadViewOnceRobust(sock, quotedSource, cachedEntry);
-      } catch {
-        audioBuffer = await downloadMessageMedia(quotedSource, "audio", sock);
-      }
-
-      if (audioBuffer && audioBuffer.length > 0) {
-        const mimetype = unwrapQuoted.audioMessage?.mimetype || "audio/mp4";
-        const ptt = Boolean(unwrapQuoted.audioMessage?.ptt);
+      const res = await retrieveMediaBuffer(sock, candidates, "audio");
+      if (res && res.buffer) {
+        const mimetype = res.media?.mimetype || unwrapQuoted.audioMessage?.mimetype || "audio/mp4";
+        const ptt = Boolean(res.media?.ptt || unwrapQuoted.audioMessage?.ptt);
 
         mediaPayload = {
-          audio: audioBuffer,
+          audio: res.buffer,
           mimetype,
           ptt,
         };
@@ -168,25 +234,20 @@ export default async function status({
       unwrapQuoted.documentMessage ||
       unwrapQuoted.viewOnceMessage?.message?.documentMessage ||
       unwrapQuoted.viewOnceMessageV2?.message?.documentMessage ||
-      cachedEntry?.mediaType === "document"
+      cachedEntry?.mediaType === "document" ||
+      cachedEntry?.content?.documentMessage
     );
 
     if (hasDocument) {
-      let docBuffer;
-      try {
-        docBuffer = await downloadViewOnceRobust(sock, quotedSource, cachedEntry);
-      } catch {
-        docBuffer = await downloadMessageMedia(quotedSource, "document", sock);
-      }
-
-      if (docBuffer && docBuffer.length > 0) {
-        const origCaption = unwrapQuoted.documentMessage?.caption || "";
+      const res = await retrieveMediaBuffer(sock, candidates, "document");
+      if (res && res.buffer) {
+        const origCaption = res.media?.caption || unwrapQuoted.documentMessage?.caption || "";
         const finalCaption = customCaption || origCaption;
-        const mimetype = unwrapQuoted.documentMessage?.mimetype || "application/octet-stream";
-        const fileName = unwrapQuoted.documentMessage?.fileName || "status-attachment";
+        const mimetype = res.media?.mimetype || unwrapQuoted.documentMessage?.mimetype || "application/octet-stream";
+        const fileName = res.media?.fileName || unwrapQuoted.documentMessage?.fileName || "attachment";
 
         mediaPayload = {
-          document: docBuffer,
+          document: res.buffer,
           caption: finalCaption || undefined,
           mimetype,
           fileName,
@@ -201,18 +262,27 @@ export default async function status({
       const origText = (
         unwrapQuoted.conversation ||
         unwrapQuoted.extendedTextMessage?.text ||
+        unwrapQuoted.groupInviteMessage?.caption ||
+        cachedEntry?.text ||
         ""
       ).trim();
 
-      const textToPost = customCaption || origText;
+      let textToPost = customCaption || origText;
+
+      // If quoted message is a group invite message structure, synthesize invite link
+      if (!textToPost && unwrapQuoted.groupInviteMessage?.inviteCode) {
+        textToPost = `https://chat.whatsapp.com/${unwrapQuoted.groupInviteMessage.inviteCode}`;
+      }
+
       if (!textToPost) {
         return;
       }
 
-      // Check if text contains a URL and generate rich link preview
+      // Check if text contains a URL (web link or WhatsApp group invite)
       const richPreview = await generateRichLinkPreview(
         textToPost,
-        unwrapQuoted.extendedTextMessage
+        unwrapQuoted.extendedTextMessage || cachedEntry?.content?.extendedTextMessage,
+        sock
       );
 
       if (richPreview) {
@@ -276,7 +346,10 @@ export default async function status({
       },
     });
 
-    logger.info("[GROUP_STATUS] Relaying group status directly to group", { chatId });
+    logger.info("[GROUP_STATUS] Relaying group status directly to group", {
+      chatId,
+      mediaType: mediaPayload.image ? "image" : mediaPayload.video ? "video" : mediaPayload.audio ? "audio" : "text",
+    });
 
     // 5. Send strictly to chatId (the group) — NEVER to personal status@broadcast
     try {
