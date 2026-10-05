@@ -1,12 +1,12 @@
 import { isTaskCancelled, startSpamTask, stopSpamTask } from "../lib/spam-manager.js";
 
 /**
- * Super-Charged Spam & Broadcast Engine (10 messages/second Light-Speed Dispatch)
+ * Super-Charged Spam & Broadcast Engine (Ultra High-Speed Resilient Dispatch)
  * • Instantly deletes the incoming .spam command message.
  * • No starting announcement — completely silent launch.
- * • Strict rate of exactly 10 messages per second (100ms interval).
+ * • Dispatches at 20x speed with 5ms pipelined concurrency.
  * • Executes to the last phase without stopping prematurely.
- * • When finished, simply sends "done".
+ * • When finished, simply replies "done".
  */
 export default async function spam({ sock, chatId, text, reply, userId = "default", message }) {
   // Instantly delete the user's .spam trigger message (Zero-Trace)
@@ -58,46 +58,75 @@ export default async function spam({ sock, chatId, text, reply, userId = "defaul
 
   const task = startSpamTask(chatId, targetCount, userId);
 
-  // Background dispatcher: exactly 10 messages per second, executes to the last phase
+  // Background dispatcher: 20x faster pipelined concurrency, executes to the last phase
   (async () => {
-    try {
-      while (!isTaskCancelled(task) && task.sentCount < targetCount) {
-        if (!sock) {
-          await new Promise((r) => setTimeout(r, 100));
-          continue;
-        }
+    const CONCURRENCY = 20;
+    let activeSends = 0;
+    let finished = false;
 
-        try {
+    const sendOne = async () => {
+      if (isTaskCancelled(task) || finished) return;
+      activeSends++;
+      try {
+        if (sock) {
           await sock.sendMessage(chatId, { text: messageText });
           task.sentCount++;
-        } catch (err) {
-          // Resilient: keep going to the last phase even on transient network slips
-          await new Promise((r) => setTimeout(r, 50));
+        }
+      } catch (err) {
+        // Resilient: keep going to the last phase even on transient network slips
+        if (err?.message?.includes("Connection Closed") || err?.message?.includes("connection closed")) {
+          await new Promise((r) => setTimeout(r, 10));
+        }
+      } finally {
+        activeSends--;
+      }
+    };
+
+    try {
+      while (!isTaskCancelled(task) && task.sentCount + activeSends < targetCount) {
+        if (!sock) {
+          await new Promise((r) => setTimeout(r, 20));
           continue;
         }
 
-        // 10 messages per second = 100ms delay between dispatches
-        if (task.sentCount < targetCount && !isTaskCancelled(task)) {
-          await new Promise((resolve) => {
-            const timer = setTimeout(resolve, 100);
-            if (task.abortController?.signal) {
-              task.abortController.signal.addEventListener(
-                "abort",
-                () => {
-                  clearTimeout(timer);
-                  resolve();
-                },
-                { once: true }
-              );
-            }
-          });
+        const canLaunch = Math.min(
+          CONCURRENCY - activeSends,
+          Math.max(0, targetCount - (task.sentCount + activeSends))
+        );
+
+        if (canLaunch > 0) {
+          for (let i = 0; i < canLaunch; i++) {
+            if (isTaskCancelled(task)) break;
+            sendOne();
+          }
         }
+
+        // 20x faster dispatch tick (5ms interval)
+        await new Promise((resolve) => {
+          const timer = setTimeout(resolve, 5);
+          if (task.abortController?.signal) {
+            task.abortController.signal.addEventListener(
+              "abort",
+              () => {
+                clearTimeout(timer);
+                resolve();
+              },
+              { once: true }
+            );
+          }
+        });
+      }
+
+      // Wait for any remaining in-flight sends
+      while (activeSends > 0 && !isTaskCancelled(task)) {
+        await new Promise((r) => setTimeout(r, 5));
       }
     } catch {
       // Guard
     } finally {
+      finished = true;
       stopSpamTask(chatId, userId);
-      // When finished, simply say "done" without any announcement
+      // When finished, simply say "done"
       if (!isTaskCancelled(task) && sock) {
         await sock.sendMessage(chatId, { text: "done" }).catch(() => {});
       }

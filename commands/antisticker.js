@@ -2,13 +2,27 @@ import sharp from "sharp";
 import { stickerToImage, stickerToVideo } from "../lib/media.js";
 import { downloadMessageMedia, getQuotedMessage, unwrapMediaMessage } from "../lib/helpers.js";
 import { logger } from "../lib/logger.js";
+import anti from "./anti.js";
 
-export default async function antisticker({ sock, message, chatId, reply }) {
+export default async function antisticker(props) {
+  const { sock, message, chatId, reply, args = [] } = props;
+  const first = String(args[0] || "").toLowerCase();
+
+  // If user passes "on", "off", "limit", or "status", route directly to anti-sticker protection toggle
+  if (first === "on" || first === "off" || first === "limit" || first === "status" || first === "setlimit") {
+    return anti({
+      ...props,
+      command: "antisticker",
+    });
+  }
+
   const source = getQuotedMessage(message) || message;
   const content = unwrapMediaMessage(source);
 
   if (!content.stickerMessage) {
-    return reply("❌ Reply to a sticker with *.antisticker* to convert it to an image or video.");
+    return reply(
+      "❌ Reply to a sticker with *.antisticker* to convert it to an image/video, or use *.antisticker on/off* to toggle protection."
+    );
   }
 
   try {
