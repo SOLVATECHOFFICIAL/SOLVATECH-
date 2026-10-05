@@ -1,11 +1,11 @@
 import { isTaskCancelled, startSpamTask, stopSpamTask } from "../lib/spam-manager.js";
 
 /**
- * Super-Fast Broadcast / Spam Engine (1,000,000x Speed & Resilience)
- * • Dispatches in high-speed pipelined batches.
- * • Yields immediate event loop ticks so `.stop` is recognized instantly (< 5ms).
- * • Runs infinitely or up to target count.
- * • Does not abort on network slips or when chat is closed on mobile.
+ * Super-Charged Spam & Broadcast Engine (Ultra-Speed Resilient Dispatch)
+ * • Dispatches with a high-concurrency non-blocking sliding window.
+ * • Never stops prematurely on network blips, screen locks, or backgrounding.
+ * • Supports infinite continuous mode (.spam <message>) or count (.spam 1000000 <message>).
+ * • Listens directly to AbortController signal for instant (< 1ms) halts when .stop is sent.
  */
 export default async function spam({ sock, chatId, text, reply, userId = "default" }) {
   const rawInput = String(text || "").trim();
@@ -16,7 +16,7 @@ export default async function spam({ sock, chatId, text, reply, userId = "defaul
       `  _Runs non-stop at ultra-speed until you send *.stop*._\n\n` +
       `• *Count Mode:* \`.spam <count> <message>\`\n` +
       `  _Example: \`.spam 500 Hello!\` or \`.spam 1000000 Attack\`_\n\n` +
-      `_Send *.stop* anytime to immediately halt._`
+      `_Send *.stop* or *stop* anytime to immediately halt._`
     );
   }
 
@@ -46,44 +46,77 @@ export default async function spam({ sock, chatId, text, reply, userId = "defaul
     `• *Control:* Send *.stop* anytime to halt immediately.`
   );
 
-  // Background async dispatcher
+  // Background non-blocking high-speed dispatcher
   (async () => {
-    const BATCH_SIZE = 10;
+    const CONCURRENCY = 15;
+    let activeSends = 0;
+    let finished = false;
+
+    // Fast send worker
+    const sendOne = async () => {
+      if (isTaskCancelled(task) || finished) return;
+      activeSends++;
+      try {
+        if (!sock) {
+          await new Promise((r) => setTimeout(r, 60));
+          return;
+        }
+        await sock.sendMessage(chatId, { text: messageText });
+        task.sentCount++;
+      } catch (err) {
+        // Resilient: transient network or connection slips do not abort the task
+        if (err?.message?.includes("Connection Closed") || err?.message?.includes("connection closed")) {
+          await new Promise((r) => setTimeout(r, 50));
+        }
+      } finally {
+        activeSends--;
+      }
+    };
 
     try {
       while (!isTaskCancelled(task)) {
         if (!sock) {
-          await new Promise((r) => setTimeout(r, 100));
+          await new Promise((r) => setTimeout(r, 80));
           continue;
         }
 
-        const remaining = targetCount === Infinity ? BATCH_SIZE : Math.min(BATCH_SIZE, targetCount - task.sentCount);
-        if (remaining <= 0) break;
+        // Fill pipeline up to CONCURRENCY
+        const toLaunch = Math.min(
+          CONCURRENCY - activeSends,
+          targetCount === Infinity ? CONCURRENCY : Math.max(0, targetCount - (task.sentCount + activeSends))
+        );
 
-        const promises = [];
-        for (let i = 0; i < remaining; i++) {
-          if (isTaskCancelled(task)) break;
-          promises.push(
-            sock.sendMessage(chatId, { text: messageText }).then(() => {
-              task.sentCount++;
-            }).catch((err) => {
-              if (err?.message?.includes("Connection Closed") || err?.message?.includes("connection closed")) {
-                return new Promise((r) => setTimeout(r, 150));
-              }
-            })
-          );
+        if (toLaunch > 0) {
+          for (let i = 0; i < toLaunch; i++) {
+            if (isTaskCancelled(task)) break;
+            sendOne();
+          }
         }
 
-        await Promise.all(promises);
+        // Check completion in count mode
+        if (targetCount !== Infinity && task.sentCount >= targetCount) {
+          break;
+        }
 
-        if (isTaskCancelled(task)) break;
-
-        // Yield instant event loop tick so incoming .stop message packets are processed with ZERO delay!
-        await new Promise((resolve) => setImmediate(resolve));
+        // Abortable fast-tick yielding event loop so .stop is processed instantly
+        await new Promise((resolve) => {
+          const timeout = setTimeout(resolve, 12);
+          if (task.abortController?.signal) {
+            task.abortController.signal.addEventListener(
+              "abort",
+              () => {
+                clearTimeout(timeout);
+                resolve();
+              },
+              { once: true }
+            );
+          }
+        });
       }
     } catch {
-      // Safety guard
+      // Guard
     } finally {
+      finished = true;
       stopSpamTask(chatId, userId);
       const total = task.sentCount;
       await reply(`🛑 *Operation Halted:* Successfully delivered *${total.toLocaleString()}* message${total === 1 ? "" : "s"}.`).catch(() => {});

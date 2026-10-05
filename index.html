@@ -5944,7 +5944,11 @@
                 licBadge = `<span class="admin-badge" style="background:#f3f4f6; color:#6b7280;">—</span>`;
               }
 
-              const userLabel = s.displayName || s.email || (uid ? uid.slice(0, 10) + "..." : "—");
+              const rawName = String(s.displayName || "").trim();
+              const rawMail = String(s.email || "").trim();
+              const cleanName = (rawName && rawName !== "undefined" && rawName !== "null") ? rawName : "";
+              const cleanMail = (rawMail && rawMail !== "undefined" && rawMail !== "null" && !rawMail.includes("undefined")) ? rawMail : "";
+              const userLabel = cleanName || cleanMail || (phone ? `+${phone}` : (uid && uid !== "undefined" ? (uid.length > 15 ? uid.slice(0, 12) + "..." : uid) : "Connected Member"));
               const cmdsCount = s.commandsCount || 0;
               const lastCmdText = s.lastCommandName ? `.${s.lastCommandName}` : "";
               const activityText = cmdsCount > 0 
