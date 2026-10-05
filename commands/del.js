@@ -7,12 +7,12 @@ import { logger } from "../lib/logger.js";
 /**
  * .del / .delete command
  *
- * Usage:
- *  - Reply to a message with `.del` -> Deletes that specific message.
- *    (Admins can delete any message; Non-admins can only delete their own messages).
- *  - `.del <count>` (e.g. `.del 29`) -> Deletes the last N messages from down to up (newest to oldest).
- *    (Admins delete all messages straight, including users' own; Non-admins delete only their own messages).
- *  - `.del` (no count, no reply) -> Deletes 1 message (Admin: last message; Non-admin: user's last message).
+ * Lightning-fast deletion:
+ *  - Reply to a message with `.del` -> Instantly deletes the replied message.
+ *    (Admins can delete any message; Non-admins delete their own messages).
+ *  - `.del <amount>` (e.g. `.del 10`, `.del 29`) -> Instantly deletes the last N messages from down to up.
+ *    (Admins delete all messages straight including users' own; Non-admins delete only their own messages).
+ *  - `.del` (no count, no reply) -> Instantly deletes 1 message.
  */
 export default async function del({
   sock,
@@ -46,36 +46,40 @@ export default async function del({
 
   const botIsAdmin = !isGroupChat || (metadata && isBotAdmin(metadata, botJids));
 
-  // 1. Delete the user's .del command message itself immediately
+  // 1. Instantly delete the user's .del command message itself (Zero-Trace)
   if (message?.key) {
-    await sock.sendMessage(chatId, { delete: message.key }).catch(() => {});
+    sock.sendMessage(chatId, { delete: message.key }).catch(() => {});
   }
 
-  // 2. Check if user replied to a specific message
+  // 2. Reply Mode: If replied to a specific message, delete that message immediately
   const quoted = getQuotedMessage(message, sock);
   const context = getContextInfo(message);
   const targetQuotedId = quoted?.id || quoted?.stanzaId || context?.stanzaId;
 
   if (targetQuotedId) {
     const quotedParticipant = quoted?.participant || context?.participant || "";
-    const isOwnMessage = quoted?.fromMe || (quotedParticipant && senderAliases.has(quotedParticipant)) || jidAliases(quotedParticipant).some((a) => senderAliases.has(a));
+    const isOwnMessage = Boolean(
+      quoted?.fromMe ||
+      (quotedParticipant && senderAliases.has(quotedParticipant)) ||
+      jidAliases(quotedParticipant).some((a) => senderAliases.has(a))
+    );
 
     if (!senderIsAdmin && !isOwnMessage) {
       const notice = await reply("❌ *Permission Denied:* Only group administrators can delete messages sent by other members.").catch(() => null);
       if (notice?.key) {
         setTimeout(() => {
           sock.sendMessage(chatId, { delete: notice.key }).catch(() => {});
-        }, 4000);
+        }, 3000);
       }
       return;
     }
 
     if (isGroupChat && !isOwnMessage && !botIsAdmin) {
-      const notice = await reply("⚠️ *Bot Admin Required:* The bot must be an administrator in this group to delete other members' messages.").catch(() => null);
+      const notice = await reply("⚠️ *Bot Admin Required:* I must be a group admin to delete messages sent by other members.").catch(() => null);
       if (notice?.key) {
         setTimeout(() => {
           sock.sendMessage(chatId, { delete: notice.key }).catch(() => {});
-        }, 4000);
+        }, 3000);
       }
       return;
     }
@@ -87,39 +91,31 @@ export default async function del({
       fromMe: Boolean(quoted?.fromMe || (senderIsLinkedAccount && isOwnMessage)),
     };
 
-    let ok = false;
-    try {
-      await sock.sendMessage(chatId, { delete: deleteKey });
-      ok = true;
-    } catch {
-      try {
-        await sock.sendMessage(chatId, {
-          delete: {
-            remoteJid: chatId,
-            id: targetQuotedId,
-            participant: quotedParticipant,
-          },
-        });
-        ok = true;
-      } catch (err) {
-        logger.debug(`Could not delete quoted message ${targetQuotedId}:`, err.message);
-      }
-    }
+    removeCachedMessage(userId, targetQuotedId);
 
-    if (ok) {
-      removeCachedMessage(userId, targetQuotedId);
-    }
+    // Instant parallel delete attempts (with & without fromMe) for light speed deletion
+    await Promise.allSettled([
+      sock.sendMessage(chatId, { delete: deleteKey }),
+      sock.sendMessage(chatId, {
+        delete: {
+          remoteJid: chatId,
+          id: targetQuotedId,
+          participant: quotedParticipant,
+        },
+      }),
+    ]).catch(() => {});
+
     return;
   }
 
-  // 3. Bulk count deletion from down to up (newest to oldest)
+  // 3. Count Mode: .del <amount> (e.g. .del 29)
   let count = 1;
   const rawArg = args[0] ? parseInt(args[0], 10) : NaN;
   if (!isNaN(rawArg) && rawArg > 0) {
     count = Math.min(rawArg, 100);
   }
 
-  // Retrieve cached messages sorted newest first ("down to up")
+  // Retrieve cached messages sorted newest first ("from down to up")
   const recentMessages = getChatRecentMessages(userId, chatId);
 
   // Exclude the .del trigger message itself
@@ -140,63 +136,42 @@ export default async function del({
   }
 
   if (targetsToDelete.length === 0) {
-    const notice = await reply(
-      senderIsAdmin
-        ? "ℹ️ *No recent messages found in chat history to delete.*"
-        : "ℹ️ *No recent messages found from you in chat history to delete.*"
-    ).catch(() => null);
-
-    if (notice?.key) {
-      setTimeout(() => {
-        sock.sendMessage(chatId, { delete: notice.key }).catch(() => {});
-      }, 4000);
-    }
     return;
   }
 
   // If sender is admin and attempting to delete messages from other participants, verify bot is admin
   const hasOtherMembersMessages = targetsToDelete.some((m) => !senderAliases.has(m.sender) && !m.fromMe);
   if (isGroupChat && hasOtherMembersMessages && !botIsAdmin) {
-    const notice = await reply("⚠️ *Bot Admin Required:* The bot must be an administrator in this group to delete other members' messages.").catch(() => null);
+    const notice = await reply("⚠️ *Bot Admin Required:* I must be a group admin to delete other members' messages.").catch(() => null);
     if (notice?.key) {
       setTimeout(() => {
         sock.sendMessage(chatId, { delete: notice.key }).catch(() => {});
-      }, 4000);
+      }, 3000);
     }
     return;
   }
 
-  let deletedCount = 0;
-  for (const msg of targetsToDelete) {
-    try {
-      await sock.sendMessage(chatId, {
-        delete: {
-          remoteJid: chatId,
-          id: msg.id,
-          participant: msg.sender,
-          fromMe: Boolean(msg.fromMe),
-        },
-      });
-      removeCachedMessage(userId, msg.id);
-      deletedCount += 1;
-      // Slight delay to prevent WhatsApp rate limiting
-      if (targetsToDelete.length > 1) {
-        await new Promise((r) => setTimeout(r, 120));
-      }
-    } catch (err) {
-      logger.debug(`Could not delete message ${msg.id}:`, err.message);
-    }
-  }
-
-  const roleLabel = senderIsAdmin ? "message(s) straight" : "of your message(s)";
-  const confirmMsg = await reply(
-    `🗑️ Successfully deleted *${deletedCount}* ${roleLabel} (newest to oldest).`
-  ).catch(() => null);
-
-  // Auto-clean confirm message after 4 seconds so the chat stays completely clean
-  if (confirmMsg?.key) {
-    setTimeout(() => {
-      sock.sendMessage(chatId, { delete: confirmMsg.key }).catch(() => {});
-    }, 4000);
+  // ULTRA FAST PARALLEL BATCH EXECUTION:
+  // Execute deletes in concurrent batches of 8 for light-speed completion
+  const BATCH_SIZE = 8;
+  for (let i = 0; i < targetsToDelete.length; i += BATCH_SIZE) {
+    const batch = targetsToDelete.slice(i, i + BATCH_SIZE);
+    await Promise.allSettled(
+      batch.map(async (msg) => {
+        removeCachedMessage(userId, msg.id);
+        try {
+          await sock.sendMessage(chatId, {
+            delete: {
+              remoteJid: chatId,
+              id: msg.id,
+              participant: msg.sender,
+              fromMe: Boolean(msg.fromMe),
+            },
+          });
+        } catch (e) {
+          logger.debug(`Could not delete message ${msg.id}:`, e.message);
+        }
+      })
+    );
   }
 }
