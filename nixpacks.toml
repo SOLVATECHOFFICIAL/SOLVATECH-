@@ -1,6 +1,6 @@
 # Nixpacks build configuration for Railway
 [phases.setup]
-nixPkgs = ["ffmpeg"]
+nixPkgs = ["nodejs_22", "ffmpeg"]
 
 [phases.install]
 cmds = ["npm install --omit=dev --legacy-peer-deps"]

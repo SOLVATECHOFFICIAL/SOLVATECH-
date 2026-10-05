@@ -1652,9 +1652,23 @@ syncAllPaymentsFromCloud().then((res) => {
 });
 
 // Background auto-restore & license audits
-restoreAllSessions().catch((error) => {
-  logger.warn("Auto-restore session error", error.message);
-});
+const isRailwayEnvironment = Boolean(
+  process.env.RAILWAY_ENVIRONMENT ||
+  process.env.RAILWAY_PROJECT_ID ||
+  process.env.RAILWAY_SERVICE_ID ||
+  process.env.RAILWAY_STATIC_URL ||
+  process.env.RAILWAY_TCP_PROXY_PORT
+);
+
+const runOnlyOnRailway = process.env.RUN_ONLY_ON_RAILWAY === "true" || process.env.RUN_ONLY_ON_RAILWAY === "1";
+
+if (runOnlyOnRailway && !isRailwayEnvironment) {
+  logger.info("ℹ️ [Deployment Policy] RUN_ONLY_ON_RAILWAY is enabled. Auto-restoring WhatsApp sockets is skipped in this environment so your bot runs exclusively on Railway without 440 conflicts.");
+} else {
+  restoreAllSessions().catch((error) => {
+    logger.warn("Auto-restore session error", error.message);
+  });
+}
 
 setInterval(() => {
   auditActiveSessions().catch((err) => {
