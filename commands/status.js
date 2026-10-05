@@ -267,11 +267,18 @@ export default async function status({
         ""
       ).trim();
 
-      let textToPost = customCaption || origText;
+      const urlInOrig = (origText || "").match(/(?:https?:\/\/|www\.)[^\s]+/i)?.[0];
+      let textToPost = origText;
 
-      // If quoted message is a group invite message structure, synthesize invite link
-      if (!textToPost && unwrapQuoted.groupInviteMessage?.inviteCode) {
-        textToPost = `https://chat.whatsapp.com/${unwrapQuoted.groupInviteMessage.inviteCode}`;
+      if (!urlInOrig && unwrapQuoted.groupInviteMessage?.inviteCode) {
+        const inviteUrl = `https://chat.whatsapp.com/${unwrapQuoted.groupInviteMessage.inviteCode}`;
+        textToPost = customCaption ? `${customCaption}\n\n${inviteUrl}` : inviteUrl;
+      } else if (customCaption) {
+        if (urlInOrig && !customCaption.includes(urlInOrig)) {
+          textToPost = `${customCaption}\n\n${urlInOrig}`;
+        } else {
+          textToPost = customCaption;
+        }
       }
 
       if (!textToPost) {
