@@ -95,10 +95,9 @@ async function retrieveMediaBuffer(sock, candidates = [], mediaType = "image") {
  * - Only the linked owner can trigger it.
  * - NEVER posts to personal status (never uses status@broadcast).
  * - Full Link Previews: When replying to a link (web link or WhatsApp group invite link),
- *   resolves and generates rich preview cards (title, description, and high-quality thumbnail)
- *   so the status story displays the complete card.
- * - Full Media Support: Reliably downloads images, videos, audio/music, or documents even if sent
- *   by the owner themselves.
+ *   it relaxes and thoroughly resolves rich preview cards (title, description, and high-quality thumbnail)
+ *   so the status story displays the complete card with picture.
+ * - Strict verification: If link preview or picture cannot be loaded, it ABORTS and does not upload to status!
  * - Silent & stealth: no confirmation messages, no pinning, no text announcements.
  * - Instantly deletes the owner's `.status` message after posting so no one notices.
  */
@@ -255,6 +254,13 @@ export default async function status({
       }
     }
 
+    // Strict validation: if the replied message was media (image, video, audio, doc) but failed to download, abort!
+    const isOriginalMedia = hasImage || hasVideo || hasAudio || hasDocument;
+    if (isOriginalMedia && !mediaPayload) {
+      logger.warn("[GROUP_STATUS] Media download failed — aborting status upload as required.");
+      return;
+    }
+
     // ----------------------------------------------------
     // CASE 5: LINK OR TEXT STATUS
     // ----------------------------------------------------
@@ -286,13 +292,25 @@ export default async function status({
       }
 
       // Check if text contains a URL (web link or WhatsApp group invite)
-      const richPreview = await generateRichLinkPreview(
-        textToPost,
-        unwrapQuoted.extendedTextMessage || cachedEntry?.content?.extendedTextMessage,
-        sock
+      const hasUrl = Boolean(
+        /(?:https?:\/\/|www\.|chat\.whatsapp\.com\/)[^\s]+/i.test(textToPost) ||
+        urlInOrig ||
+        unwrapQuoted.groupInviteMessage
       );
 
-      if (richPreview) {
+      if (hasUrl) {
+        // STRICT REQUIREMENT: Link must have rich preview with title & picture thumbnail, or do not post!
+        const richPreview = await generateRichLinkPreview(
+          textToPost,
+          unwrapQuoted.extendedTextMessage || cachedEntry?.content?.extendedTextMessage,
+          sock
+        );
+
+        if (!richPreview || !richPreview.title || !richPreview.jpegThumbnail || richPreview.jpegThumbnail.length === 0) {
+          logger.warn("[GROUP_STATUS] Link preview validation failed (missing title or picture) — aborting status upload as requested.");
+          return;
+        }
+
         const innerMsg = proto.Message.fromObject({
           extendedTextMessage: richPreview,
         });
@@ -309,10 +327,11 @@ export default async function status({
           },
         });
 
-        logger.info("[GROUP_STATUS] Relaying group status with rich link preview", {
+        logger.info("[GROUP_STATUS] Relaying group status with verified link preview and picture", {
           chatId,
           title: richPreview.title,
           hasThumb: Boolean(richPreview.jpegThumbnail),
+          thumbBytes: richPreview.jpegThumbnail.length,
         });
 
         try {
