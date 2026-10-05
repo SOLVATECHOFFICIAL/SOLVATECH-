@@ -5,7 +5,14 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { PORT } from "./lib/config.js";
 import { logger } from "./lib/logger.js";
-import { getWhatsAppController, restoreAllSessions, auditActiveSessions, getAllWhatsAppStatuses } from "./lib/whatsapp.js";
+import {
+  getWhatsAppController,
+  restoreAllSessions,
+  auditActiveSessions,
+  getAllWhatsAppStatuses,
+  disconnectSessionWithNotice,
+  disconnectMultipleSessionsWithNotice,
+} from "./lib/whatsapp.js";
 import { getLockedNumberForUid, getAllNumberLocks, unlinkNumberFromUser, unlinkPhoneNumber } from "./lib/number-lock.js";
 import { requireAuth, requireAdmin, isAdminEmail, createPreviewToken, getFirebaseServerFirestore } from "./lib/auth.js";
 import { isSupabaseConfigured, getSupabasePublicConfig, supabaseUpsert, checkSupabaseSchemaStatus } from "./lib/supabase.js";
@@ -967,6 +974,21 @@ for (const p of prefixes) {
 
       const pendingPaymentsCount = (paymentRequests || []).filter((p) => p && p.status === "pending").length;
 
+      const enrichedWhatsappList = (whatsappList || []).map((ws) => {
+        const uid = ws.verifiedUid || ws.userId;
+        const lock = locksByUid[uid] || "";
+        const cust = customersMap[uid] || {};
+        return {
+          ...ws,
+          uid,
+          lockedPhoneNumber: lock,
+          phoneNumber: lock || ws.botNumber || cust.phoneNumber || "",
+          email: ws.userEmail || cust.email || "",
+          displayName: cust.displayName || "",
+          licenseStatus: cust.licenseStatus || cust.activeLicense?.status || "none",
+        };
+      });
+
       response.json({
         success: true,
         overview: {
@@ -993,7 +1015,7 @@ for (const p of prefixes) {
         payments: paymentRequests || [],
         paymentConfig: paymentConfig || {},
         referrals: referralAudit,
-        whatsappSessions: whatsappList,
+        whatsappSessions: enrichedWhatsappList,
         recentActivity: activityEvents.slice(0, 50),
         systemHealth: {
           uptimeSeconds: Math.floor(process.uptime()),
@@ -1203,6 +1225,22 @@ for (const p of prefixes) {
     } catch (error) {
       logger.error("Admin overwrite user error", error.stack || error.message);
       response.status(500).json({ error: error.message || "Failed to overwrite user." });
+    }
+  });
+
+  // Admin: Disconnect single or multiple WhatsApp sessions with personal update DM notification
+  app.post(`${p}/admin/sessions/disconnect`, requireAuth, requireAdmin, async (request, response) => {
+    try {
+      const { userId, userIds, message } = request.body || {};
+      const targets = Array.isArray(userIds) ? userIds : userId ? [userId] : [];
+      if (targets.length === 0) {
+        return response.status(400).json({ error: "No userId or userIds specified." });
+      }
+      const result = await disconnectMultipleSessionsWithNotice(targets, message);
+      return response.json(result);
+    } catch (error) {
+      logger.error("Admin disconnect sessions error:", error.stack || error.message);
+      return response.status(500).json({ error: error.message || "Failed to disconnect sessions." });
     }
   });
 

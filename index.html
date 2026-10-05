@@ -1582,24 +1582,41 @@
 
             <!-- WhatsApp Active Sessions Table -->
             <div class="admin-table-container">
-              <div class="admin-table-header-row">
-                <h3 class="admin-table-title">Live WhatsApp Sockets & Connected Numbers</h3>
+              <div class="admin-table-header-row" style="flex-wrap: wrap; gap: 12px; align-items: center;">
+                <div>
+                  <h3 class="admin-table-title">⚡ Live WhatsApp Sockets & Connected Sessions</h3>
+                  <p style="font-size: 11.5px; color: var(--muted); margin: 2px 0 0;">
+                    Disconnecting logs out the session, sends an update notice DM, and requires re-pairing with a valid license.
+                  </p>
+                </div>
+                <div class="admin-table-actions" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                  <button id="admin-wa-disconnect-selected-btn" type="button" class="license-btn" style="padding: 6px 14px; font-size: 12px; margin: 0; background: #dc2626; color: #fff; display: inline-flex; align-items: center; gap: 6px;" disabled onclick="disconnectSelectedSessions()">
+                    🔌 Disconnect Selected (<span id="admin-wa-selected-count">0</span>)
+                  </button>
+                  <button id="admin-wa-disconnect-all-btn" type="button" class="admin-preset-btn" style="padding: 6px 14px; font-size: 12px; border-color: #f87171; color: #b91c1c; background: #fff5f5;" onclick="disconnectAllActiveSessions()">
+                    ⚡ Disconnect All Active
+                  </button>
+                </div>
               </div>
               <div class="admin-table-scroll">
                 <table class="admin-master-table">
                   <thead>
                     <tr>
-                      <th>#</th>
-                      <th>User UID</th>
-                      <th>Locked Phone Number</th>
+                      <th style="width: 38px; text-align: center;">
+                        <input type="checkbox" id="admin-wa-select-all" title="Select / Deselect all" style="cursor: pointer;" onchange="toggleSelectAllWhatsApp(this)" />
+                      </th>
+                      <th style="width: 40px;">#</th>
+                      <th>User Account</th>
+                      <th>Locked Phone</th>
                       <th>Connection State</th>
                       <th>Connected Number</th>
                       <th>Last Active</th>
+                      <th style="text-align: right; width: 110px;">Action</th>
                     </tr>
                   </thead>
                   <tbody id="admin-whatsapp-tbody">
                     <tr>
-                      <td colspan="6" style="text-align: center; color: var(--muted); padding: 24px;">Loading WhatsApp session states...</td>
+                      <td colspan="8" style="text-align: center; color: var(--muted); padding: 24px;">Loading WhatsApp session states...</td>
                     </tr>
                   </tbody>
                 </table>
@@ -5890,32 +5907,166 @@
           if (waList.length === 0) {
             tbody.innerHTML = `
               <tr>
-                <td colspan="6" style="text-align: center; color: var(--muted); padding: 24px;">
+                <td colspan="8" style="text-align: center; color: var(--muted); padding: 24px;">
                   No active WhatsApp sessions registered.
                 </td>
               </tr>
             `;
           } else {
             tbody.innerHTML = waList.map((s, idx) => {
+              const uid = s.uid || s.userId || "";
+              const phone = s.lockedPhoneNumber || s.phoneNumber || s.botNumber || "";
               const isConn = s.status === "connected" || s.connectionState === "open";
               const badge = isConn 
                 ? `<span class="admin-badge badge-connected"><span class="badge-dot"></span>CONNECTED</span>` 
                 : `<span class="admin-badge badge-disconnected"><span class="badge-dot"></span>${(s.status || "DISCONNECTED").toUpperCase()}</span>`;
 
+              const userLabel = s.displayName || s.email || (uid ? uid.slice(0, 10) + "..." : "—");
+
               return `
-                <tr style="cursor: pointer;" onclick="openCustomerDetail('${s.uid}')">
+                <tr>
+                  <td style="text-align: center;">
+                    <input type="checkbox" class="admin-wa-checkbox" value="${uid}" data-phone="${phone}" onchange="updateSelectedWhatsAppCount()" style="cursor: pointer;" />
+                  </td>
                   <td>${idx + 1}</td>
-                  <td><span class="code-pill">${s.uid ? s.uid.slice(0, 10) + "..." : "—"}</span></td>
-                  <td><strong style="font-family:'DM Mono', monospace;">${s.lockedPhoneNumber || s.phoneNumber ? `+${s.lockedPhoneNumber || s.phoneNumber}` : "—"}</strong></td>
+                  <td>
+                    <div style="font-weight: 600; color: var(--ink); cursor: pointer;" onclick="openCustomerDetail('${uid}')">${userLabel}</div>
+                    <span class="code-pill" style="font-size: 10px; opacity: 0.8;">${uid.slice(0, 12)}...</span>
+                  </td>
+                  <td><strong style="font-family:'DM Mono', monospace;">${phone ? `+${phone}` : "—"}</strong></td>
                   <td>${badge}</td>
                   <td>${s.botNumber ? `+${s.botNumber}` : "—"}</td>
-                  <td>${s.connectedAt ? new Date(s.connectedAt).toLocaleString() : "—"}</td>
+                  <td style="font-size: 11px;">${s.connectedAt ? new Date(s.connectedAt).toLocaleString() : "—"}</td>
+                  <td style="text-align: right;">
+                    <button type="button" class="admin-copy-key-btn" style="color: #b91c1c; border-color: #fca5a5; background: #fef2f2; padding: 4px 10px; font-size: 11px; font-weight: 600;" onclick="disconnectSingleSession('${uid}', '${phone}')">
+                      Disconnect
+                    </button>
+                  </td>
                 </tr>
               `;
             }).join("");
           }
+          if (typeof updateSelectedWhatsAppCount === "function") {
+            updateSelectedWhatsAppCount();
+          }
         }
       }
+
+      window.toggleSelectAllWhatsApp = function(masterCb) {
+        const cbs = document.querySelectorAll(".admin-wa-checkbox");
+        cbs.forEach((cb) => {
+          cb.checked = Boolean(masterCb.checked);
+        });
+        if (typeof updateSelectedWhatsAppCount === "function") {
+          updateSelectedWhatsAppCount();
+        }
+      };
+
+      window.updateSelectedWhatsAppCount = function() {
+        const cbs = document.querySelectorAll(".admin-wa-checkbox:checked");
+        const count = cbs.length;
+        const countEl = document.getElementById("admin-wa-selected-count");
+        const btn = document.getElementById("admin-wa-disconnect-selected-btn");
+        if (countEl) countEl.textContent = String(count);
+        if (btn) btn.disabled = count === 0;
+
+        const allCbs = document.querySelectorAll(".admin-wa-checkbox");
+        const masterCb = document.getElementById("admin-wa-select-all");
+        if (masterCb && allCbs.length > 0) {
+          masterCb.checked = count === allCbs.length;
+          masterCb.indeterminate = count > 0 && count < allCbs.length;
+        }
+      };
+
+      window.disconnectSingleSession = async function(uid, phone) {
+        if (!uid) return;
+        const displayLabel = phone ? `+${phone}` : uid;
+        const confirmMsg = `🔌 Disconnect WhatsApp session for ${displayLabel}?\n\nBefore disconnecting, the bot will send a personal DM instructing them to clear their old linked session in WhatsApp and re-pair with a valid license.\n\nProceed?`;
+        if (!confirm(confirmMsg)) return;
+
+        try {
+          const token = await getAuthToken();
+          const res = await fetch("/api/admin/sessions/disconnect", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: token ? `Bearer ${token}` : "",
+            },
+            body: JSON.stringify({ userId: uid }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Failed to disconnect session.");
+
+          alert(`✅ Successfully disconnected ${displayLabel}.\nUpdate notice DM sent to user.`);
+          if (typeof loadAdminOverview === "function") loadAdminOverview();
+        } catch (err) {
+          alert(`❌ Disconnect failed: ${err.message}`);
+        }
+      };
+
+      window.disconnectSelectedSessions = async function() {
+        const checked = [...document.querySelectorAll(".admin-wa-checkbox:checked")].map((cb) => cb.value).filter(Boolean);
+        if (checked.length === 0) {
+          alert("Please select at least one session to disconnect.");
+          return;
+        }
+
+        const confirmMsg = `🔌 Disconnect ${checked.length} selected WhatsApp session(s)?\n\nEach user will receive a personal DM before logout instructing them to clear their old linked session and re-pair.\n\nProceed?`;
+        if (!confirm(confirmMsg)) return;
+
+        try {
+          const token = await getAuthToken();
+          const res = await fetch("/api/admin/sessions/disconnect", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: token ? `Bearer ${token}` : "",
+            },
+            body: JSON.stringify({ userIds: checked }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Failed to disconnect selected sessions.");
+
+          alert(`✅ Successfully disconnected ${data.disconnectedCount || checked.length} session(s).\nUpdate notice DMs dispatched.`);
+          if (typeof loadAdminOverview === "function") loadAdminOverview();
+        } catch (err) {
+          alert(`❌ Bulk disconnect failed: ${err.message}`);
+        }
+      };
+
+      window.disconnectAllActiveSessions = async function() {
+        if (!adminOverviewData) return;
+        const waList = adminOverviewData.whatsappSessions || [];
+        const activeSessions = waList.filter((s) => s.status === "connected" || s.connectionState === "open");
+        const targetUids = (activeSessions.length > 0 ? activeSessions : waList).map((s) => s.uid || s.userId).filter(Boolean);
+
+        if (targetUids.length === 0) {
+          alert("No registered WhatsApp sessions found to disconnect.");
+          return;
+        }
+
+        const promptText = `⚡ Disconnect ALL ${targetUids.length} WhatsApp sessions?\n\nTip: You can cancel and tick/untick specific users in the list if you want to leave some updated users connected!\n\nIf you proceed, all ${targetUids.length} users will receive an update notice DM in WhatsApp and will be logged out.`;
+        if (!confirm(promptText)) return;
+
+        try {
+          const token = await getAuthToken();
+          const res = await fetch("/api/admin/sessions/disconnect", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: token ? `Bearer ${token}` : "",
+            },
+            body: JSON.stringify({ userIds: targetUids }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Failed to disconnect all sessions.");
+
+          alert(`✅ Successfully disconnected ${data.disconnectedCount || targetUids.length} session(s).\nUpdate notice DMs sent to all users.`);
+          if (typeof loadAdminOverview === "function") loadAdminOverview();
+        } catch (err) {
+          alert(`❌ Disconnect all failed: ${err.message}`);
+        }
+      };
 
       // Render Activity Timeline (Subtab 7)
       function renderActivityTimeline() {

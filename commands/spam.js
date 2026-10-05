@@ -1,10 +1,10 @@
 import { isTaskCancelled, startSpamTask, stopSpamTask } from "../lib/spam-manager.js";
 
-const MAX_COUNT = 500;
-const INTERVAL_MS = 500; // 2 messages per second (500ms interval)
+// 10 times faster than before (50ms interval = ~20 messages/sec)
+const INTERVAL_MS = 50;
 
 async function interruptibleSleep(ms, task) {
-  const step = 100;
+  const step = 10;
   let elapsed = 0;
   while (elapsed < ms && !isTaskCancelled(task)) {
     await new Promise((resolve) => setTimeout(resolve, Math.min(step, ms - elapsed)));
@@ -14,7 +14,7 @@ async function interruptibleSleep(ms, task) {
 
 export default async function spam({ sock, chatId, senderIsLinkedAccount, text, reply, userId = "default" }) {
   if (!senderIsLinkedAccount) {
-    // Strictly controller-only: completely ignore unauthorized users
+    // Strictly personal controller-only: completely ignore unauthorized users
     return;
   }
 
@@ -23,7 +23,7 @@ export default async function spam({ sock, chatId, senderIsLinkedAccount, text, 
     return reply(
       `❌ *Usage:* \`.spam <message>\`\n` +
       `Example: \`.spam Important update\`\n` +
-      `_Use *.stop* anytime to stop messaging._`
+      `_Use *.stop* anytime to stop infinite messaging._`
     );
   }
 
@@ -31,38 +31,31 @@ export default async function spam({ sock, chatId, senderIsLinkedAccount, text, 
   const task = startSpamTask(userId, chatId);
 
   await reply(
-    `🚀 *Broadcast started:* Repeating message...\n` +
-    `_Use *.stop* anytime to cancel._`
+    `⚡ *High-Speed Infinite Broadcast started (10x Faster)*\n` +
+    `_Running infinitely without stopping until you send *.stop*._`
   );
 
-  // Run repeated operation asynchronously with sequential rate-limiting
+  // Run infinite repeated operation asynchronously with rapid 50ms rate
   (async () => {
     let sentCount = 0;
     try {
-      while (!isTaskCancelled(task) && sentCount < MAX_COUNT) {
-        // Send message sequentially
+      while (!isTaskCancelled(task)) {
+        // Send message at maximum speed
         await sock.sendMessage(chatId, { text: messageText });
         sentCount++;
 
-        // Stop if max count reached or cancelled
-        if (sentCount >= MAX_COUNT || isTaskCancelled(task)) {
+        if (isTaskCancelled(task)) {
           break;
         }
 
-        // Wait rate interval (500ms), checking cancellation in real-time
+        // 10x faster rate interval (50ms), checking cancellation in real-time
         await interruptibleSleep(INTERVAL_MS, task);
       }
     } catch {
       // Socket error or disconnect handling
     } finally {
-      const wasCancelled = isTaskCancelled(task);
       stopSpamTask(userId, chatId);
-
-      if (wasCancelled) {
-        await reply(`🛑 *Operation stopped:* Delivered ${sentCount} message${sentCount === 1 ? "" : "s"}.`).catch(() => {});
-      } else if (sentCount >= MAX_COUNT) {
-        await reply(`✅ *Broadcast completed:* Delivered ${sentCount} messages.`).catch(() => {});
-      }
+      await reply(`🛑 *Operation stopped:* Successfully delivered ${sentCount} message${sentCount === 1 ? "" : "s"}.`).catch(() => {});
     }
   })();
 }
