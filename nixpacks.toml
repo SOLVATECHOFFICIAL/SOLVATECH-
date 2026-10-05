@@ -2,6 +2,9 @@
 [phases.setup]
 nixPkgs = ["ffmpeg"]
 
+[phases.install]
+cmds = ["npm install --omit=dev --legacy-peer-deps"]
+
 [variables]
 NODE_ENV = "production"
 BOT_DATA_DIR = "/app/runtime"

@@ -27,5 +27,8 @@
     "sharp": "^0.34.1",
     "tesseract.js": "^7.0.0",
     "web-push": "^3.6.7"
+  },
+  "overrides": {
+    "link-preview-js": "^5.0.0"
   }
 }
