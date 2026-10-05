@@ -10,6 +10,8 @@ import { getCachedIncomingMessage } from "../lib/deleted-messages.js";
 import { generateRichLinkPreview } from "../lib/link-preview.js";
 import { logger } from "../lib/logger.js";
 
+const ANY_LINK_REGEX = /(?:https?:\/\/|www\.|chat\.whatsapp\.com\/|whatsapp\.com\/channel\/|wa\.me\/)[^\s]+/i;
+
 /**
  * Robustly extract and decrypt media buffer from candidate message structures.
  */
@@ -87,19 +89,16 @@ async function retrieveMediaBuffer(sock, candidates = [], mediaType = "image") {
 
 /**
  * .status command:
- * Reply to any photo, video, audio/music, link, or text in a group with `.status [optional caption]`.
- * Posts the content directly as that group's Group Status update (group story).
+ * Post photos, videos, audio, group links, channel links, or web links to WhatsApp Group Status (story).
  *
  * Requirements:
  * - Only works in groups.
  * - Only the linked owner can trigger it.
- * - NEVER posts to personal status (never uses status@broadcast).
- * - Full Link Previews: When replying to a link (web link or WhatsApp group invite link),
- *   it relaxes and thoroughly resolves rich preview cards (title, description, and high-quality thumbnail)
- *   so the status story displays the complete card with picture.
- * - Strict verification: If link preview or picture cannot be loaded, it ABORTS and does not upload to status!
- * - Silent & stealth: no confirmation messages, no pinning, no text announcements.
- * - Instantly deletes the owner's `.status` message after posting so no one notices.
+ * - Supports replying to a message or typing `.status <link or caption>` directly.
+ * - Full Link Previews: When posting group invite links, WhatsApp channel links, or any web URLs,
+ *   thoroughly resolves rich preview cards (title, description, and high-quality picture thumbnail)
+ *   so the status story renders the complete card with image before posting.
+ * - Deletes the owner's `.status` command message immediately to maintain zero trace.
  */
 export default async function status({
   sock,
@@ -114,7 +113,6 @@ export default async function status({
     return;
   }
 
-  // 2. Extract replied message
   const msgKey = message?.key || {};
   const content = getMessageContent(message);
   const contextInfo = Object.values(content).find(
@@ -123,183 +121,193 @@ export default async function status({
 
   const quotedMsg = contextInfo?.quotedMessage;
   const quotedStanzaId = contextInfo?.stanzaId;
+  const customCaption = args.join(" ").trim();
 
-  if (!quotedMsg) {
+  // If no quoted message and no direct text/link provided, nothing to post
+  if (!quotedMsg && !customCaption) {
     return;
   }
 
   try {
-    const unwrapQuoted = unwrapMediaMessage(quotedMsg);
+    const unwrapQuoted = quotedMsg ? unwrapMediaMessage(quotedMsg) : {};
     const cachedEntry = quotedStanzaId ? getCachedIncomingMessage(userId, quotedStanzaId) : null;
-    const customCaption = args.join(" ").trim();
-
-    // Candidates in order of rich media data availability
-    const candidates = [
-      cachedEntry?.rawMessage,
-      cachedEntry?.content,
-      quotedMsg,
-    ].filter(Boolean);
 
     let mediaPayload = null;
 
-    // ----------------------------------------------------
-    // CASE 1: IMAGE
-    // ----------------------------------------------------
-    const hasImage = Boolean(
-      unwrapQuoted.imageMessage ||
-      unwrapQuoted.viewOnceMessage?.message?.imageMessage ||
-      unwrapQuoted.viewOnceMessageV2?.message?.imageMessage ||
-      cachedEntry?.mediaType === "image" ||
-      cachedEntry?.content?.imageMessage
-    );
+    if (quotedMsg) {
+      // Candidates in order of rich media data availability
+      const candidates = [
+        cachedEntry?.rawMessage,
+        cachedEntry?.content,
+        quotedMsg,
+      ].filter(Boolean);
 
-    if (hasImage) {
-      const res = await retrieveMediaBuffer(sock, candidates, "image");
-      if (res && res.buffer) {
-        const origCaption =
-          res.media?.caption ||
-          unwrapQuoted.imageMessage?.caption ||
-          unwrapQuoted.viewOnceMessage?.message?.imageMessage?.caption ||
-          "";
-        const finalCaption = customCaption || origCaption;
+      // ----------------------------------------------------
+      // CASE 1: IMAGE
+      // ----------------------------------------------------
+      const hasImage = Boolean(
+        unwrapQuoted.imageMessage ||
+        unwrapQuoted.viewOnceMessage?.message?.imageMessage ||
+        unwrapQuoted.viewOnceMessageV2?.message?.imageMessage ||
+        cachedEntry?.mediaType === "image" ||
+        cachedEntry?.content?.imageMessage
+      );
 
-        mediaPayload = {
-          image: res.buffer,
-          caption: finalCaption || undefined,
-        };
+      if (hasImage) {
+        const res = await retrieveMediaBuffer(sock, candidates, "image");
+        if (res && res.buffer) {
+          const origCaption =
+            res.media?.caption ||
+            unwrapQuoted.imageMessage?.caption ||
+            unwrapQuoted.viewOnceMessage?.message?.imageMessage?.caption ||
+            "";
+          const finalCaption = customCaption || origCaption;
+
+          mediaPayload = {
+            image: res.buffer,
+            caption: finalCaption || undefined,
+          };
+        }
+      }
+
+      // ----------------------------------------------------
+      // CASE 2: VIDEO
+      // ----------------------------------------------------
+      const hasVideo = !mediaPayload && Boolean(
+        unwrapQuoted.videoMessage ||
+        unwrapQuoted.ptvMessage ||
+        unwrapQuoted.viewOnceMessage?.message?.videoMessage ||
+        unwrapQuoted.viewOnceMessageV2?.message?.videoMessage ||
+        cachedEntry?.mediaType === "video" ||
+        cachedEntry?.content?.videoMessage
+      );
+
+      if (hasVideo) {
+        const res = await retrieveMediaBuffer(sock, candidates, "video");
+        if (res && res.buffer) {
+          const origCaption =
+            res.media?.caption ||
+            unwrapQuoted.videoMessage?.caption ||
+            unwrapQuoted.viewOnceMessage?.message?.videoMessage?.caption ||
+            "";
+          const finalCaption = customCaption || origCaption;
+          const mimetype = res.media?.mimetype || unwrapQuoted.videoMessage?.mimetype || "video/mp4";
+
+          mediaPayload = {
+            video: res.buffer,
+            caption: finalCaption || undefined,
+            mimetype,
+          };
+        }
+      }
+
+      // ----------------------------------------------------
+      // CASE 3: AUDIO / MUSIC
+      // ----------------------------------------------------
+      const hasAudio = !mediaPayload && Boolean(
+        unwrapQuoted.audioMessage ||
+        unwrapQuoted.viewOnceMessage?.message?.audioMessage ||
+        unwrapQuoted.viewOnceMessageV2?.message?.audioMessage ||
+        cachedEntry?.mediaType === "audio" ||
+        cachedEntry?.content?.audioMessage
+      );
+
+      if (hasAudio) {
+        const res = await retrieveMediaBuffer(sock, candidates, "audio");
+        if (res && res.buffer) {
+          const mimetype = res.media?.mimetype || unwrapQuoted.audioMessage?.mimetype || "audio/mp4";
+          const ptt = Boolean(res.media?.ptt || unwrapQuoted.audioMessage?.ptt);
+
+          mediaPayload = {
+            audio: res.buffer,
+            mimetype,
+            ptt,
+          };
+        }
+      }
+
+      // ----------------------------------------------------
+      // CASE 4: DOCUMENT / FILE
+      // ----------------------------------------------------
+      const hasDocument = !mediaPayload && Boolean(
+        unwrapQuoted.documentMessage ||
+        unwrapQuoted.viewOnceMessage?.message?.documentMessage ||
+        unwrapQuoted.viewOnceMessageV2?.message?.documentMessage ||
+        cachedEntry?.mediaType === "document" ||
+        cachedEntry?.content?.documentMessage
+      );
+
+      if (hasDocument) {
+        const res = await retrieveMediaBuffer(sock, candidates, "document");
+        if (res && res.buffer) {
+          const origCaption = res.media?.caption || unwrapQuoted.documentMessage?.caption || "";
+          const finalCaption = customCaption || origCaption;
+          const mimetype = res.media?.mimetype || unwrapQuoted.documentMessage?.mimetype || "application/octet-stream";
+          const fileName = res.media?.fileName || unwrapQuoted.documentMessage?.fileName || "attachment";
+
+          mediaPayload = {
+            document: res.buffer,
+            caption: finalCaption || undefined,
+            mimetype,
+            fileName,
+          };
+        }
+      }
+
+      // If replied message was media but download failed, abort
+      const isOriginalMedia = hasImage || hasVideo || hasAudio || hasDocument;
+      if (isOriginalMedia && !mediaPayload) {
+        logger.warn("[GROUP_STATUS] Media download failed — aborting status upload.");
+        return;
       }
     }
 
     // ----------------------------------------------------
-    // CASE 2: VIDEO
-    // ----------------------------------------------------
-    const hasVideo = !mediaPayload && Boolean(
-      unwrapQuoted.videoMessage ||
-      unwrapQuoted.ptvMessage ||
-      unwrapQuoted.viewOnceMessage?.message?.videoMessage ||
-      unwrapQuoted.viewOnceMessageV2?.message?.videoMessage ||
-      cachedEntry?.mediaType === "video" ||
-      cachedEntry?.content?.videoMessage
-    );
-
-    if (hasVideo) {
-      const res = await retrieveMediaBuffer(sock, candidates, "video");
-      if (res && res.buffer) {
-        const origCaption =
-          res.media?.caption ||
-          unwrapQuoted.videoMessage?.caption ||
-          unwrapQuoted.viewOnceMessage?.message?.videoMessage?.caption ||
-          "";
-        const finalCaption = customCaption || origCaption;
-        const mimetype = res.media?.mimetype || unwrapQuoted.videoMessage?.mimetype || "video/mp4";
-
-        mediaPayload = {
-          video: res.buffer,
-          caption: finalCaption || undefined,
-          mimetype,
-        };
-      }
-    }
-
-    // ----------------------------------------------------
-    // CASE 3: AUDIO / MUSIC
-    // ----------------------------------------------------
-    const hasAudio = !mediaPayload && Boolean(
-      unwrapQuoted.audioMessage ||
-      unwrapQuoted.viewOnceMessage?.message?.audioMessage ||
-      unwrapQuoted.viewOnceMessageV2?.message?.audioMessage ||
-      cachedEntry?.mediaType === "audio" ||
-      cachedEntry?.content?.audioMessage
-    );
-
-    if (hasAudio) {
-      const res = await retrieveMediaBuffer(sock, candidates, "audio");
-      if (res && res.buffer) {
-        const mimetype = res.media?.mimetype || unwrapQuoted.audioMessage?.mimetype || "audio/mp4";
-        const ptt = Boolean(res.media?.ptt || unwrapQuoted.audioMessage?.ptt);
-
-        mediaPayload = {
-          audio: res.buffer,
-          mimetype,
-          ptt,
-        };
-      }
-    }
-
-    // ----------------------------------------------------
-    // CASE 4: DOCUMENT / FILE
-    // ----------------------------------------------------
-    const hasDocument = !mediaPayload && Boolean(
-      unwrapQuoted.documentMessage ||
-      unwrapQuoted.viewOnceMessage?.message?.documentMessage ||
-      unwrapQuoted.viewOnceMessageV2?.message?.documentMessage ||
-      cachedEntry?.mediaType === "document" ||
-      cachedEntry?.content?.documentMessage
-    );
-
-    if (hasDocument) {
-      const res = await retrieveMediaBuffer(sock, candidates, "document");
-      if (res && res.buffer) {
-        const origCaption = res.media?.caption || unwrapQuoted.documentMessage?.caption || "";
-        const finalCaption = customCaption || origCaption;
-        const mimetype = res.media?.mimetype || unwrapQuoted.documentMessage?.mimetype || "application/octet-stream";
-        const fileName = res.media?.fileName || unwrapQuoted.documentMessage?.fileName || "attachment";
-
-        mediaPayload = {
-          document: res.buffer,
-          caption: finalCaption || undefined,
-          mimetype,
-          fileName,
-        };
-      }
-    }
-
-    // Strict validation: if the replied message was media (image, video, audio, doc) but failed to download, abort!
-    const isOriginalMedia = hasImage || hasVideo || hasAudio || hasDocument;
-    if (isOriginalMedia && !mediaPayload) {
-      logger.warn("[GROUP_STATUS] Media download failed — aborting status upload as required.");
-      return;
-    }
-
-    // ----------------------------------------------------
-    // CASE 5: LINK OR TEXT STATUS
+    // CASE 5: LINK OR TEXT STATUS (Group, Channel, or Web Link)
     // ----------------------------------------------------
     if (!mediaPayload) {
-      const origText = (
-        unwrapQuoted.conversation ||
-        unwrapQuoted.extendedTextMessage?.text ||
-        unwrapQuoted.groupInviteMessage?.caption ||
-        cachedEntry?.text ||
-        ""
-      ).trim();
+      let textToPost = "";
 
-      const urlInOrig = (origText || "").match(/(?:https?:\/\/|www\.)[^\s]+/i)?.[0];
-      let textToPost = origText;
+      if (quotedMsg) {
+        const origText = (
+          unwrapQuoted.conversation ||
+          unwrapQuoted.extendedTextMessage?.text ||
+          unwrapQuoted.groupInviteMessage?.caption ||
+          cachedEntry?.text ||
+          ""
+        ).trim();
 
-      if (!urlInOrig && unwrapQuoted.groupInviteMessage?.inviteCode) {
-        const inviteUrl = `https://chat.whatsapp.com/${unwrapQuoted.groupInviteMessage.inviteCode}`;
-        textToPost = customCaption ? `${customCaption}\n\n${inviteUrl}` : inviteUrl;
-      } else if (customCaption) {
-        if (urlInOrig && !customCaption.includes(urlInOrig)) {
-          textToPost = `${customCaption}\n\n${urlInOrig}`;
+        const urlInOrig = (origText || "").match(ANY_LINK_REGEX)?.[0];
+
+        if (!urlInOrig && unwrapQuoted.groupInviteMessage?.inviteCode) {
+          const inviteUrl = `https://chat.whatsapp.com/${unwrapQuoted.groupInviteMessage.inviteCode}`;
+          textToPost = customCaption ? `${customCaption}\n\n${inviteUrl}` : inviteUrl;
+        } else if (customCaption) {
+          if (urlInOrig && !customCaption.includes(urlInOrig)) {
+            textToPost = `${customCaption}\n\n${urlInOrig}`;
+          } else {
+            textToPost = customCaption;
+          }
         } else {
-          textToPost = customCaption;
+          textToPost = origText;
         }
+      } else {
+        // Direct .status <link or caption>
+        textToPost = customCaption;
       }
 
       if (!textToPost) {
         return;
       }
 
-      // Check if text contains a URL (web link or WhatsApp group invite)
+      // Check if text contains ANY URL (group link, channel link, website link)
       const hasUrl = Boolean(
-        /(?:https?:\/\/|www\.|chat\.whatsapp\.com\/)[^\s]+/i.test(textToPost) ||
-        urlInOrig ||
+        ANY_LINK_REGEX.test(textToPost) ||
         unwrapQuoted.groupInviteMessage
       );
 
       if (hasUrl) {
-        // STRICT REQUIREMENT: Link must have rich preview with title & picture thumbnail, or do not post!
+        logger.info("[GROUP_STATUS] Generating verified rich link preview for group status story...");
         const richPreview = await generateRichLinkPreview(
           textToPost,
           unwrapQuoted.extendedTextMessage || cachedEntry?.content?.extendedTextMessage,
@@ -307,7 +315,7 @@ export default async function status({
         );
 
         if (!richPreview || !richPreview.title || !richPreview.jpegThumbnail || richPreview.jpegThumbnail.length === 0) {
-          logger.warn("[GROUP_STATUS] Link preview validation failed (missing title or picture) — aborting status upload as requested.");
+          logger.warn("[GROUP_STATUS] Link preview validation failed — aborting status upload as requested.");
           return;
         }
 
@@ -327,7 +335,7 @@ export default async function status({
           },
         });
 
-        logger.info("[GROUP_STATUS] Relaying group status with verified link preview and picture", {
+        logger.info("[GROUP_STATUS] Relaying group status with verified link preview card and thumbnail", {
           chatId,
           title: richPreview.title,
           hasThumb: Boolean(richPreview.jpegThumbnail),
@@ -340,8 +348,10 @@ export default async function status({
           await sock.relayMessage(chatId, statusV1Message, {});
         }
 
-        // Stealth cleanup: immediately delete the owner's .status message
-        await sock.sendMessage(chatId, { delete: msgKey }).catch(() => {});
+        // Stealth cleanup: delete the owner's .status message
+        if (msgKey?.id) {
+          await sock.sendMessage(chatId, { delete: msgKey }).catch(() => {});
+        }
         return;
       }
 
@@ -354,12 +364,12 @@ export default async function status({
       return;
     }
 
-    // 3. Generate inner message structure with media uploaded to WhatsApp servers
+    // Generate inner message structure with media uploaded to WhatsApp servers
     const innerMsg = await generateWAMessageContent(mediaPayload, {
       upload: sock.waUploadToServer,
     });
 
-    // 4. Construct Group Status message wrappers (V2 and standard V1)
+    // Construct Group Status message wrappers
     const statusV2Message = proto.Message.fromObject({
       groupStatusMessageV2: {
         message: innerMsg,
@@ -377,16 +387,16 @@ export default async function status({
       mediaType: mediaPayload.image ? "image" : mediaPayload.video ? "video" : mediaPayload.audio ? "audio" : "text",
     });
 
-    // 5. Send strictly to chatId (the group) — NEVER to personal status@broadcast
     try {
       await sock.relayMessage(chatId, statusV2Message, {});
     } catch {
       await sock.relayMessage(chatId, statusV1Message, {});
     }
 
-    // 6. Stealth cleanup: immediately delete the owner's .status message so no one notices
-    await sock.sendMessage(chatId, { delete: msgKey }).catch(() => {});
-
+    // Stealth cleanup: delete the owner's .status message
+    if (msgKey?.id) {
+      await sock.sendMessage(chatId, { delete: msgKey }).catch(() => {});
+    }
   } catch (err) {
     logger.error("[GROUP_STATUS] Execution error", err.message);
   }

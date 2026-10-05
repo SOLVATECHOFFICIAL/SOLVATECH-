@@ -1,6 +1,9 @@
 import { addWarning, clearWarning, setWarningLimit } from "../lib/database.js";
 import { requireAdmin } from "../lib/command-tools.js";
 import { isAdmin, isBotAdmin, isOwner, resolveGroupTargetJids } from "../lib/permissions.js";
+import { getContextInfo, getQuotedMessage, jidAliases } from "../lib/helpers.js";
+import { getChatRecentMessages, removeCachedMessage } from "../lib/deleted-messages.js";
+import { logger } from "../lib/logger.js";
 
 export default async function warn({
   sock,
@@ -41,12 +44,67 @@ export default async function warn({
     return reply("❌ *Admin Immune:* Group administrators and owners cannot receive warnings.");
   }
 
+  // REQUIREMENT: ".warn must delete that particular thing no matter what"
+  // Delete the offending message that caused the warning immediately!
+  const quoted = getQuotedMessage(message, sock);
+  const context = getContextInfo(message);
+  const targetQuotedId = quoted?.id || quoted?.stanzaId || context?.stanzaId;
+  const targetParticipant = quoted?.participant || context?.participant || targetJid;
+
+  if (targetQuotedId) {
+    const deleteKey = {
+      remoteJid: chatId,
+      id: targetQuotedId,
+      participant: targetParticipant,
+      fromMe: Boolean(quoted?.fromMe),
+    };
+    try {
+      await sock.sendMessage(chatId, { delete: deleteKey });
+      removeCachedMessage(userId, targetQuotedId);
+    } catch {
+      try {
+        await sock.sendMessage(chatId, {
+          delete: {
+            remoteJid: chatId,
+            id: targetQuotedId,
+            participant: targetParticipant,
+          },
+        });
+        removeCachedMessage(userId, targetQuotedId);
+      } catch (delErr) {
+        logger.debug(`Could not delete quoted warning violation message: ${delErr.message}`);
+      }
+    }
+  } else if (targetJid) {
+    // If not quoted directly (e.g. .warn @user reason), delete the offender's most recent message from chat history
+    try {
+      const recent = getChatRecentMessages(userId, chatId);
+      const targetAliasSet = new Set(targetAliases.flatMap(jidAliases));
+      const targetRecentMsg = recent.find((m) => targetAliasSet.has(m.sender));
+      if (targetRecentMsg) {
+        await sock.sendMessage(chatId, {
+          delete: {
+            remoteJid: chatId,
+            id: targetRecentMsg.id,
+            participant: targetRecentMsg.sender,
+            fromMe: Boolean(targetRecentMsg.fromMe),
+          },
+        }).catch(() => {});
+        removeCachedMessage(userId, targetRecentMsg.id);
+      }
+    } catch (tagErr) {
+      logger.debug(`Could not delete target recent message: ${tagErr.message}`);
+    }
+  }
+
   const reason = args.filter((a) => !a.startsWith("@")).join(" ").trim() || "Violation of group rules";
   const result = await addWarning(chatId, targetJid, userId, reason, targetAliases);
 
   const adminClean = sender.split("@")[0].split(":")[0];
   const mentions = [...new Set([targetJid, sender, resolved.mentionJid].filter(Boolean))];
 
+  // REQUIREMENT: "Also the second one .warn not deleting the warn message"
+  // Keep the warning announcement visible in the group chat permanently (no auto-deletion).
   if (result.exceeded) {
     const botJids = [
       sock.user?.id,
@@ -77,7 +135,7 @@ export default async function warn({
   }
 
   return reply(
-    `👮‍♂️ *Admin Warning Issued:* @${targetClean} has been warned (*${result.count}/${result.limit}*).\n_Issued by Admin: @${adminClean}_\n_Reason: ${reason}_\n_Reaching ${result.limit} warnings will result in removal from the group._`,
+    `👮‍♂️ *Admin Warning Issued:* @${targetClean} has been warned (*${result.count}/${result.limit}*).\n_Issued by Admin: @${adminClean}_\n_Reason: ${reason}_\n_Offending message deleted._\n_Reaching ${result.limit} warnings will result in removal from the group._`,
     { mentions }
   );
 }
