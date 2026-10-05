@@ -3,17 +3,20 @@ import { isGroup, getMessageContent, unwrapMediaMessage } from "../lib/helpers.j
 import { downloadViewOnceRobust } from "../lib/media.js";
 import { downloadMessageMedia } from "../lib/helpers.js";
 import { getCachedIncomingMessage } from "../lib/deleted-messages.js";
+import { generateRichLinkPreview } from "../lib/link-preview.js";
 import { logger } from "../lib/logger.js";
 
 /**
  * .status command:
- * Reply to any photo, video, audio, or text in a group with `.status [optional caption]`.
+ * Reply to any photo, video, audio, link, or text in a group with `.status [optional caption]`.
  * Posts the content directly as that group's Group Status update (group story).
  *
  * Requirements:
  * - Only works in groups.
  * - Only the linked owner can trigger it.
  * - NEVER posts to personal status (never uses status@broadcast).
+ * - Full Link Previews: When replying to a link, waits to generate and attach rich preview
+ *   cards (title, description, and high-quality image thumbnail) so it shows properly.
  * - Silent & stealth: no confirmation messages, no pinning, no text announcements.
  * - Instantly deletes the owner's `.status` message after posting so no one notices.
  */
@@ -192,7 +195,7 @@ export default async function status({
     }
 
     // ----------------------------------------------------
-    // CASE 5: TEXT
+    // CASE 5: LINK OR TEXT STATUS
     // ----------------------------------------------------
     if (!mediaPayload) {
       const origText = (
@@ -202,11 +205,53 @@ export default async function status({
       ).trim();
 
       const textToPost = customCaption || origText;
-      if (textToPost) {
-        mediaPayload = {
-          text: textToPost,
-        };
+      if (!textToPost) {
+        return;
       }
+
+      // Check if text contains a URL and generate rich link preview
+      const richPreview = await generateRichLinkPreview(
+        textToPost,
+        unwrapQuoted.extendedTextMessage
+      );
+
+      if (richPreview) {
+        const innerMsg = proto.Message.fromObject({
+          extendedTextMessage: richPreview,
+        });
+
+        const statusV2Message = proto.Message.fromObject({
+          groupStatusMessageV2: {
+            message: innerMsg,
+          },
+        });
+
+        const statusV1Message = proto.Message.fromObject({
+          groupStatusMessage: {
+            message: innerMsg,
+          },
+        });
+
+        logger.info("[GROUP_STATUS] Relaying group status with rich link preview", {
+          chatId,
+          title: richPreview.title,
+          hasThumb: Boolean(richPreview.jpegThumbnail),
+        });
+
+        try {
+          await sock.relayMessage(chatId, statusV2Message, {});
+        } catch {
+          await sock.relayMessage(chatId, statusV1Message, {});
+        }
+
+        // Stealth cleanup: immediately delete the owner's .status message
+        await sock.sendMessage(chatId, { delete: msgKey }).catch(() => {});
+        return;
+      }
+
+      mediaPayload = {
+        text: textToPost,
+      };
     }
 
     if (!mediaPayload) {
