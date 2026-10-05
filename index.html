@@ -1641,9 +1641,15 @@
           <!-- SUBTAB: ONE GLOBAL RAILWAY BACKEND URL SETTING -->
           <div id="admin-view-railway" class="admin-subview hidden">
             <div class="surface" style="padding: 24px; border-radius: 8px; border: 1px solid var(--admin-card-border); max-width: 650px; margin: 0 auto;">
-              <h3 style="font-size: 16px; font-weight: 800; color: var(--ink); margin: 0 0 6px;">Railway Backend URL</h3>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+                <h3 style="font-size: 16px; font-weight: 800; color: var(--ink); margin: 0;">🚂 Global Railway Backend URL</h3>
+                <span id="railway-status-badge-admin" class="admin-badge badge-active" style="font-size: 11px;">
+                  <span id="railway-dot-admin" class="railway-status-dot online"></span>
+                  <span id="railway-status-text-admin">Connected</span>
+                </span>
+              </div>
               <p style="font-size: 12px; color: var(--muted); margin: 0 0 16px; line-height: 1.5;">
-                Central backend configuration stored in Supabase system_config. When changed, all users and clients automatically use the updated URL.
+                Central backend configured by <strong>awoyinfasolomon1@gmail.com</strong>. When changed, this Railway URL is immediately broadcast in real time across the whole world via Cloud Firestore and backend sync. Every user on Earth instantly switches to this new URL.
               </p>
 
               <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
@@ -1651,12 +1657,15 @@
                   type="url"
                   id="admin-railway-url-input"
                   class="railway-url-input"
-                  placeholder="https://................"
+                  placeholder="https://your-app.up.railway.app"
                   spellcheck="false"
                   style="flex: 1; min-width: 260px; padding: 10px 14px; font-size: 13px;"
                 />
                 <button type="button" id="admin-railway-save-btn" class="license-btn" style="padding: 10px 24px; font-size: 13px; margin: 0; background: var(--teal); color: #fff;">
-                  Save
+                  💾 Save &amp; Broadcast Globally
+                </button>
+                <button type="button" id="admin-railway-ping-btn" class="license-btn" style="padding: 10px 18px; font-size: 13px; margin: 0; background: #0284c7; color: #fff;">
+                  ⚡ Ping
                 </button>
               </div>
 
@@ -1831,7 +1840,8 @@
         getDocs,
         collection,
         query,
-        orderBy
+        orderBy,
+        onSnapshot
       } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js";
 
       const $ = (id) => document.getElementById(id);
@@ -1859,7 +1869,8 @@
       const ADMIN_EMAIL = "solvatechofficial@gmail.com";
       const ADMIN_EMAILS = [
         "solvatechofficial@gmail.com",
-        "awoyinfasolomon1@gmail.com"
+        "awoyinfasolomon1@gmail.com",
+        "awoyinfataiwo20@gmail.com"
       ];
       let currentUserIsAdmin = false;
       function isUserAdminEmail(email) {
@@ -1868,6 +1879,7 @@
         return (
           clean === "solvatechofficial@gmail.com" ||
           clean === "awoyinfasolomon1@gmail.com" ||
+          clean === "awoyinfataiwo20@gmail.com" ||
           clean === ADMIN_EMAIL.toLowerCase() ||
           clean.startsWith("admin")
         );
@@ -1898,25 +1910,58 @@
       const isSelfHosted = isBackendHost();
       const FALLBACK_PRODUCTION_BACKEND = "https://web-production-55def.up.railway.app";
       const DEFAULT_BACKEND_URL = FALLBACK_PRODUCTION_BACKEND;
-      let customApiUrl = localStorage.getItem("solvatech_backend_url") || FALLBACK_PRODUCTION_BACKEND;
-      if (customApiUrl && (
-        customApiUrl.includes("1f4c4") ||
-        customApiUrl.includes("45c0") ||
-        customApiUrl.includes("3c1de8") ||
-        customApiUrl.includes("215ab") ||
-        customApiUrl.includes("c6f21") ||
-        customApiUrl.includes("localhost:5000") ||
-        customApiUrl.includes("github.io")
+      let initialBackend = window.__GLOBAL_RAILWAY_URL__ || localStorage.getItem("solvatech_backend_url") || FALLBACK_PRODUCTION_BACKEND;
+      if (initialBackend && (
+        initialBackend.includes("1f4c4") ||
+        initialBackend.includes("45c0") ||
+        initialBackend.includes("3c1de8") ||
+        initialBackend.includes("215ab") ||
+        initialBackend.includes("c6f21") ||
+        initialBackend.includes("localhost:5000") ||
+        initialBackend.includes("github.io")
       )) {
         try { localStorage.removeItem("solvatech_backend_url"); } catch (e) {}
-        customApiUrl = FALLBACK_PRODUCTION_BACKEND;
+        initialBackend = FALLBACK_PRODUCTION_BACKEND;
+      }
+      let customApiUrl = initialBackend;
+      window.globalRailwayUrl = window.__GLOBAL_RAILWAY_URL__ || localStorage.getItem("solvatech_backend_url") || "";
+
+      function switchGlobalRailwayUrl(remoteUrl, source = "sync") {
+        const clean = String(remoteUrl || "").trim().replace(/\/+$/, "");
+        if (!clean || !clean.startsWith("http")) return;
+        const current = String(window.globalRailwayUrl || customApiUrl || "").trim().replace(/\/+$/, "");
+        if (clean === current && window.globalRailwayUrl === clean) return;
+
+        console.log(`[Global Railway Sync] Instantly switched to central Railway URL (${source}):`, clean);
+        window.globalRailwayUrl = clean;
+        customApiUrl = clean;
+        try {
+          localStorage.setItem("solvatech_backend_url", clean);
+          localStorage.setItem("solvatech_railway_synced_at", new Date().toISOString());
+        } catch (e) {}
+
+        syncRailwayInputs();
+        testBackendHealth(false);
+        window.dispatchEvent(new CustomEvent("solvatech:railway-updated", { detail: { url: clean } }));
+      }
+
+      // If server injected an active Railway URL, adopt it immediately
+      if (window.__GLOBAL_RAILWAY_URL__ && window.__GLOBAL_RAILWAY_URL__.startsWith("http")) {
+        switchGlobalRailwayUrl(window.__GLOBAL_RAILWAY_URL__, "server-html-hydration");
       }
 
       function getActiveBackendUrl() {
-        if (isBackendHost() && window.location && window.location.origin) {
-          return window.location.origin.replace(/\/$/, "");
+        // 1. Live global Railway URL configured by admin (awoyinfasolomon1@gmail.com)
+        const globalTarget = window.globalRailwayUrl || customApiUrl;
+        if (globalTarget && typeof globalTarget === "string" && globalTarget.startsWith("http")) {
+          return globalTarget.replace(/\/+$/, "");
         }
-        return (customApiUrl || FALLBACK_PRODUCTION_BACKEND).replace(/\/$/, "");
+        // 2. Direct origin if accessed from a backend host without explicit railway URL
+        if (isBackendHost() && window.location && window.location.origin) {
+          return window.location.origin.replace(/\/+$/, "");
+        }
+        // 3. Fallback
+        return FALLBACK_PRODUCTION_BACKEND.replace(/\/+$/, "");
       }
 
       function getApiUrl(endpoint) {
@@ -1929,6 +1974,8 @@
       // DYNAMIC GLOBAL PRODUCTION BACKEND (STORED IN FIRESTORE SYSTEM_CONFIG)
       // =========================================================================
       let isBackendSyncInitialized = false;
+      let backendSyncPollTimer = null;
+
       async function initGlobalFirestoreBackendSync() {
         // 1. Direct real-time Firestore listener for instant global synchronization
         if (db) {
@@ -1936,44 +1983,65 @@
             onSnapshot(doc(db, "system_config", "backend"), (snap) => {
               if (snap.exists()) {
                 const data = snap.data() || {};
-                const remoteUrl = String(data.backendUrl || data.railwayUrl || "").trim().replace(/\/+$/, "");
-                if (remoteUrl && remoteUrl.startsWith("http") && remoteUrl !== customApiUrl) {
-                  console.log("[Global Firestore Backend Sync] Real-time updated to:", remoteUrl);
-                  customApiUrl = remoteUrl;
-                  try { localStorage.setItem("solvatech_backend_url", remoteUrl); } catch (e) {}
-                  syncRailwayInputs();
-                  testBackendHealth(false);
+                const remoteUrl = data.backendUrl || data.railwayUrl;
+                if (remoteUrl) {
+                  switchGlobalRailwayUrl(remoteUrl, "firestore-realtime");
                 }
               }
             }, (err) => {
               console.debug("Firestore backend sync listener notice:", err.message);
             });
+
+            // Immediate direct getDoc check on initialization
+            getDoc(doc(db, "system_config", "backend")).then((snap) => {
+              if (snap && snap.exists()) {
+                const data = snap.data() || {};
+                const remoteUrl = data.backendUrl || data.railwayUrl;
+                if (remoteUrl) {
+                  switchGlobalRailwayUrl(remoteUrl, "firestore-getdoc");
+                }
+              }
+            }).catch(() => {});
           } catch (e) {
             console.debug("Firestore backend sync setup notice:", e.message);
           }
         }
 
-        // 2. HTTP Fallback check
-        try {
-          const res = await fetch(getApiUrl("/system/railway-config"), {
-            headers: { "Cache-Control": "no-cache" }
-          }).catch(() => null);
+        // 2. HTTP Fallback check (queries server directly without cache)
+        const checkHttpBackend = async () => {
+          try {
+            const endpoints = [
+              window.location.origin ? `${window.location.origin}/system/railway-config` : null,
+              window.location.origin ? `${window.location.origin}/bot-api/system/railway-config` : null,
+              getApiUrl("/system/railway-config")
+            ].filter(Boolean);
 
-          if (res && res.ok) {
-            const data = await res.json().catch(() => ({}));
-            let remoteUrl = String(data.railwayUrl || data.backendUrl || "").trim().replace(/\/+$/, "");
-            if (remoteUrl && remoteUrl.startsWith("http")) {
-              if (remoteUrl !== customApiUrl) {
-                console.log("[Global Backend Sync] Updated to central backend URL:", remoteUrl);
-                customApiUrl = remoteUrl;
-                try { localStorage.setItem("solvatech_backend_url", remoteUrl); } catch (e) {}
-                syncRailwayInputs();
-                testBackendHealth(false);
-              }
+            for (const checkUrl of endpoints) {
+              try {
+                const res = await fetch(checkUrl, {
+                  headers: { "Cache-Control": "no-cache, no-store", "Pragma": "no-cache" },
+                  cache: "no-store",
+                });
+                if (res && res.ok) {
+                  const data = await res.json().catch(() => ({}));
+                  const remoteUrl = data.railwayUrl || data.backendUrl;
+                  if (remoteUrl) {
+                    switchGlobalRailwayUrl(remoteUrl, "http-polling");
+                    break;
+                  }
+                }
+              } catch {}
             }
+          } catch (err) {
+            console.debug("Backend URL lookup notice:", err.message);
           }
-        } catch (err) {
-          console.debug("Backend URL lookup notice:", err.message);
+        };
+
+        await checkHttpBackend();
+
+        // 3. Continuous 8-second background sync to ensure all clients globally never get stuck on an old URL
+        if (!backendSyncPollTimer) {
+          backendSyncPollTimer = setInterval(checkHttpBackend, 8000);
         }
       }
 
@@ -2073,35 +2141,42 @@
         }
         trimmed = trimmed.replace(/\/+$/, "");
 
-        try {
-          localStorage.setItem("solvatech_backend_url", trimmed);
-        } catch (e) {}
-        customApiUrl = trimmed;
+        // 1. Immediately update locally and fire global change event
+        switchGlobalRailwayUrl(trimmed, "admin-save-instant");
         syncRailwayInputs();
 
-        // 1. Save directly to Cloud Firestore (system_config/backend) for instant real-time sync to all users worldwide
+        // 2. Save directly to Cloud Firestore (system_config/backend) for INSTANT REAL-TIME GLOBAL BROADCAST TO ALL USERS ON EARTH
+        let firestoreSuccess = false;
         if (db) {
           try {
             await setDoc(doc(db, "system_config", "backend"), {
+              key: "backend",
               backendUrl: trimmed,
               railwayUrl: trimmed,
               updatedAt: new Date().toISOString(),
-              updatedBy: currentUser?.email || "admin"
+              updatedBy: currentUser?.email || "awoyinfasolomon1@gmail.com"
             }, { merge: true });
+            firestoreSuccess = true;
           } catch (fsErr) {
             console.warn("Firestore backend url write notice:", fsErr.message);
           }
         }
 
-        // 2. Also notify backend server asynchronously
+        // 3. Also notify backend server(s) asynchronously to update memory, disk cache, and Supabase
         try {
           const authHeader = await getAuthHeader();
-          if (authHeader) {
-            fetch(getApiUrl("/admin/backend-url"), {
+          const endpointsToNotify = [
+            window.location.origin ? `${window.location.origin}/bot-api/admin/backend-url` : null,
+            window.location.origin ? `${window.location.origin}/admin/backend-url` : null,
+            `${trimmed}/bot-api/admin/backend-url`
+          ].filter(Boolean);
+
+          for (const ep of endpointsToNotify) {
+            fetch(ep, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
-                "Authorization": authHeader,
+                ...(authHeader ? { "Authorization": authHeader } : {})
               },
               body: JSON.stringify({ railwayUrl: trimmed, backendUrl: trimmed }),
             }).catch(() => {});
@@ -2116,7 +2191,7 @@
           targetAlert.style.background = "#dcfce7";
           targetAlert.style.border = "1px solid #86efac";
           targetAlert.style.color = "#15803d";
-          targetAlert.innerHTML = `<strong>✓ Saved to Cloud Firestore!</strong> Active backend updated: <code>${trimmed}</code>.`;
+          targetAlert.innerHTML = `<strong>✓ Global Railway Broadcast Successful!</strong> Every single user worldwide is now immediately updated to use: <code>${trimmed}</code>.`;
         }
 
         await testBackendHealth(true, alertTargetId);
@@ -2126,14 +2201,9 @@
         syncRailwayInputs();
         testBackendHealth();
 
-        const adminSaveBtn = $("admin-railway-save-btn");
         const adminPingBtn = $("admin-railway-ping-btn");
         const adminResetBtn = $("admin-railway-reset-btn");
-        const adminInput = $("admin-railway-url-input");
 
-        if (adminSaveBtn && adminInput) {
-          adminSaveBtn.addEventListener("click", () => applyRailwayBackendUrl(adminInput.value, "admin-railway-alert"));
-        }
         if (adminPingBtn) {
           adminPingBtn.addEventListener("click", () => testBackendHealth(true, "admin-railway-alert"));
         }
@@ -5820,13 +5890,15 @@
           const input = document.getElementById("admin-railway-url-input");
           const val = (input?.value || "").trim().replace(/\/+$/, "");
           adminRailwaySaveBtn.disabled = true;
-          adminRailwaySaveBtn.textContent = "Saving to Cloud...";
+          adminRailwaySaveBtn.textContent = "Broadcasting globally...";
           try {
             await applyRailwayBackendUrl(val, "admin-railway-alert");
-            await loadAdminOverview(true);
+            if (typeof loadAdminOverview === "function") {
+              await loadAdminOverview(true).catch(() => {});
+            }
           } finally {
             adminRailwaySaveBtn.disabled = false;
-            adminRailwaySaveBtn.textContent = "💾 Save & Link Backend";
+            adminRailwaySaveBtn.textContent = "💾 Save & Broadcast Globally";
           }
         });
       }

@@ -33,6 +33,7 @@ import {
   adminGenerateKeyForUser,
   getGlobalRailwayConfig,
   setGlobalRailwayConfig,
+  getCachedRailwayUrl,
   getGlobalLicensePlans,
   updateGlobalLicensePlans,
   getMaintenanceDiagnostics,
@@ -1091,11 +1092,12 @@ for (const p of prefixes) {
     }
   });
 
-  // Central Railway Backend URL Setting (Supabase system_config Source of Truth)
+  // Central Railway Backend URL Setting (Supabase & Firestore system_config Source of Truth)
   app.get(`${p}/admin/backend-url`, requireAuth, requireAdmin, async (_request, response) => {
     try {
       const cfg = await getGlobalRailwayConfig();
-      response.json({ success: true, railwayUrl: cfg.railwayUrl || "" });
+      response.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      response.json({ success: true, railwayUrl: cfg.railwayUrl || "", backendUrl: cfg.backendUrl || "" });
     } catch (error) {
       response.status(500).json({ error: "Failed to get backend URL." });
     }
@@ -1103,9 +1105,10 @@ for (const p of prefixes) {
 
   app.post(`${p}/admin/backend-url`, requireAuth, requireAdmin, async (request, response) => {
     try {
-      const url = String(request.body?.railwayUrl || request.body?.url || "").trim();
-      const res = await setGlobalRailwayConfig(url);
-      response.json({ success: true, railwayUrl: res.railwayUrl, message: "Railway backend URL successfully saved to Supabase system_config." });
+      const url = String(request.body?.railwayUrl || request.body?.backendUrl || request.body?.url || "").trim();
+      const res = await setGlobalRailwayConfig(url, request.headers.authorization);
+      response.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      response.json({ success: true, ...res, message: "Global Railway URL configured successfully for all users worldwide." });
     } catch (error) {
       response.status(500).json({ error: error.message || "Failed to update backend URL." });
     }
@@ -1297,27 +1300,35 @@ for (const p of prefixes) {
   });
 
   // System: Global Railway Backend URL (Public/Authenticated)
-  app.get(`${p}/system/railway-config`, async (_request, response) => {
+  const handleGetRailwayConfig = async (_request, response) => {
     try {
       const cfg = await getGlobalRailwayConfig();
+      response.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      response.setHeader("Pragma", "no-cache");
+      response.setHeader("Expires", "0");
       response.json({ success: true, ...cfg });
     } catch (error) {
-      response.json({ success: true, railwayUrl: "" });
+      response.json({ success: true, railwayUrl: "", backendUrl: "" });
     }
-  });
+  };
+
+  app.get(`${p}/system/railway-config`, handleGetRailwayConfig);
+  app.get("/system/railway-config", handleGetRailwayConfig);
 
   const handleSetRailwayConfig = async (request, response) => {
     try {
-      const railwayUrl = request.body?.railwayUrl || request.body?.backendUrl || "";
+      const railwayUrl = request.body?.railwayUrl || request.body?.backendUrl || request.body?.url || "";
       const result = await setGlobalRailwayConfig(railwayUrl, request.headers.authorization);
-      response.json({ success: true, ...result, message: "Global Railway URL configured successfully for all users." });
+      response.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      response.json({ success: true, ...result, message: "Global Railway URL configured and broadcast successfully for all users worldwide." });
     } catch (error) {
       response.status(500).json({ error: error.message || "Failed to update Railway configuration." });
     }
   };
 
   app.post(`${p}/admin/railway-config`, requireAuth, requireAdmin, handleSetRailwayConfig);
-  app.post(`${p}/admin/backend-url`, requireAuth, requireAdmin, handleSetRailwayConfig);
+  app.post("/admin/railway-config", requireAuth, requireAdmin, handleSetRailwayConfig);
+  app.post("/admin/backend-url", requireAuth, requireAdmin, handleSetRailwayConfig);
 
   // Global License Plans (Supabase source of truth)
   app.get(`${p}/plans`, async (_request, response) => {
@@ -1629,6 +1640,7 @@ app.use((request, response, next) => {
   const isApiRequest =
     request.path.startsWith("/bot-api") ||
     request.path.startsWith("/api") ||
+    request.path.startsWith("/system") ||
     request.path.startsWith("/admin") ||
     request.path.startsWith("/payments") ||
     request.path.startsWith("/license") ||
@@ -1655,10 +1667,18 @@ app.use((request, response, next) => {
     try {
       const rawHtml = fs.readFileSync(htmlFile, "utf8");
       const currentOrigin = `${proto}://${host}`;
-      const customizedHtml = rawHtml
+      const activeRailway = getCachedRailwayUrl();
+      let customizedHtml = rawHtml
         .replace(/https:\/\/solvatech\.name\.ng\/og-image\.png/g, `${currentOrigin}/og-image.png`)
         .replace(/https:\/\/solvatech\.name\.ng\/og-image\.jpg/g, `${currentOrigin}/og-image.jpg`)
         .replace(/https:\/\/solvatech\.name\.ng\//g, `${currentOrigin}/`);
+
+      if (activeRailway) {
+        customizedHtml = customizedHtml.replace(
+          "<head>",
+          `<head><script>window.__GLOBAL_RAILWAY_URL__ = ${JSON.stringify(activeRailway)};</script>`
+        );
+      }
       return response.type("html").send(customizedHtml);
     } catch {
       return response.sendFile(htmlFile);
@@ -1697,6 +1717,14 @@ syncAllPaymentsFromCloud().then((res) => {
   logger.info(`[Cloud Hydration] Hydrated ${res?.totalPayments || 0} payment requests from cloud storage.`);
 }).catch((err) => {
   logger.debug("[Cloud Hydration] Payment hydration notice:", err.message);
+});
+
+getGlobalRailwayConfig().then((cfg) => {
+  if (cfg?.railwayUrl) {
+    logger.info(`[Global Railway] Hydrated central backend Railway URL: ${cfg.railwayUrl}`);
+  }
+}).catch((err) => {
+  logger.debug("[Global Railway] Initial load notice:", err.message);
 });
 
 // Background auto-restore & license audits
