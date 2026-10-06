@@ -369,16 +369,6 @@ for (const p of prefixes) {
       getUserLicenseStatus(verifiedUid, userEmail),
     ]);
 
-    const currentStatus = controller.getStatus();
-    if (
-      license?.hasActiveLicense &&
-      currentStatus.status === "idle" &&
-      !currentStatus.pairingCode &&
-      controller.hasSavedSession()
-    ) {
-      controller.ensureConnected().catch(() => {});
-    }
-
     const latestStatus = controller.getStatus();
     const preferences = await getUserPreferences(safeUserId);
 
@@ -1370,7 +1360,10 @@ for (const p of prefixes) {
       const railwayUrl = request.body?.railwayUrl || request.body?.backendUrl || request.body?.url || "";
       const result = await setGlobalRailwayConfig(railwayUrl, request.headers.authorization);
       response.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-      response.json({ success: true, ...result, message: "Global Railway URL configured and broadcast successfully for all users worldwide." });
+      const message = result.changed
+        ? "Global Railway URL updated. All active user sessions were notified and disconnected to reconnect to the new backend."
+        : "Global Railway URL verified (unchanged). Active user sessions remain intact.";
+      response.json({ success: true, ...result, message });
     } catch (error) {
       response.status(500).json({ error: error.message || "Failed to update Railway configuration." });
     }

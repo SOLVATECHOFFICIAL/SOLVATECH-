@@ -200,9 +200,9 @@
               <span id="user-email" class="user-email">user@gmail.com</span>
             </div>
           </div>
-          <button id="logout-btn" class="logout-button" type="button" title="Log out and return to sign in">
+          <button id="logout-btn" class="logout-button" type="button" title="Sign out of your dashboard account">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
-            <span>Log Out</span>
+            <span>Sign Out (Web)</span>
           </button>
         </div>
       </div>
@@ -727,11 +727,7 @@
                   <strong id="connected-number" style="font-family: var(--font-mono); font-size: 13px; color: var(--teal);">—</strong>
                 </div>
                 <div class="status-btn-group" style="display: flex; gap: 8px; margin-top: 4px;">
-                  <button type="button" id="btn-quick-reconnect" class="btn-reconnect-small" title="Wake up or reconnect WhatsApp socket if sleeping">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
-                    <span>⚡ Reconnect Bot</span>
-                  </button>
-                  <button id="disconnect" class="disconnect" disabled>Disconnect Session</button>
+                  <button id="disconnect" class="disconnect" disabled style="width: 100%;">🔌 Disconnect WhatsApp Bot</button>
                 </div>
               </aside>
             </section>
@@ -863,9 +859,6 @@
             <button type="button" class="admin-subnav-btn" data-subtab="railway" id="admin-subtab-btn-railway">
               <span>🚂 Railway URL</span>
             </button>
-            <button type="button" class="admin-subnav-btn" data-subtab="recycling" id="admin-subtab-btn-recycling">
-              <span>🧹 Safe Storage & Cleanup</span>
-            </button>
             <button type="button" class="admin-subnav-btn" data-subtab="sanitation" id="admin-subtab-btn-sanitation" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(6, 95, 70, 0.08)); border-color: rgba(16, 185, 129, 0.35); font-weight: 800;">
               <span>⚡ Turbo Purge &amp; Firebase</span>
               <span id="admin-count-transient-badge" class="admin-subnav-count" style="background:#fee2e2; color:#b91c1c; font-weight:900;">0</span>
@@ -880,10 +873,6 @@
             <button type="button" class="admin-subnav-btn" data-subtab="referrals" id="admin-subtab-btn-referrals">
               <span>🎁 Referrals</span>
               <span id="admin-count-referrals" class="admin-subnav-count">0</span>
-            </button>
-            <button type="button" class="admin-subnav-btn" data-subtab="system" id="admin-subtab-btn-system">
-              <span>⚡ WhatsApp Sockets</span>
-              <span id="admin-count-connected" class="admin-subnav-count" style="background:#dcfce7; color:#15803d;">0</span>
             </button>
           </div>
 
@@ -1011,244 +1000,6 @@
               </div>
 
               <div id="admin-generate-msg" class="license-msg hidden" style="margin-top: 14px;"></div>
-            </div>
-          </div>
-
-          <!-- SUBTAB 3: SAFE STORAGE & MAINTENANCE CLEANUP -->
-          <div id="admin-view-recycling" class="admin-subview hidden">
-            <!-- 500MB LIVE STORAGE QUOTA METER & BREAKDOWN -->
-            <div class="surface" style="padding: 22px; border-radius: 10px; border: 1px solid #cbd5e1; margin-bottom: 18px; background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);">
-              <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 14px; margin-bottom: 14px;">
-                <div>
-                  <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                    <span class="admin-badge badge-active" style="background:#dcfce7; color:#15803d; border-color:#86efac; font-weight:800;">500 MB QUOTA</span>
-                    <span class="admin-badge" style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-weight:800;">DUAL-VAULT PROTECTED</span>
-                    <h3 style="font-size: 16px; font-weight: 800; color: #0f172a; margin: 0;">
-                      📊 Live 500MB Supabase Storage &amp; Recycling Bin Manager
-                    </h3>
-                  </div>
-                  <p style="font-size: 12px; color: #475569; margin: 5px 0 0; line-height: 1.5; max-width: 740px;">
-                    Monitor real-time database and receipt picture storage out of your <strong>500.00 MB</strong> allocation. Clear processed payment receipt images, message history, command logs, or AI chat history to free space immediately.
-                    <strong style="color:#047857;">Connected &amp; Disconnected WhatsApp sessions, Active/Unlimited customers, and Pending receipts are 100% locked and never touched.</strong>
-                  </p>
-                </div>
-                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-                  <button type="button" id="admin-recover-vault-btn" class="admin-preset-btn" style="padding: 7px 13px; font-size: 11px; background:#eff6ff; color:#1e40af; border-color:#93c5fd; font-weight:800;">
-                    🛡️ Sync Firebase ↔ Supabase Vault
-                  </button>
-                  <button type="button" id="admin-refresh-diag-btn" class="admin-preset-btn" style="padding: 7px 13px; font-size: 11px; font-weight:800;">
-                    ↻ Refresh Live Storage
-                  </button>
-                </div>
-              </div>
-
-              <!-- Live 500MB Gauge Box -->
-              <div style="background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; margin-bottom: 18px;">
-                <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 10px; margin-bottom: 8px;">
-                  <div>
-                    <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b;">TOTAL LIVE STORAGE USED</span>
-                    <div style="display: flex; align-items: baseline; gap: 8px; margin-top: 2px;">
-                      <span id="admin-storage-used-label" style="font-size: 24px; font-weight: 900; color: #0f172a; font-family: 'DM Mono', monospace; transition: all 0.3s ease;">0.00 MB</span>
-                      <span style="font-size: 13px; font-weight: 700; color: #64748b;">/ <span id="admin-storage-quota-label">500.00 MB</span> (<span id="admin-storage-pct-label">0.00%</span>)</span>
-                    </div>
-                  </div>
-                  <div style="text-align: right;">
-                    <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #059669;">FREE SPACE REMAINING</span>
-                    <div id="admin-storage-free-label" style="font-size: 18px; font-weight: 800; color: #059669; font-family: 'DM Mono', monospace;">500.00 MB</div>
-                  </div>
-                </div>
-
-                <!-- Multi-segment animated bar -->
-                <div style="width: 100%; height: 14px; background: #e2e8f0; border-radius: 999px; overflow: hidden; display: flex; box-shadow: inset 0 1px 3px rgba(0,0,0,0.08);">
-                  <div id="admin-storage-bar-protected" title="Protected Core Data (Users, Active Licenses, WhatsApp Sessions)" style="width: 1%; height: 100%; background: #10b981; transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);"></div>
-                  <div id="admin-storage-bar-pics" title="Clearable Receipt Pictures" style="width: 0%; height: 100%; background: #8b5cf6; transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);"></div>
-                  <div id="admin-storage-bar-history" title="Clearable History & Logs" style="width: 0%; height: 100%; background: #f59e0b; transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);"></div>
-                </div>
-
-                <!-- Legend & Reclaimable Summary -->
-                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 10px; font-size: 11px; color: #475569;">
-                  <div style="display: flex; gap: 14px; flex-wrap: wrap; align-items: center;">
-                    <span style="display: inline-flex; align-items: center; gap: 5px;"><span style="width:9px; height:9px; border-radius:50%; background:#10b981; display:inline-block;"></span> Protected Core: <strong id="admin-storage-protected-bytes">0 KB</strong></span>
-                    <span style="display: inline-flex; align-items: center; gap: 5px;"><span style="width:9px; height:9px; border-radius:50%; background:#8b5cf6; display:inline-block;"></span> Receipt Pics: <strong id="admin-storage-pics-bytes">0 KB</strong></span>
-                    <span style="display: inline-flex; align-items: center; gap: 5px;"><span style="width:9px; height:9px; border-radius:50%; background:#f59e0b; display:inline-block;"></span> History &amp; Logs: <strong id="admin-storage-history-bytes">0 KB</strong></span>
-                  </div>
-                  <div>
-                    Reclaimable Space Ready to Clear: <strong id="admin-storage-clearable-bytes" style="color: #b45309; font-family: 'DM Mono', monospace;">0 B</strong>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Protected Core KPIs Row -->
-              <div class="admin-kpi-grid" style="margin-bottom: 18px;">
-                <div class="admin-kpi-card" style="padding: 12px 14px; background:#ffffff; border-left: 3px solid #10b981;">
-                  <span class="admin-kpi-label" style="font-size: 10px;">PROTECTED ACTIVE / UNLIMITED</span>
-                  <div style="display:flex; align-items:baseline; gap:6px;">
-                    <div id="admin-diag-active" class="admin-kpi-val" style="font-size: 20px; color:#10b981;">—</div>
-                    <span style="font-size:11px; color:#64748b;">Active / <strong id="admin-diag-unlimited" style="color:#0f766e;">—</strong> Unl</span>
-                  </div>
-                  <div class="admin-kpi-sub">Dual-Vault synced &amp; locked</div>
-                </div>
-                <div class="admin-kpi-card" style="padding: 12px 14px; background:#ffffff; border-left: 3px solid #2563eb;">
-                  <span class="admin-kpi-label" style="font-size: 10px;">WHATSAPP SESSIONS (LOCKED)</span>
-                  <div id="admin-diag-sessions" class="admin-kpi-val" style="font-size: 20px; color:#2563eb;">—</div>
-                  <div class="admin-kpi-sub">Connected &amp; Disconnected safe</div>
-                </div>
-                <div class="admin-kpi-card" style="padding: 12px 14px; background:#ffffff; border-left: 3px solid #8b5cf6;">
-                  <span class="admin-kpi-label" style="font-size: 10px;">CLEARABLE RECEIPT PICS</span>
-                  <div id="admin-diag-clearable-pics" class="admin-kpi-val" style="font-size: 20px; color:#7c3aed;">0 (0 B)</div>
-                  <div class="admin-kpi-sub">Pending receipts (<span id="admin-diag-pending-pics">0</span>) kept safe</div>
-                </div>
-                <div class="admin-kpi-card" style="padding: 12px 14px; background:#ffffff; border-left: 3px solid #ef4444;">
-                  <span class="admin-kpi-label" style="font-size: 10px;">EXPIRED LICENSES &amp; KEYS</span>
-                  <div id="admin-diag-expired" class="admin-kpi-val" style="font-size: 20px; color:#ef4444;">—</div>
-                  <div class="admin-kpi-sub">Safe to purge anytime</div>
-                </div>
-              </div>
-
-              <!-- Granular Storage Category Cards (Clear Pics, Clear History, Clear Logs, Clear Expired) -->
-              <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin-bottom: 16px;">
-                <!-- 1. Receipt Pictures Card -->
-                <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:14px; display:flex; flex-direction:column; justify-content:space-between; gap:10px;">
-                  <div>
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                      <strong style="font-size:12px; color:#0f172a;">🖼️ Payment Receipt Pictures</strong>
-                      <span id="admin-cat-pics-size" class="code-pill" style="background:#f3e8ff; color:#6d28d9; font-weight:800;">0 B</span>
-                    </div>
-                    <p style="font-size:11px; color:#64748b; margin:4px 0 0; line-height:1.4;">
-                      Deletes screenshots from approved, rejected, or expired payments. Pending payment images are untouched.
-                    </p>
-                  </div>
-                  <button type="button" id="admin-clean-receipt-pics-btn" class="admin-preset-btn" style="width:100%; justify-content:center; background:#f3e8ff; color:#6d28d9; border-color:#d8b4fe; font-weight:700; font-size:11px;">
-                    🖼️ Clear Processed Receipt Pics
-                  </button>
-                </div>
-
-                <!-- 2. Message & Media History Card -->
-                <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:14px; display:flex; flex-direction:column; justify-content:space-between; gap:10px;">
-                  <div>
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                      <strong style="font-size:12px; color:#0f172a;">💬 Message &amp; Anti-Delete History</strong>
-                      <span id="admin-cat-msg-size" class="code-pill" style="background:#fef3c7; color:#b45309; font-weight:800;">0 rows (0 B)</span>
-                    </div>
-                    <p style="font-size:11px; color:#64748b; margin:4px 0 0; line-height:1.4;">
-                      Clears cached deleted messages and media metadata logs without touching any WhatsApp session.
-                    </p>
-                  </div>
-                  <button type="button" id="admin-clean-msg-history-btn" class="admin-preset-btn" style="width:100%; justify-content:center; background:#fef3c7; color:#92400e; border-color:#fcd34d; font-weight:700; font-size:11px;">
-                    💬 Clear Message History
-                  </button>
-                </div>
-
-                <!-- 3. Bot Command & Moderation Logs Card -->
-                <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:14px; display:flex; flex-direction:column; justify-content:space-between; gap:10px;">
-                  <div>
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                      <strong style="font-size:12px; color:#0f172a;">📜 Command &amp; Event History</strong>
-                      <span id="admin-cat-cmd-size" class="code-pill" style="background:#e0f2fe; color:#0369a1; font-weight:800;">0 rows (0 B)</span>
-                    </div>
-                    <p style="font-size:11px; color:#64748b; margin:4px 0 0; line-height:1.4;">
-                      Clears historical bot command execution logs, anti-spam events, audit logs, and broadcast history.
-                    </p>
-                  </div>
-                  <button type="button" id="admin-clean-cmd-history-btn" class="admin-preset-btn" style="width:100%; justify-content:center; background:#e0f2fe; color:#0369a1; border-color:#7dd3fc; font-weight:700; font-size:11px;">
-                    📜 Clear Command &amp; Event Logs
-                  </button>
-                </div>
-
-                <!-- 4. AI Chat & Fact History Card -->
-                <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:14px; display:flex; flex-direction:column; justify-content:space-between; gap:10px;">
-                  <div>
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                      <strong style="font-size:12px; color:#0f172a;">🤖 AI Memory &amp; Chat History</strong>
-                      <span id="admin-cat-ai-size" class="code-pill" style="background:#dcfce7; color:#15803d; font-weight:800;">0 rows (0 B)</span>
-                    </div>
-                    <p style="font-size:11px; color:#64748b; margin:4px 0 0; line-height:1.4;">
-                      Clears stored AI conversation history and deep facts to reduce database size.
-                    </p>
-                  </div>
-                  <button type="button" id="admin-clean-ai-history-btn" class="admin-preset-btn" style="width:100%; justify-content:center; background:#dcfce7; color:#15803d; border-color:#86efac; font-weight:700; font-size:11px;">
-                    🤖 Clear AI Chat History
-                  </button>
-                </div>
-
-                <!-- 5. Old Rejected & Expired Payment Requests -->
-                <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:14px; display:flex; flex-direction:column; justify-content:space-between; gap:10px;">
-                  <div>
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                      <strong style="font-size:12px; color:#0f172a;">🧾 Rejected / Expired Payments</strong>
-                      <span id="admin-cat-pay-size" class="code-pill" style="background:#fee2e2; color:#b91c1c; font-weight:800;">0 rows (0 B)</span>
-                    </div>
-                    <p style="font-size:11px; color:#64748b; margin:4px 0 0; line-height:1.4;">
-                      Purges abandoned, expired, or rejected payment sessions and their receipt files.
-                    </p>
-                  </div>
-                  <button type="button" id="admin-clean-old-payments-btn" class="admin-preset-btn" style="width:100%; justify-content:center; background:#fee2e2; color:#991b1b; border-color:#fca5a5; font-weight:700; font-size:11px;">
-                    🧾 Purge Rejected &amp; Expired Payments
-                  </button>
-                </div>
-
-                <!-- 6. One-Click Smart Sweep All Clearable History & Pics -->
-                <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:14px; display:flex; flex-direction:column; justify-content:space-between; gap:10px;">
-                  <div>
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                      <strong style="font-size:12px; color:#92400e;">⚡ Smart Sweep All History &amp; Pics</strong>
-                      <span class="code-pill" style="background:#fef3c7; color:#92400e; font-weight:800;">SAFE SWEEP</span>
-                    </div>
-                    <p style="font-size:11px; color:#b45309; margin:4px 0 0; line-height:1.4;">
-                      Clears all processed receipt pics, message/command/AI history, and expired keys in one click. Never touches active users or WhatsApp sessions.
-                    </p>
-                  </div>
-                  <button type="button" id="admin-clean-all-safe-btn" class="admin-preset-btn" style="width:100%; justify-content:center; background:#d97706; color:#ffffff; border-color:#b45309; font-weight:800; font-size:11px;">
-                    ⚡ Smart Sweep All Clearable Space
-                  </button>
-                </div>
-              </div>
-
-              <!-- Secondary License & Cache Action Buttons -->
-              <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding-top: 10px; border-top: 1px dashed #cbd5e1;">
-                <button type="button" id="admin-clean-expired-lic-btn" class="admin-preset-btn" style="background: #fee2e2; color: #991b1b; border-color: #fca5a5; font-weight: 700; font-size: 11px;">
-                  🧹 Purge Expired Licenses
-                </button>
-                <button type="button" id="admin-clean-unused-keys-btn" class="admin-preset-btn" style="background: #fef3c7; color: #92400e; border-color: #fcd34d; font-weight: 700; font-size: 11px;">
-                  🧹 Purge Unused Keys
-                </button>
-                <button type="button" id="admin-clean-orphaned-btn" class="admin-preset-btn" style="background: #f1f5f9; color: #334155; border-color: #cbd5e1; font-weight: 700; font-size: 11px;">
-                  🛡️ Clean Orphaned Records
-                </button>
-                <button type="button" id="admin-resync-cache-btn" class="admin-preset-btn" style="background: #ecfdf5; color: #047857; border-color: #86efac; font-weight: 700; font-size: 11px;">
-                  🔄 Re-sync Cache
-                </button>
-              </div>
-              <div id="admin-purge-msg" class="license-msg hidden" style="margin-top: 12px;"></div>
-            </div>
-
-            <!-- Recycling Table -->
-            <div class="admin-table-container">
-              <div class="admin-table-header-row">
-                <h3 class="admin-table-title">Recycling Bin Key List</h3>
-                <span id="admin-recycling-count-badge" class="admin-badge badge-expired">0 Keys</span>
-              </div>
-              <div class="admin-table-scroll">
-                <table class="admin-master-table">
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>License Key</th>
-                      <th>Status</th>
-                      <th>Duration</th>
-                      <th>Created</th>
-                      <th>Redeemed By</th>
-                      <th>Expiry</th>
-                      <th style="text-align: center;">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody id="admin-recycling-tbody">
-                    <tr>
-                      <td colspan="8" style="text-align: center; color: var(--muted); padding: 24px;">Loading keys for recycling bin...</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
             </div>
           </div>
 
@@ -1629,53 +1380,6 @@
             </div>
           </div>
 
-          <!-- SUBTAB 4: EXPIRING WATCHLIST VIEW -->
-          <div id="admin-view-expiring" class="admin-subview hidden">
-            <div class="surface" style="padding: 20px; border-radius: 8px; border: 1px solid var(--admin-card-border); margin-bottom: 20px; background: #fffdf5; border-color: #fef3c7;">
-              <div style="display: flex; align-items: center; gap: 12px;">
-                <span style="font-size: 24px;">⏳</span>
-                <div>
-                  <h3 style="font-size: 15px; font-weight: 800; color: #92400e; margin: 0 0 2px;">
-                    Subscription Expiration & Renewal Watch
-                  </h3>
-                  <p style="font-size: 12px; color: #b45309; margin: 0;">
-                    Real-time monitoring of licenses expiring within the next 48 hours or expired in the past 7 days. Use the direct WhatsApp contact link for instant renewal follow-ups.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div class="admin-table-container">
-              <div class="admin-table-header-row">
-                <h3 class="admin-table-title">Urgent Renewal Queue</h3>
-                <span id="admin-expiring-queue-count" class="admin-badge badge-expiring">0 Accounts</span>
-              </div>
-              <div class="admin-table-scroll">
-                <table class="admin-master-table">
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>Customer Email</th>
-                      <th>WhatsApp Phone</th>
-                      <th>License Key</th>
-                      <th>Duration</th>
-                      <th>Expiry Timestamp</th>
-                      <th>Live Remaining</th>
-                      <th>Status</th>
-                      <th>Direct Action</th>
-                    </tr>
-                  </thead>
-                  <tbody id="admin-expiring-tbody">
-                    <tr>
-                      <td colspan="9" style="text-align: center; color: var(--muted); padding: 24px;">No licenses currently in the urgent expiry window.</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <div id="admin-expiring-cards" class="admin-cards-list"></div>
-            </div>
-          </div>
-
           <!-- SUBTAB 5: REFERRALS AUDIT VIEW -->
           <div id="admin-view-referrals" class="admin-subview hidden">
             <!-- Referral Program Summary KPIs -->
@@ -1750,105 +1454,6 @@
               </div>
 
               <div id="admin-referrals-cards" class="admin-cards-list"></div>
-            </div>
-          </div>
-
-          <!-- SUBTAB 6: WHATSAPP & SYSTEM HEALTH VIEW -->
-          <div id="admin-view-system" class="admin-subview hidden">
-            <!-- System Stats Grid -->
-            <div class="admin-kpi-grid">
-              <div class="admin-kpi-card kpi-emerald">
-                <div class="admin-kpi-card-header">
-                  <span class="admin-kpi-label">SERVER UPTIME</span>
-                  <span class="admin-kpi-icon">⏱️</span>
-                </div>
-                <div id="admin-sys-uptime" class="admin-kpi-val" style="font-size: 18px; font-family: 'DM Mono', monospace;">—</div>
-                <div class="admin-kpi-sub">Continuous node process</div>
-              </div>
-
-              <div class="admin-kpi-card kpi-blue">
-                <div class="admin-kpi-card-header">
-                  <span class="admin-kpi-label">ACTIVE SESSIONS</span>
-                  <span class="admin-kpi-icon">📱</span>
-                </div>
-                <div id="admin-sys-controllers" class="admin-kpi-val">0</div>
-                <div class="admin-kpi-sub">In-memory Baileys controllers</div>
-              </div>
-
-              <div class="admin-kpi-card kpi-purple">
-                <div class="admin-kpi-card-header">
-                  <span class="admin-kpi-label">NUMBER LOCKS</span>
-                  <span class="admin-kpi-icon">🔒</span>
-                </div>
-                <div id="admin-sys-locks" class="admin-kpi-val">0</div>
-                <div class="admin-kpi-sub">Locked 1-phone-per-account</div>
-              </div>
-
-              <div class="admin-kpi-card kpi-slate">
-                <div class="admin-kpi-card-header">
-                  <span class="admin-kpi-label">PLATFORM / NODE</span>
-                  <span class="admin-kpi-icon">🖥️</span>
-                </div>
-                <div id="admin-sys-platform" class="admin-kpi-val" style="font-size: 16px;">Linux / ESM</div>
-                <div class="admin-kpi-sub">Railway / Container runtime</div>
-              </div>
-            </div>
-
-            <!-- WhatsApp Active Sessions Table -->
-            <div class="admin-table-container">
-              <div class="admin-table-header-row" style="flex-wrap: wrap; gap: 12px; align-items: center;">
-                <div>
-                  <h3 class="admin-table-title">⚡ Live WhatsApp Sockets & Connected Sessions</h3>
-                  <p style="font-size: 11.5px; color: var(--muted); margin: 2px 0 0;">
-                    Disconnecting logs out the session, sends an update notice DM, and requires re-pairing with a valid license.
-                  </p>
-                </div>
-                <div class="admin-table-actions" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-                  <button id="admin-wa-disconnect-selected-btn" type="button" class="license-btn" style="padding: 6px 14px; font-size: 12px; margin: 0; background: #dc2626; color: #fff; display: inline-flex; align-items: center; gap: 6px;" disabled onclick="disconnectSelectedSessions()">
-                    🔌 Disconnect Selected (<span id="admin-wa-selected-count">0</span>)
-                  </button>
-                  <button id="admin-wa-disconnect-all-btn" type="button" class="admin-preset-btn" style="padding: 6px 14px; font-size: 12px; border-color: #f87171; color: #b91c1c; background: #fff5f5;" onclick="disconnectAllActiveSessions()">
-                    ⚡ Disconnect All Active
-                  </button>
-                </div>
-              </div>
-              <div class="admin-table-scroll">
-                <table class="admin-master-table">
-                  <thead>
-                    <tr>
-                      <th style="width: 38px; text-align: center;">
-                        <input type="checkbox" id="admin-wa-select-all" title="Select / Deselect all" style="cursor: pointer;" onchange="toggleSelectAllWhatsApp(this)" />
-                      </th>
-                      <th style="width: 40px;">#</th>
-                      <th>User Account</th>
-                      <th>Role</th>
-                      <th>WhatsApp Phone</th>
-                      <th>Socket State</th>
-                      <th>License Status</th>
-                      <th>Commands / Activity</th>
-                      <th style="text-align: right; width: 120px;">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody id="admin-whatsapp-tbody">
-                    <tr>
-                      <td colspan="9" style="text-align: center; color: var(--muted); padding: 24px;">Loading WhatsApp session states...</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          <!-- SUBTAB 7: RECENT ACTIVITY LOGS VIEW -->
-          <div id="admin-view-activity" class="admin-subview hidden">
-            <div class="surface" style="padding: 20px; border-radius: 8px; border: 1px solid var(--admin-card-border);">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
-                <h3 style="font-size: 14px; font-weight: 800; color: var(--ink); margin: 0;">📜 Authoritative Real-Time Event Feed</h3>
-                <span class="admin-badge badge-active">Live Synchronized</span>
-              </div>
-              <div id="admin-activity-timeline" class="admin-activity-timeline">
-                <div style="text-align: center; color: var(--muted); padding: 24px;">Gathering event records...</div>
-              </div>
             </div>
           </div>
 
@@ -6155,8 +5760,8 @@
               const isChecked = selectedSessionUserIds.has(s.userId);
 
               const connBadge = isLive 
-                ? `<span class="admin-badge badge-connected" style="background:#dcfce7; color:#15803d; border-color:#86efac; font-weight:800;"><span class="badge-dot" style="background:#16a34a;"></span>CONNECTED 🟢</span>`
-                : `<span class="admin-badge badge-disconnected" style="background:#f1f5f9; color:#64748b;"><span class="badge-dot" style="background:#94a3b8;"></span>${(s.status || "SAVED").toUpperCase()} ⚪</span>`;
+                ? `<span class="admin-badge badge-connected" style="background:#dcfce7; color:#15803d; border-color:#86efac; font-weight:800;"><span class="badge-dot" style="background:#16a34a;"></span>ONLINE 🟢</span>`
+                : `<span class="admin-badge badge-disconnected" style="background:#f1f5f9; color:#64748b;"><span class="badge-dot" style="background:#94a3b8;"></span>DISCONNECTED ⚪</span>`;
 
               const credsBadge = s.hasCreds 
                 ? `<span class="code-pill" style="color:#047857; background:#dcfce7; font-weight:800;">🔥 Synced (${s.credsFormatted})</span>`
