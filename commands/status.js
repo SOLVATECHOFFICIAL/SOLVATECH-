@@ -1,35 +1,73 @@
 import {
   generateWAMessageContent,
+  generateWAMessageFromContent,
   downloadContentFromMessage,
   downloadMediaMessage,
   proto,
 } from "@whiskeysockets/baileys";
+import sharp from "sharp";
 import { isGroup, getMessageContent, unwrapMediaMessage, streamToBuffer } from "../lib/helpers.js";
 import { downloadViewOnceRobust } from "../lib/media.js";
-import { getCachedIncomingMessage } from "../lib/deleted-messages.js";
+import { getCachedIncomingMessage, ensureMediaDownloaded } from "../lib/deleted-messages.js";
 import { generateRichLinkPreview } from "../lib/link-preview.js";
 import { logger } from "../lib/logger.js";
 
 const ANY_LINK_REGEX = /(?:https?:\/\/|www\.|chat\.whatsapp\.com\/|whatsapp\.com\/channel\/|wa\.me\/)[^\s]+/i;
 
 /**
- * Robustly extract and decrypt media buffer from candidate message structures.
+ * Ensures a valid JPEG thumbnail buffer exists for video and image status/posts.
  */
-async function retrieveMediaBuffer(sock, candidates = [], mediaType = "image") {
+async function ensureJpegThumbnail(buffer, existingThumb = null, isVideo = false) {
+  if (existingThumb && Buffer.isBuffer(existingThumb) && existingThumb.length > 0) {
+    return existingThumb;
+  }
+  if (existingThumb && typeof existingThumb === "string") {
+    try {
+      const b = Buffer.from(existingThumb, "base64");
+      if (b.length > 0) return b;
+    } catch {}
+  }
+  if (!isVideo && buffer && Buffer.isBuffer(buffer)) {
+    try {
+      return await sharp(buffer)
+        .resize(320, 320, { fit: "inside" })
+        .jpeg({ quality: 75 })
+        .toBuffer();
+    } catch (err) {
+      logger.debug("[GCSTATUS] Image thumbnail generation notice:", err.message);
+    }
+  }
+  return null;
+}
+
+/**
+ * Robustly extract and decrypt media buffer across multiple candidate representations.
+ */
+async function retrieveMediaBuffer(sock, candidates = [], mediaType = "image", cachedEntry = null) {
   const streamType = mediaType === "audio" ? "audio" : mediaType === "video" ? "video" : "image";
 
+  // Strategy 1: Check pre-buffered media in cachedEntry
+  if (cachedEntry?.mediaBuffer && Buffer.isBuffer(cachedEntry.mediaBuffer) && cachedEntry.mediaBuffer.length > 0) {
+    const rawContent = unwrapMediaMessage(cachedEntry.rawMessage || {});
+    return {
+      buffer: cachedEntry.mediaBuffer,
+      media: rawContent?.videoMessage || rawContent?.imageMessage || rawContent?.audioMessage || rawContent?.documentMessage,
+    };
+  }
+
+  // Strategy 2: Direct stream decryption via downloadContentFromMessage
   for (const candidate of candidates) {
     if (!candidate) continue;
     const content = unwrapMediaMessage(candidate);
     const media =
-      content?.imageMessage ||
       content?.videoMessage ||
+      content?.imageMessage ||
       content?.audioMessage ||
       content?.documentMessage ||
       content?.ptvMessage ||
       content?.stickerMessage;
 
-    if (media && media.mediaKey) {
+    if (media && (media.mediaKey || media.url || media.directPath)) {
       try {
         const stream = await downloadContentFromMessage(media, streamType);
         const buf = await streamToBuffer(stream);
@@ -37,22 +75,22 @@ async function retrieveMediaBuffer(sock, candidates = [], mediaType = "image") {
           return { buffer: buf, media };
         }
       } catch (err) {
-        logger.debug(`[GROUP_STATUS] Direct stream decryption note for ${mediaType}:`, err.message);
+        logger.debug(`[GCSTATUS] Direct stream decryption notice for ${mediaType}:`, err.message);
       }
     }
   }
 
-  // Fallback 1: downloadViewOnceRobust
+  // Strategy 3: downloadViewOnceRobust
   for (const candidate of candidates) {
     if (!candidate) continue;
     try {
       const target = candidate.message ? candidate : { message: candidate };
-      const buf = await downloadViewOnceRobust(sock, target, null);
+      const buf = await downloadViewOnceRobust(sock, target, cachedEntry);
       if (buf && buf.length > 0) {
         const content = unwrapMediaMessage(candidate);
         const media =
-          content?.imageMessage ||
           content?.videoMessage ||
+          content?.imageMessage ||
           content?.audioMessage ||
           content?.documentMessage;
         return { buffer: buf, media };
@@ -60,7 +98,7 @@ async function retrieveMediaBuffer(sock, candidates = [], mediaType = "image") {
     } catch {}
   }
 
-  // Fallback 2: Baileys downloadMediaMessage
+  // Strategy 4: Baileys downloadMediaMessage
   for (const candidate of candidates) {
     if (!candidate) continue;
     try {
@@ -75,11 +113,25 @@ async function retrieveMediaBuffer(sock, candidates = [], mediaType = "image") {
       if (buf && buf.length > 0) {
         const content = unwrapMediaMessage(candidate);
         const media =
-          content?.imageMessage ||
           content?.videoMessage ||
+          content?.imageMessage ||
           content?.audioMessage ||
           content?.documentMessage;
         return { buffer: buf, media };
+      }
+    } catch {}
+  }
+
+  // Strategy 5: cachedEntry on-demand download via ensureMediaDownloaded
+  if (cachedEntry) {
+    try {
+      const buf = await ensureMediaDownloaded(cachedEntry, sock);
+      if (buf && buf.length > 0) {
+        const rawContent = unwrapMediaMessage(cachedEntry.rawMessage || {});
+        return {
+          buffer: buf,
+          media: rawContent?.videoMessage || rawContent?.imageMessage || rawContent?.audioMessage || rawContent?.documentMessage,
+        };
       }
     } catch {}
   }
@@ -88,30 +140,38 @@ async function retrieveMediaBuffer(sock, candidates = [], mediaType = "image") {
 }
 
 /**
- * Strips the .status command trigger cleanly from text/caption.
- * e.g. ".status https://chat.whatsapp.com/..." -> "https://chat.whatsapp.com/..."
- * e.g. ".Status check out this video" -> "check out this video"
+ * Strips the command triggers (.gcstatus, .status, .groupstatus with optional everyone/all) cleanly.
  */
 function cleanStatusCaption(rawText = "") {
   if (!rawText) return "";
   let cleaned = String(rawText).trim();
-  // Strip leading command prefixes like .status, .Status, !status, /status, etc.
-  cleaned = cleaned.replace(/^[.!\/#$]?status\s*/i, "").trim();
+  cleaned = cleaned.replace(/^[.!\/#$]?(?:gcstatus|groupstatus|status)(?:\s+@?(?:everyone|all))?\s*/i, "").trim();
   return cleaned;
 }
 
 /**
- * .status command:
- * Post photos, videos, audio, group links, channel links, or web links to WhatsApp Group Status (story).
+ * Cleans command arguments specifically typed after the command.
+ */
+function cleanUserArgs(rawArgs = "") {
+  if (!rawArgs) return "";
+  let cleaned = String(rawArgs).trim();
+  cleaned = cleaned.replace(/^[.!\/#$]?(?:gcstatus|groupstatus|status)\s*/i, "").trim();
+  cleaned = cleaned.replace(/^@?(?:everyone|all)\s*/i, "").trim();
+  return cleaned;
+}
+
+/**
+ * .gcstatus / .status command:
+ * Posts videos, photos, audio, documents, text, or links to ALL participating groups (everyone).
  *
  * SPECIFICATION:
- * - Patient processing: allows full time needed (1-2+ mins) for heavy videos and media to upload completely.
- * - Supports direct media with caption (e.g. user sends video with .status <description/link>).
- * - Supports replying to media with .status <caption/link>.
- * - Clean caption stripping: removes the command word (.status) so only the clean under-text/link is uploaded.
- * - Video under-text (caption) is preserved directly on the status payload.
- * - Only works in groups.
- * - Only the linked owner can trigger it.
+ * - Broadcasts to every group the bot/account participates in.
+ * - Supports direct media with caption (e.g. user sends video with caption: .gcstatus everyone <description/link>).
+ * - Supports replying to media with .gcstatus everyone <caption/link>.
+ * - Strips command prefixes (.gcstatus, .status, everyone) so only the clean under-text/link is uploaded.
+ * - Video under-text (caption) is preserved directly on the video message in all groups.
+ * - Uploads media once to WhatsApp server, then relays to each group with minimal latency.
+ * - Works for linked account owner in any group or personal DM.
  */
 export default async function status({
   sock,
@@ -121,10 +181,8 @@ export default async function status({
   args = [],
   userId = "default",
 }) {
-  const statusStartTime = Date.now();
-
-  // 1. Group-only & Owner-only restriction
-  if (!isGroup(chatId) || !senderIsLinkedAccount) {
+  // Owner-only restriction: only the linked owner can trigger broadcasts
+  if (!senderIsLinkedAccount) {
     return;
   }
 
@@ -137,16 +195,16 @@ export default async function status({
   const quotedMsg = contextInfo?.quotedMessage;
   const quotedStanzaId = contextInfo?.stanzaId;
 
-  // React with ⏳ to indicate that the upload process has started
+  // React with ⏳ to indicate that processing and uploading has started
   if (msgKey?.id) {
     sock.sendMessage(chatId, { react: { text: "⏳", key: msgKey } }).catch(() => {});
   }
 
   // Clean the caption provided via command arguments
   const userTypedArgs = args.join(" ").trim();
-  const cleanedTypedText = cleanStatusCaption(userTypedArgs);
+  const cleanedTypedText = cleanUserArgs(userTypedArgs);
 
-  // Check if the current incoming message ITSELF contains media (direct media upload with .status caption)
+  // Check if current incoming message contains direct media
   const currentUnwrapped = unwrapMediaMessage(message);
   const currentHasDirectMedia = Boolean(
     currentUnwrapped?.videoMessage ||
@@ -170,60 +228,70 @@ export default async function status({
   try {
     let mediaPayload = null;
 
-    // PRIORITY 1: Check media attached DIRECTLY to the current message (direct send with .status in caption)
+    // PRIORITY 1: Check media attached DIRECTLY to the current message
     if (currentHasDirectMedia) {
       const directCandidates = [message, currentContent, currentUnwrapped].filter(Boolean);
 
       // Direct Video
       if (currentUnwrapped.videoMessage || currentUnwrapped.ptvMessage) {
-        logger.info("[GROUP_STATUS] Processing direct video upload for group status (allowing full upload time)...");
-        const res = await retrieveMediaBuffer(sock, directCandidates, "video");
+        logger.info("[GCSTATUS] Processing direct video for all groups broadcast...");
+        const res = await retrieveMediaBuffer(sock, directCandidates, "video", cachedEntry);
         if (res && res.buffer) {
           const rawCaption = res.media?.caption || currentUnwrapped.videoMessage?.caption || "";
           const cleanMediaCaption = cleanStatusCaption(rawCaption);
           const finalCaption = cleanedTypedText || cleanMediaCaption;
           const mimetype = res.media?.mimetype || currentUnwrapped.videoMessage?.mimetype || "video/mp4";
 
+          const existingThumb =
+            res.media?.jpegThumbnail ||
+            currentUnwrapped.videoMessage?.jpegThumbnail ||
+            null;
+
           mediaPayload = {
             video: res.buffer,
             caption: finalCaption || undefined,
             mimetype,
+            jpegThumbnail: existingThumb || undefined,
           };
         }
       }
       // Direct Image
       else if (currentUnwrapped.imageMessage) {
-        logger.info("[GROUP_STATUS] Processing direct image upload for group status...");
-        const res = await retrieveMediaBuffer(sock, directCandidates, "image");
+        logger.info("[GCSTATUS] Processing direct image for all groups broadcast...");
+        const res = await retrieveMediaBuffer(sock, directCandidates, "image", cachedEntry);
         if (res && res.buffer) {
           const rawCaption = res.media?.caption || currentUnwrapped.imageMessage?.caption || "";
           const cleanMediaCaption = cleanStatusCaption(rawCaption);
           const finalCaption = cleanedTypedText || cleanMediaCaption;
+          const existingThumb =
+            res.media?.jpegThumbnail ||
+            currentUnwrapped.imageMessage?.jpegThumbnail ||
+            null;
 
           mediaPayload = {
             image: res.buffer,
             caption: finalCaption || undefined,
+            jpegThumbnail: existingThumb || undefined,
           };
         }
       }
       // Direct Audio
       else if (currentUnwrapped.audioMessage) {
-        logger.info("[GROUP_STATUS] Processing direct audio upload for group status...");
-        const res = await retrieveMediaBuffer(sock, directCandidates, "audio");
+        logger.info("[GCSTATUS] Processing direct audio for all groups broadcast...");
+        const res = await retrieveMediaBuffer(sock, directCandidates, "audio", cachedEntry);
         if (res && res.buffer) {
           const mimetype = res.media?.mimetype || currentUnwrapped.audioMessage?.mimetype || "audio/mp4";
-          const ptt = Boolean(res.media?.ptt || currentUnwrapped.audioMessage?.ptt);
-
           mediaPayload = {
             audio: res.buffer,
             mimetype,
-            ptt,
+            ptt: true,
           };
         }
       }
       // Direct Document
       else if (currentUnwrapped.documentMessage) {
-        const res = await retrieveMediaBuffer(sock, directCandidates, "document");
+        logger.info("[GCSTATUS] Processing direct document for all groups broadcast...");
+        const res = await retrieveMediaBuffer(sock, directCandidates, "document", cachedEntry);
         if (res && res.buffer) {
           const rawCaption = res.media?.caption || currentUnwrapped.documentMessage?.caption || "";
           const finalCaption = cleanedTypedText || cleanStatusCaption(rawCaption);
@@ -240,7 +308,7 @@ export default async function status({
       }
     }
 
-    // PRIORITY 2: Check media from QUOTED message (user replied to media with .status)
+    // PRIORITY 2: Check media from QUOTED message (user replied to media with .gcstatus / .status)
     if (!mediaPayload && quotedMsg) {
       const quotedCandidates = [
         cachedEntry?.rawMessage,
@@ -260,8 +328,8 @@ export default async function status({
       );
 
       if (hasQuotedVideo) {
-        logger.info("[GROUP_STATUS] Processing quoted video upload for group status (allowing full upload time)...");
-        const res = await retrieveMediaBuffer(sock, quotedCandidates, "video");
+        logger.info("[GCSTATUS] Processing quoted video for all groups broadcast...");
+        const res = await retrieveMediaBuffer(sock, quotedCandidates, "video", cachedEntry);
         if (res && res.buffer) {
           const origCaption =
             res.media?.caption ||
@@ -273,10 +341,17 @@ export default async function status({
           const finalCaption = cleanedTypedText || cleanOrigCaption;
           const mimetype = res.media?.mimetype || unwrapQuoted.videoMessage?.mimetype || "video/mp4";
 
+          const existingThumb =
+            res.media?.jpegThumbnail ||
+            unwrapQuoted.videoMessage?.jpegThumbnail ||
+            cachedEntry?.content?.videoMessage?.jpegThumbnail ||
+            null;
+
           mediaPayload = {
             video: res.buffer,
             caption: finalCaption || undefined,
             mimetype,
+            jpegThumbnail: existingThumb || undefined,
           };
         }
       }
@@ -291,8 +366,8 @@ export default async function status({
       );
 
       if (hasQuotedImage) {
-        logger.info("[GROUP_STATUS] Processing quoted image upload for group status...");
-        const res = await retrieveMediaBuffer(sock, quotedCandidates, "image");
+        logger.info("[GCSTATUS] Processing quoted image for all groups broadcast...");
+        const res = await retrieveMediaBuffer(sock, quotedCandidates, "image", cachedEntry);
         if (res && res.buffer) {
           const origCaption =
             res.media?.caption ||
@@ -303,9 +378,16 @@ export default async function status({
           const cleanOrigCaption = cleanStatusCaption(origCaption);
           const finalCaption = cleanedTypedText || cleanOrigCaption;
 
+          const existingThumb =
+            res.media?.jpegThumbnail ||
+            unwrapQuoted.imageMessage?.jpegThumbnail ||
+            cachedEntry?.content?.imageMessage?.jpegThumbnail ||
+            null;
+
           mediaPayload = {
             image: res.buffer,
             caption: finalCaption || undefined,
+            jpegThumbnail: existingThumb || undefined,
           };
         }
       }
@@ -320,16 +402,14 @@ export default async function status({
       );
 
       if (hasQuotedAudio) {
-        logger.info("[GROUP_STATUS] Processing quoted audio upload for group status...");
-        const res = await retrieveMediaBuffer(sock, quotedCandidates, "audio");
+        logger.info("[GCSTATUS] Processing quoted audio for all groups broadcast...");
+        const res = await retrieveMediaBuffer(sock, quotedCandidates, "audio", cachedEntry);
         if (res && res.buffer) {
           const mimetype = res.media?.mimetype || unwrapQuoted.audioMessage?.mimetype || "audio/mp4";
-          const ptt = Boolean(res.media?.ptt || unwrapQuoted.audioMessage?.ptt);
-
           mediaPayload = {
             audio: res.buffer,
             mimetype,
-            ptt,
+            ptt: true,
           };
         }
       }
@@ -344,7 +424,8 @@ export default async function status({
       );
 
       if (hasQuotedDocument) {
-        const res = await retrieveMediaBuffer(sock, quotedCandidates, "document");
+        logger.info("[GCSTATUS] Processing quoted document for all groups broadcast...");
+        const res = await retrieveMediaBuffer(sock, quotedCandidates, "document", cachedEntry);
         if (res && res.buffer) {
           const origCaption = res.media?.caption || unwrapQuoted.documentMessage?.caption || "";
           const finalCaption = cleanedTypedText || cleanStatusCaption(origCaption);
@@ -361,8 +442,96 @@ export default async function status({
       }
     }
 
-    // PRIORITY 3: LINK OR TEXT STATUS (Group Invite, Channel, or Web Link)
-    if (!mediaPayload) {
+    // 1. Fetch ALL participating groups
+    let participating = {};
+    try {
+      participating = await sock.groupFetchAllParticipating();
+    } catch (fetchErr) {
+      logger.warn("[GCSTATUS] groupFetchAllParticipating notice:", fetchErr.message);
+    }
+
+    const participatingJids = Object.keys(participating || {});
+    const targetGroups = Array.from(
+      new Set([
+        ...participatingJids,
+        ...(isGroup(chatId) ? [chatId] : []),
+      ])
+    ).filter((j) => isGroup(j));
+
+    if (targetGroups.length === 0) {
+      logger.warn("[GCSTATUS] No participating groups found to post to.");
+      if (msgKey?.id) {
+        await sock.sendMessage(chatId, { react: { text: "❓", key: msgKey } }).catch(() => {});
+      }
+      return;
+    }
+
+    let successCount = 0;
+    const ownJid = sock.user?.id || sock.authState?.creds?.me?.id;
+
+    // CASE A: MEDIA POST (Video, Image, Audio, Document)
+    if (mediaPayload) {
+      if (mediaPayload.video) {
+        const thumb = await ensureJpegThumbnail(
+          mediaPayload.video,
+          mediaPayload.jpegThumbnail,
+          true
+        );
+        if (thumb) mediaPayload.jpegThumbnail = thumb;
+      } else if (mediaPayload.image) {
+        const thumb = await ensureJpegThumbnail(
+          mediaPayload.image,
+          mediaPayload.jpegThumbnail,
+          false
+        );
+        if (thumb) mediaPayload.jpegThumbnail = thumb;
+      }
+
+      logger.info(`[GCSTATUS] Broadcasting media to ${targetGroups.length} groups...`, {
+        mediaType: mediaPayload.video ? "video" : mediaPayload.image ? "image" : mediaPayload.audio ? "audio" : "document",
+        hasCaption: Boolean(mediaPayload.caption),
+        caption: mediaPayload.caption || "",
+      });
+
+      // Upload once to WhatsApp media server
+      let preparedContent = null;
+      try {
+        preparedContent = await generateWAMessageContent(mediaPayload, {
+          upload: sock.waUploadToServer,
+        });
+      } catch (uploadErr) {
+        logger.warn("[GCSTATUS] Single-upload generateWAMessageContent error, will fallback per group:", uploadErr.message);
+      }
+
+      for (const groupJid of targetGroups) {
+        try {
+          if (preparedContent) {
+            const fullMsg = generateWAMessageFromContent(groupJid, preparedContent, {
+              userJid: ownJid,
+            });
+            await sock.relayMessage(groupJid, fullMsg.message, { messageId: fullMsg.key.id });
+            successCount++;
+          } else {
+            await sock.sendMessage(groupJid, mediaPayload);
+            successCount++;
+          }
+        } catch (relayErr) {
+          logger.debug(`[GCSTATUS] Relay error to ${groupJid}, falling back to sendMessage:`, relayErr.message);
+          try {
+            await sock.sendMessage(groupJid, mediaPayload);
+            successCount++;
+          } catch (sendErr) {
+            logger.warn(`[GCSTATUS] Could not deliver media to group ${groupJid}:`, sendErr.message);
+          }
+        }
+
+        if (targetGroups.length > 1) {
+          await new Promise((r) => setTimeout(r, 350));
+        }
+      }
+    }
+    // CASE B: TEXT OR LINK POST
+    else {
       let textToPost = "";
 
       if (quotedMsg) {
@@ -404,112 +573,57 @@ export default async function status({
         unwrapQuoted.groupInviteMessage
       );
 
+      let linkPreviewMsg = null;
       if (hasUrl) {
-        logger.info("[GROUP_STATUS] Resolving high-fidelity link preview for link status story...");
-        const richPreview = await generateRichLinkPreview(
-          textToPost,
-          unwrapQuoted.extendedTextMessage || cachedEntry?.content?.extendedTextMessage,
-          sock
-        );
-
-        if (!richPreview || !richPreview.title || !richPreview.jpegThumbnail || richPreview.jpegThumbnail.length === 0) {
-          logger.warn("[GROUP_STATUS] Link preview validation fallback — relaying clean text card.");
-          mediaPayload = { text: textToPost };
-        } else {
-          // Allow deliberate propagation (6-10 seconds) so WhatsApp servers cache the picture thumbnail
-          const elapsedSoFar = Date.now() - statusStartTime;
-          if (elapsedSoFar < 7000) {
-            await new Promise((resolve) => setTimeout(resolve, 7500 - elapsedSoFar));
+        logger.info("[GCSTATUS] Generating rich link preview for groups broadcast...");
+        try {
+          const richPreview = await generateRichLinkPreview(
+            textToPost,
+            unwrapQuoted.extendedTextMessage || cachedEntry?.content?.extendedTextMessage,
+            sock
+          );
+          if (richPreview && richPreview.title) {
+            linkPreviewMsg = {
+              text: textToPost,
+              contextInfo: richPreview.contextInfo,
+            };
           }
-
-          const innerMsg = proto.Message.fromObject({
-            extendedTextMessage: richPreview,
-          });
-
-          const statusV2Message = proto.Message.fromObject({
-            groupStatusMessageV2: { message: innerMsg },
-          });
-
-          const statusV1Message = proto.Message.fromObject({
-            groupStatusMessage: { message: innerMsg },
-          });
-
-          logger.info("[GROUP_STATUS] Relaying group status with verified link preview card and thumbnail", {
-            chatId,
-            title: richPreview.title,
-            totalElapsedMs: Date.now() - statusStartTime,
-          });
-
-          try {
-            await sock.relayMessage(chatId, statusV2Message, {});
-          } catch {
-            await sock.relayMessage(chatId, statusV1Message, {});
-          }
-
-          if (msgKey?.id) {
-            await sock.sendMessage(chatId, { react: { text: "✅", key: msgKey } }).catch(() => {});
-            setTimeout(() => {
-              sock.sendMessage(chatId, { delete: msgKey }).catch(() => {});
-            }, 3000);
-          }
-          return;
+        } catch (previewErr) {
+          logger.debug("[GCSTATUS] Link preview fallback:", previewErr.message);
         }
-      } else {
-        mediaPayload = { text: textToPost };
+      }
+
+      const textPayload = linkPreviewMsg || { text: textToPost };
+
+      logger.info(`[GCSTATUS] Broadcasting text/link to ${targetGroups.length} groups...`, {
+        textSnippet: textToPost.slice(0, 60),
+      });
+
+      for (const groupJid of targetGroups) {
+        try {
+          await sock.sendMessage(groupJid, textPayload);
+          successCount++;
+        } catch (err) {
+          logger.warn(`[GCSTATUS] Could not deliver text to group ${groupJid}:`, err.message);
+        }
+
+        if (targetGroups.length > 1) {
+          await new Promise((r) => setTimeout(r, 350));
+        }
       }
     }
 
-    if (!mediaPayload) {
-      if (msgKey?.id) {
-        sock.sendMessage(chatId, { react: { text: "❌", key: msgKey } }).catch(() => {});
-      }
-      return;
-    }
-
-    // Media upload and generation (allows full time needed for large videos/photos)
-    logger.info("[GROUP_STATUS] Uploading status media payload (allowing full upload time)...", {
-      chatId,
-      mediaType: mediaPayload.video ? "video" : mediaPayload.image ? "image" : mediaPayload.audio ? "audio" : "text",
-      hasCaption: Boolean(mediaPayload.caption),
-      captionText: mediaPayload.caption || "",
-    });
-
-    const innerMsg = await generateWAMessageContent(mediaPayload, {
-      upload: sock.waUploadToServer,
-    });
-
-    const statusV2Message = proto.Message.fromObject({
-      groupStatusMessageV2: {
-        message: innerMsg,
-      },
-    });
-
-    const statusV1Message = proto.Message.fromObject({
-      groupStatusMessage: {
-        message: innerMsg,
-      },
-    });
-
-    logger.info("[GROUP_STATUS] Relaying group status directly to group", {
-      chatId,
-      mediaType: mediaPayload.video ? "video" : mediaPayload.image ? "image" : mediaPayload.audio ? "audio" : "text",
-      totalElapsedMs: Date.now() - statusStartTime,
-    });
-
-    try {
-      await sock.relayMessage(chatId, statusV2Message, {});
-    } catch {
-      await sock.relayMessage(chatId, statusV1Message, {});
-    }
+    logger.info(`[GCSTATUS] Completed broadcast to ${successCount}/${targetGroups.length} groups.`);
 
     if (msgKey?.id) {
-      await sock.sendMessage(chatId, { react: { text: "✅", key: msgKey } }).catch(() => {});
-      setTimeout(() => {
-        sock.sendMessage(chatId, { delete: msgKey }).catch(() => {});
-      }, 3000);
+      if (successCount > 0) {
+        await sock.sendMessage(chatId, { react: { text: "✅", key: msgKey } }).catch(() => {});
+      } else {
+        await sock.sendMessage(chatId, { react: { text: "⚠️", key: msgKey } }).catch(() => {});
+      }
     }
   } catch (err) {
-    logger.error("[GROUP_STATUS] Execution error", err.message);
+    logger.error("[GCSTATUS] Execution error:", err.message);
     if (msgKey?.id) {
       sock.sendMessage(chatId, { react: { text: "⚠️", key: msgKey } }).catch(() => {});
     }
