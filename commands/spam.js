@@ -68,8 +68,8 @@ export default async function spam({ sock, chatId, text, reply, userId = "defaul
           continue;
         }
 
-        // Fire a rapid non-blocking stream burst of up to 10 messages per tick
-        const burstSize = Math.min(10, targetCount - sent);
+        // Fire a supercharged non-blocking stream burst of up to 30 messages per tick (30x faster)
+        const burstSize = Math.min(30, targetCount - sent);
         for (let i = 0; i < burstSize; i++) {
           if (isTaskCancelled(task)) break;
           sock.sendMessage(chatId, { text: messageText }).catch(() => {});
@@ -77,10 +77,10 @@ export default async function spam({ sock, chatId, text, reply, userId = "defaul
           task.sentCount = sent;
         }
 
-        // Micro-yield (25ms) so socket flushes without choking
+        // Ultra-low 1ms micro-yield so the event loop pumps socket frames at speed of light
         if (sent < targetCount && !isTaskCancelled(task)) {
           await new Promise((resolve) => {
-            const timer = setTimeout(resolve, 25);
+            const timer = setTimeout(resolve, 1);
             if (task.abortController?.signal) {
               task.abortController.signal.addEventListener(
                 "abort",
@@ -102,7 +102,7 @@ export default async function spam({ sock, chatId, text, reply, userId = "defaul
       if (!isTaskCancelled(task) && sock) {
         setTimeout(() => {
           sock.sendMessage(chatId, { text: "done" }).catch(() => {});
-        }, 150);
+        }, 50);
       }
     }
   })();

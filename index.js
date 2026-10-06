@@ -1761,8 +1761,9 @@ setInterval(() => {
     const mem = process.memoryUsage();
     const heapUsedMb = Math.round(mem.heapUsed / 1024 / 1024);
     const rssMb = Math.round(mem.rss / 1024 / 1024);
-    if (heapUsedMb > 250) {
-      logger.info(`[Memory Monitor] Heap: ${heapUsedMb}MB, RSS: ${rssMb}MB (Optimized GC)`);
+    if (heapUsedMb > 200) {
+      if (typeof global.gc === "function") global.gc();
+      logger.info(`[Memory Monitor] Heap: ${heapUsedMb}MB, RSS: ${rssMb}MB (Proactive Trim)`);
     }
   } catch {}
-}, 60000).unref();
+}, 30000).unref();

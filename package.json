@@ -7,10 +7,10 @@
     "node": ">=20.0.0"
   },
   "scripts": {
-    "dev": "node --max-old-space-size=360 --expose-gc index.js",
+    "dev": "node --max-old-space-size=460 --expose-gc index.js",
     "build": "node -e \"console.log('SOLVATECH BOT production build ready')\"",
-    "start": "node --max-old-space-size=360 --expose-gc index.js",
-    "serve": "node --max-old-space-size=360 --expose-gc index.js",
+    "start": "node --max-old-space-size=460 --expose-gc index.js",
+    "serve": "node --max-old-space-size=460 --expose-gc index.js",
     "typecheck": "node --check index.js && for file in lib/*.js commands/*.js; do node --check \"$file\"; done",
     "lint": "node --check index.js && for file in lib/*.js commands/*.js; do node --check \"$file\"; done"
   },
