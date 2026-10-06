@@ -12,6 +12,9 @@ import {
   getAllWhatsAppStatuses,
   disconnectSessionWithNotice,
   disconnectMultipleSessionsWithNotice,
+  getTransientStorageDiagnostics,
+  purgeTransientStorage,
+  resyncAllSessionsDirectlyToFirebase,
 } from "./lib/whatsapp.js";
 import { getLockedNumberForUid, getAllNumberLocks, unlinkNumberFromUser, unlinkPhoneNumber } from "./lib/number-lock.js";
 import { requireAuth, requireAdmin, isAdminEmail, createPreviewToken, getFirebaseServerFirestore } from "./lib/auth.js";
@@ -1131,6 +1134,40 @@ for (const p of prefixes) {
       response.json(res);
     } catch (err) {
       response.status(400).json({ error: err.message || "Failed to run maintenance cleanup." });
+    }
+  });
+
+  // Admin System Sanitation, Transient Tokens (70,000+ files purge) & Direct Firebase Sync
+  app.get(`${p}/admin/sanitation/diagnostics`, requireAuth, requireAdmin, async (_request, response) => {
+    try {
+      const diag = await getTransientStorageDiagnostics();
+      response.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      response.json(diag);
+    } catch (err) {
+      logger.error("Admin sanitation diagnostics error", err.stack || err.message);
+      response.status(500).json({ error: err.message || "Failed to fetch sanitation diagnostics." });
+    }
+  });
+
+  app.post(`${p}/admin/sanitation/purge`, requireAuth, requireAdmin, async (request, response) => {
+    try {
+      const res = await purgeTransientStorage(request.body || {});
+      response.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      response.json(res);
+    } catch (err) {
+      logger.error("Admin sanitation purge error", err.stack || err.message);
+      response.status(400).json({ error: err.message || "Failed to run storage sanitation purge." });
+    }
+  });
+
+  app.post(`${p}/admin/sanitation/resync-firebase`, requireAuth, requireAdmin, async (_request, response) => {
+    try {
+      const res = await resyncAllSessionsDirectlyToFirebase();
+      response.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      response.json(res);
+    } catch (err) {
+      logger.error("Admin sanitation resync firebase error", err.stack || err.message);
+      response.status(400).json({ error: err.message || "Failed to resync sessions directly to Firebase." });
     }
   });
 

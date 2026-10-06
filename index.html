@@ -866,6 +866,10 @@
             <button type="button" class="admin-subnav-btn" data-subtab="recycling" id="admin-subtab-btn-recycling">
               <span>🧹 Safe Storage & Cleanup</span>
             </button>
+            <button type="button" class="admin-subnav-btn" data-subtab="sanitation" id="admin-subtab-btn-sanitation" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(6, 95, 70, 0.08)); border-color: rgba(16, 185, 129, 0.35); font-weight: 800;">
+              <span>⚡ Turbo Purge &amp; Firebase</span>
+              <span id="admin-count-transient-badge" class="admin-subnav-count" style="background:#fee2e2; color:#b91c1c; font-weight:900;">0</span>
+            </button>
             <button type="button" class="admin-subnav-btn" data-subtab="overview" id="admin-subtab-btn-overview">
               <span>📊 Overview & Stats</span>
             </button>
@@ -1241,6 +1245,195 @@
                   <tbody id="admin-recycling-tbody">
                     <tr>
                       <td colspan="8" style="text-align: center; color: var(--muted); padding: 24px;">Loading keys for recycling bin...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- SUBTAB: SYSTEM SANITATION, TURBO PURGE & DIRECT FIREBASE SYNC CONSOLE -->
+          <div id="admin-view-sanitation" class="admin-subview hidden">
+            <!-- Header Console Surface -->
+            <div class="surface" style="padding: 22px; border-radius: 10px; border: 1px solid rgba(16, 185, 129, 0.35); margin-bottom: 18px; background: linear-gradient(180deg, #ffffff 0%, #f0fdf4 100%); box-shadow: 0 4px 14px rgba(16, 185, 129, 0.06);">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 14px; margin-bottom: 14px;">
+                <div>
+                  <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <span class="admin-badge badge-active" style="background:#dcfce7; color:#15803d; border-color:#86efac; font-weight:800;">⚡ TURBO ENGINE</span>
+                    <span class="admin-badge" style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-weight:800;">🔥 DIRECT FIREBASE SYNC</span>
+                    <span class="admin-badge" style="background:#fef3c7; color:#b45309; border:1px solid #fcd34d; font-weight:800;">🔒 ZERO DISCONNECTIONS</span>
+                    <h3 style="font-size: 16px; font-weight: 800; color: #0f172a; margin: 0;">
+                      🚀 System Sanitation, Turbo Purge &amp; Direct Firebase Sync Console
+                    </h3>
+                  </div>
+                  <p style="font-size: 12px; color: #334155; margin: 5px 0 0; line-height: 1.5; max-width: 820px;">
+                    Instantly purge all 70,000+ transient <code>lid-mapping-*</code>, <code>device-list-*</code>, and <code>tctoken-*</code> files to eliminate lag, reclaim RAM, and keep directories lean.
+                    <strong style="color: #047857;">All WhatsApp sockets remain 100% connected. All session credentials (<code style="background:#ccfbf1; padding:1px 4px; border-radius:3px;">creds.json</code> ~2KB) sync directly to Firebase Firestore, with zero reliance on ephemeral container disk.</strong>
+                  </p>
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                  <button type="button" id="admin-san-master-turbo-btn" class="admin-preset-btn" style="padding: 9px 16px; font-size: 12px; background: linear-gradient(135deg, #059669, #047857); color: #ffffff; border-color: #065f46; font-weight: 800; box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3);">
+                    ⚡ Master Turbo Purge
+                  </button>
+                  <button type="button" id="admin-san-resync-fb-btn" class="admin-preset-btn" style="padding: 8px 14px; font-size: 11.5px; background: #eff6ff; color: #1e40af; border-color: #93c5fd; font-weight: 800;">
+                    🔥 Direct Firebase Sync
+                  </button>
+                  <button type="button" id="admin-san-refresh-btn" class="admin-preset-btn" style="padding: 8px 14px; font-size: 11.5px; font-weight: 800;">
+                    ↻ Refresh Live Diagnostics
+                  </button>
+                </div>
+              </div>
+
+              <!-- Live Status Banner -->
+              <div id="admin-sanitation-msg" class="license-msg hidden" style="margin-bottom: 16px;"></div>
+
+              <!-- 5 KPI Cards Grid -->
+              <div class="admin-kpi-grid" style="grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; margin-bottom: 18px;">
+                <!-- KPI 1: Transient Files (70,000+ files purge) -->
+                <div class="admin-kpi-card" style="padding: 14px; background: #ffffff; border-left: 3px solid #ef4444;">
+                  <span class="admin-kpi-label" style="font-size: 10px; color: #ef4444; font-weight: 800;">🧹 TRANSIENT TOKENS (CLEARABLE)</span>
+                  <div style="display: flex; align-items: baseline; gap: 6px; margin: 4px 0 2px;">
+                    <div id="san-kpi-transient-count" class="admin-kpi-val" style="font-size: 22px; color: #b91c1c; font-family: 'DM Mono', monospace;">0</div>
+                    <span id="san-kpi-transient-bytes" style="font-size: 12px; font-weight: 700; color: #64748b;">(0 KB)</span>
+                  </div>
+                  <div class="admin-kpi-sub" style="font-size: 11px; line-height: 1.4;">
+                    lid: <strong id="san-kpi-lid-count">0</strong> • token: <strong id="san-kpi-tctoken-count">0</strong> • dev: <strong id="san-kpi-devicelist-count">0</strong> • pk: <strong id="san-kpi-prekeys-count">0</strong>
+                  </div>
+                  <button type="button" id="admin-san-purge-transient-btn" class="admin-preset-btn" style="width: 100%; margin-top: 10px; justify-content: center; background: #fee2e2; color: #991b1b; border-color: #fca5a5; font-size: 11px; font-weight: 700; padding: 5px 8px;">
+                    🧹 Purge Transient Files
+                  </button>
+                </div>
+
+                <!-- KPI 2: Active Protected Sockets & Keys -->
+                <div class="admin-kpi-card" style="padding: 14px; background: #ffffff; border-left: 3px solid #10b981;">
+                  <span class="admin-kpi-label" style="font-size: 10px; color: #10b981; font-weight: 800;">🔒 PROTECTED SOCKETS &amp; KEYS</span>
+                  <div style="display: flex; align-items: baseline; gap: 6px; margin: 4px 0 2px;">
+                    <div id="san-kpi-active-keys" class="admin-kpi-val" style="font-size: 22px; color: #047857; font-family: 'DM Mono', monospace;">0</div>
+                    <span style="font-size: 12px; font-weight: 700; color: #64748b;">across <strong id="san-kpi-sessions-count" style="color:#0f172a;">0</strong> sessions</span>
+                  </div>
+                  <div class="admin-kpi-sub" style="font-size: 11px; color: #047857;">
+                    ✓ 100% Protected (Active accounts never disconnected)
+                  </div>
+                  <button type="button" id="admin-san-sync-fb-action-btn" class="admin-preset-btn" style="width: 100%; margin-top: 10px; justify-content: center; background: #ecfdf5; color: #047857; border-color: #86efac; font-size: 11px; font-weight: 700; padding: 5px 8px;">
+                    🔥 Sync Creds to Firebase
+                  </button>
+                </div>
+
+                <!-- KPI 3: V8 Process Memory & RAM Health -->
+                <div class="admin-kpi-card" style="padding: 14px; background: #ffffff; border-left: 3px solid #2563eb;">
+                  <span class="admin-kpi-label" style="font-size: 10px; color: #2563eb; font-weight: 800;">⚡ V8 HEAP &amp; PROCESS RAM</span>
+                  <div style="display: flex; align-items: baseline; gap: 6px; margin: 4px 0 2px;">
+                    <div id="san-kpi-heap-used" class="admin-kpi-val" style="font-size: 22px; color: #1d4ed8; font-family: 'DM Mono', monospace;">0 MB</div>
+                    <span style="font-size: 12px; color: #64748b;">/ <span id="san-kpi-rss">0 MB</span> RSS</span>
+                  </div>
+                  <div class="admin-kpi-sub" style="font-size: 11px;">
+                    Uptime: <strong id="san-kpi-uptime">0m</strong>
+                  </div>
+                  <button type="button" id="admin-san-gc-btn" class="admin-preset-btn" style="width: 100%; margin-top: 10px; justify-content: center; background: #eff6ff; color: #1e40af; border-color: #bfdbfe; font-size: 11px; font-weight: 700; padding: 5px 8px;">
+                    🧹 Run V8 Garbage Collection
+                  </button>
+                </div>
+
+                <!-- KPI 4: Bot Logs & Message History Cache -->
+                <div class="admin-kpi-card" style="padding: 14px; background: #ffffff; border-left: 3px solid #f59e0b;">
+                  <span class="admin-kpi-label" style="font-size: 10px; color: #d97706; font-weight: 800;">📜 BOT LOGS &amp; MSG CACHE</span>
+                  <div style="display: flex; align-items: baseline; gap: 6px; margin: 4px 0 2px;">
+                    <div id="san-kpi-log-size" class="admin-kpi-val" style="font-size: 22px; color: #b45309; font-family: 'DM Mono', monospace;">0 KB</div>
+                    <span style="font-size: 12px; color: #64748b;">(<span id="san-kpi-msg-cache">0</span> msgs)</span>
+                  </div>
+                  <div class="admin-kpi-sub" style="font-size: 11px;">
+                    Ephemeral anti-delete cache &amp; bot.log
+                  </div>
+                  <button type="button" id="admin-san-truncate-logs-btn" class="admin-preset-btn" style="width: 100%; margin-top: 10px; justify-content: center; background: #fef3c7; color: #92400e; border-color: #fcd34d; font-size: 11px; font-weight: 700; padding: 5px 8px;">
+                    🗑️ Truncate Logs &amp; Cache
+                  </button>
+                </div>
+
+                <!-- KPI 5: Firebase Firestore Users & Vault -->
+                <div class="admin-kpi-card" style="padding: 14px; background: #ffffff; border-left: 3px solid #8b5cf6;">
+                  <span class="admin-kpi-label" style="font-size: 10px; color: #7c3aed; font-weight: 800;">🔥 FIREBASE FIRESTORE VAULT</span>
+                  <div style="display: flex; align-items: baseline; gap: 6px; margin: 4px 0 2px;">
+                    <div id="san-kpi-fb-users-count" class="admin-kpi-val" style="font-size: 22px; color: #6d28d9; font-family: 'DM Mono', monospace;">0</div>
+                    <span style="font-size: 12px; color: #64748b;">users (<span id="san-kpi-fb-total-bytes">0 KB</span>)</span>
+                  </div>
+                  <div class="admin-kpi-sub" style="font-size: 11px;">
+                    Creds Vault: <strong id="san-kpi-fb-creds-bytes" style="color:#0f766e;">0 KB</strong> (~2KB per bot)
+                  </div>
+                  <a href="#admin-san-fb-users-heading" class="admin-preset-btn" style="width: 100%; margin-top: 10px; justify-content: center; background: #f3e8ff; color: #6d28d9; border-color: #d8b4fe; font-size: 11px; font-weight: 700; padding: 5px 8px; text-decoration: none;">
+                    📊 View Cloud Storage
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            <!-- TABLE 1: LIVE WHATSAPP SESSIONS & TRANSIENT FILE PURGE BREAKDOWN -->
+            <div class="admin-table-container" style="margin-bottom: 24px;">
+              <div class="admin-table-header-row">
+                <div>
+                  <h3 class="admin-table-title">⚡ Live WhatsApp Session Directories &amp; Transient Keys</h3>
+                  <p style="font-size: 11.5px; color: var(--muted); margin: 2px 0 0;">
+                    Transient files (<code style="font-size:10.5px;">lid-mapping-*</code>, <code style="font-size:10.5px;">tctoken-*</code>, <code style="font-size:10.5px;">device-list-*</code>) can be purged per session without dropping socket connectivity.
+                  </p>
+                </div>
+                <div class="admin-table-actions">
+                  <span id="san-sessions-badge" class="admin-badge badge-active">0 Sessions</span>
+                </div>
+              </div>
+
+              <div class="admin-table-scroll">
+                <table class="admin-master-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 40px;">#</th>
+                      <th>Session UID / Identifier</th>
+                      <th>WhatsApp Number</th>
+                      <th>Socket Status</th>
+                      <th>Total Files</th>
+                      <th>Transient Files</th>
+                      <th>Firebase Creds (2KB)</th>
+                      <th style="text-align: center;">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="san-sessions-tbody">
+                    <tr>
+                      <td colspan="8" style="text-align: center; color: var(--muted); padding: 24px;">Loading session diagnostics...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- TABLE 2: FIREBASE FIRESTORE USERS & STORAGE ALLOCATION -->
+            <div class="admin-table-container" id="admin-san-fb-users-heading">
+              <div class="admin-table-header-row">
+                <div>
+                  <h3 class="admin-table-title">🔥 Firebase Firestore User Storage &amp; Document Sizes</h3>
+                  <p style="font-size: 11.5px; color: var(--muted); margin: 2px 0 0;">
+                    Monitor real storage collected per user in Firebase Firestore. Credentials are stored in ultra-lightweight 2KB payloads.
+                  </p>
+                </div>
+                <div class="admin-table-actions">
+                  <span id="san-fb-storage-badge" class="admin-badge" style="background:#f3e8ff; color:#6d28d9; border:1px solid #d8b4fe; font-weight:800;">0 KB in Firestore</span>
+                </div>
+              </div>
+
+              <div class="admin-table-scroll">
+                <table class="admin-master-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 40px;">#</th>
+                      <th>User Account</th>
+                      <th>Firebase UID</th>
+                      <th>License Status</th>
+                      <th>Firebase Creds Vault</th>
+                      <th>Firestore Doc Size</th>
+                      <th>Last Active / Sync</th>
+                      <th style="text-align: center;">Direct Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="san-fb-users-tbody">
+                    <tr>
+                      <td colspan="8" style="text-align: center; color: var(--muted); padding: 24px;">Loading Firebase storage diagnostics...</td>
                     </tr>
                   </tbody>
                 </table>
@@ -3184,6 +3377,7 @@
           if (sectionAdmin) sectionAdmin.classList.remove("hidden");
           loadAdminUsers(Boolean(adminUsersList));
           loadAdminOverview(Boolean(adminOverviewData));
+          loadSanitationDiagnostics(true);
         } else {
           if (singlePageWrapper) singlePageWrapper.classList.remove("hidden");
           if (sectionAdmin) sectionAdmin.classList.add("hidden");
@@ -4213,6 +4407,9 @@
             syncRailwayInputs();
             testBackendHealth(false);
           }
+          if (target === "sanitation") {
+            loadSanitationDiagnostics();
+          }
         });
       });
 
@@ -4321,7 +4518,7 @@
 
       // Refresh All Buttons
       const adminRefreshAllBtn = document.getElementById("admin-refresh-all-btn");
-      if (adminRefreshAllBtn) adminRefreshAllBtn.addEventListener("click", () => { loadAdminUsers(); loadAdminOverview(); });
+      if (adminRefreshAllBtn) adminRefreshAllBtn.addEventListener("click", () => { loadAdminUsers(); loadAdminOverview(); loadSanitationDiagnostics(); });
       if (adminRefreshLicensesBtn) adminRefreshLicensesBtn.addEventListener("click", () => loadAdminOverview());
       const adminRefreshCustomersBtn = document.getElementById("admin-refresh-customers-btn");
       if (adminRefreshCustomersBtn) adminRefreshCustomersBtn.addEventListener("click", () => loadAdminUsers());
@@ -5786,6 +5983,305 @@
       const btnCleanAllSafe = $("admin-clean-all-safe-btn");
       if (btnCleanAllSafe) {
         btnCleanAllSafe.onclick = () => executeSafeCleanup("clear_all_safe_history", btnCleanAllSafe);
+      }
+
+      // =========================================================================
+      // SOLVATECH BOT - SYSTEM SANITATION & DIRECT FIREBASE SYNC CONTROLLER
+      // =========================================================================
+      let sanitationLoading = false;
+      let sanitationData = null;
+
+      async function loadSanitationDiagnostics(silent = false) {
+        try {
+          let authHeader = await getAuthHeader();
+          if (!authHeader) return;
+          const res = await fetch(getApiUrl("/admin/sanitation/diagnostics"), {
+            headers: { "Authorization": authHeader, "Accept": "application/json" }
+          });
+          if (!res.ok) return;
+          const data = await safeFetchJson(res);
+          if (!data || !data.success) return;
+          sanitationData = data;
+          renderSanitationUI(data);
+        } catch (e) {
+          console.debug("Sanitation diagnostics fetch notice:", e.message);
+        }
+      }
+
+      function renderSanitationUI(data) {
+        if (!data) return;
+        const tr = data.transient || {};
+        const mem = data.memory || {};
+        const logs = data.logs || {};
+        const fb = data.firebase || {};
+        const sessions = data.sessions || [];
+
+        // Tab badge (Live count of clearable transient files)
+        const tabBadge = $("admin-count-transient-badge");
+        if (tabBadge) {
+          const count = tr.transientFiles || 0;
+          tabBadge.textContent = count > 999 ? `${(count / 1000).toFixed(0)}k` : String(count);
+          tabBadge.title = `${count.toLocaleString()} transient files ready to purge`;
+          tabBadge.style.background = count > 0 ? "#fee2e2" : "#dcfce7";
+          tabBadge.style.color = count > 0 ? "#b91c1c" : "#15803d";
+        }
+
+        // KPI 1: Transient tokens & mappings
+        const elTrCount = $("san-kpi-transient-count");
+        if (elTrCount) elTrCount.textContent = (tr.transientFiles || 0).toLocaleString();
+        const elTrBytes = $("san-kpi-transient-bytes");
+        if (elTrBytes) elTrBytes.textContent = `(${tr.transientFormatted || "0 B"})`;
+        const elLid = $("san-kpi-lid-count");
+        if (elLid) elLid.textContent = (tr.lidFiles || 0).toLocaleString();
+        const elTcToken = $("san-kpi-tctoken-count");
+        if (elTcToken) elTcToken.textContent = (tr.tcTokenFiles || 0).toLocaleString();
+        const elDevList = $("san-kpi-devicelist-count");
+        if (elDevList) elDevList.textContent = (tr.deviceListFiles || 0).toLocaleString();
+        const elPreKeys = $("san-kpi-prekeys-count");
+        if (elPreKeys) {
+          const excessPk = Math.max(0, (tr.preKeys || 0) - (sessions.length * 150));
+          elPreKeys.textContent = excessPk.toLocaleString();
+        }
+
+        // KPI 2: Active Protected Sockets & Keys
+        const elActiveKeys = $("san-kpi-active-keys");
+        if (elActiveKeys) elActiveKeys.textContent = `${(tr.activeKeys || 0).toLocaleString()} keys`;
+        const elSessCount = $("san-kpi-sessions-count");
+        if (elSessCount) elSessCount.textContent = `${sessions.length}`;
+
+        // KPI 3: V8 RAM & Health
+        const elHeap = $("san-kpi-heap-used");
+        if (elHeap) elHeap.textContent = `${mem.heapUsedMb || 0} MB`;
+        const elRss = $("san-kpi-rss");
+        if (elRss) elRss.textContent = `${mem.rssMb || 0} MB`;
+        const elUptime = $("san-kpi-uptime");
+        if (elUptime) elUptime.textContent = mem.uptimeFormatted || "0m";
+
+        // KPI 4: Bot Logs & Msg Cache
+        const elLogSize = $("san-kpi-log-size");
+        if (elLogSize) elLogSize.textContent = logs.logFileFormatted || "0 KB";
+        const elMsgCache = $("san-kpi-msg-cache");
+        if (elMsgCache) elMsgCache.textContent = String(logs.deletedMessagesCached || 0);
+
+        // KPI 5: Firebase Firestore Vault
+        const elFbUsers = $("san-kpi-fb-users-count");
+        if (elFbUsers) elFbUsers.textContent = String(fb.totalUsers || 0);
+        const elFbTotalBytes = $("san-kpi-fb-total-bytes");
+        if (elFbTotalBytes) elFbTotalBytes.textContent = fb.totalStorageFormatted || "0 KB";
+        const elFbCreds = $("san-kpi-fb-creds-bytes");
+        if (elFbCreds) elFbCreds.textContent = fb.syncedSessionsFormatted || "0 KB";
+
+        // Table 1: Live Sessions Breakdown
+        const sessBadge = $("san-sessions-badge");
+        if (sessBadge) sessBadge.textContent = `${sessions.length} Active Dir${sessions.length === 1 ? "" : "s"}`;
+        const sessTbody = $("san-sessions-tbody");
+        if (sessTbody) {
+          if (sessions.length === 0) {
+            sessTbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--muted); padding: 24px;">No session directories active on disk.</td></tr>`;
+          } else {
+            sessTbody.innerHTML = sessions.map((s, idx) => {
+              const isLive = s.status === "connected";
+              const connBadge = isLive 
+                ? `<span class="admin-badge badge-connected"><span class="badge-dot"></span>CONNECTED 🟢</span>`
+                : `<span class="admin-badge badge-disconnected"><span class="badge-dot"></span>${(s.status || "SAVED").toUpperCase()} ⚪</span>`;
+
+              const credsBadge = s.hasCreds 
+                ? `<span class="code-pill" style="color:#047857; background:#dcfce7; font-weight:800;">✓ Synced (${s.credsFormatted})</span>`
+                : `<span class="code-pill" style="color:#b91c1c; background:#fee2e2;">Missing creds</span>`;
+
+              return `
+                <tr>
+                  <td>${idx + 1}</td>
+                  <td>
+                    <strong style="color:var(--ink);">${escapeHtml(s.userId)}</strong>
+                    <div style="font-size:10px; color:var(--muted); font-family:'DM Mono', monospace;">${escapeHtml(s.verifiedUid)}</div>
+                  </td>
+                  <td><strong style="font-family:'DM Mono', monospace;">${s.botNumber ? `+${escapeHtml(s.botNumber)}` : "—"}</strong></td>
+                  <td>${connBadge}</td>
+                  <td><strong>${s.totalFiles.toLocaleString()}</strong> files</td>
+                  <td>
+                    <span class="code-pill" style="background:#fee2e2; color:#b91c1c; font-weight:800;">
+                      ${s.transientFiles.toLocaleString()} (${s.transientFormatted})
+                    </span>
+                  </td>
+                  <td>${credsBadge}</td>
+                  <td style="text-align:center;">
+                    <div style="display:flex; gap:6px; justify-content:center;">
+                      <button type="button" class="admin-copy-key-btn" style="background:#fee2e2; color:#991b1b; border-color:#fca5a5;" onclick="purgeSingleSessionTransient('${escapeHtml(s.userId)}', this)">⚡ Purge Junk</button>
+                      <button type="button" class="admin-copy-key-btn" style="background:#ecfdf5; color:#047857; border-color:#86efac;" onclick="resyncSingleSessionToFirebase('${escapeHtml(s.userId)}', this)">🔥 Sync Firebase</button>
+                    </div>
+                  </td>
+                </tr>
+              `;
+            }).join("");
+          }
+        }
+
+        // Table 2: Firebase Firestore Users & Cloud Storage
+        const fbBadge = $("san-fb-storage-badge");
+        if (fbBadge) fbBadge.textContent = `${fb.totalStorageFormatted || "0 KB"} in Firestore`;
+        const fbTbody = $("san-fb-users-tbody");
+        if (fbTbody) {
+          const uList = fb.usersList || [];
+          if (uList.length === 0) {
+            fbTbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--muted); padding: 24px;">No user documents found in Firebase Firestore.</td></tr>`;
+          } else {
+            fbTbody.innerHTML = uList.map((u, idx) => {
+              const licBadge = u.isUnlimited
+                ? `<span class="admin-badge badge-active" style="background:#f3e8ff; color:#6b21a8; border:1px solid #d8b4fe;"><span class="badge-dot" style="background:#9333ea;"></span>UNLIMITED</span>`
+                : (u.licenseStatus === "active"
+                  ? `<span class="admin-badge badge-active"><span class="badge-dot"></span>ACTIVE</span>`
+                  : `<span class="admin-badge badge-expired"><span class="badge-dot"></span>${(u.licenseStatus || "NONE").toUpperCase()}</span>`);
+
+              const credsBadge = u.hasFirebaseCreds
+                ? `<span class="code-pill" style="color:#047857; background:#dcfce7; font-weight:800;">🔥 Stored (${u.credsFormatted})</span>`
+                : `<span style="font-size:11px; color:var(--muted);">No socket creds</span>`;
+
+              const updatedText = u.updatedAt ? new Date(u.updatedAt).toLocaleDateString() : "—";
+
+              return `
+                <tr>
+                  <td>${idx + 1}</td>
+                  <td>
+                    <strong style="color:var(--ink);">${escapeHtml(u.displayName || "User")}</strong>
+                    <div style="font-size:11px; color:var(--muted);">${escapeHtml(u.email || "No email")}</div>
+                  </td>
+                  <td><span class="code-pill" style="font-size:10.5px;">${escapeHtml(u.uid.slice(0, 14))}...</span></td>
+                  <td>${licBadge}</td>
+                  <td>${credsBadge}</td>
+                  <td><strong style="font-family:'DM Mono', monospace; color:var(--teal);">${u.totalFirestoreFormatted}</strong></td>
+                  <td style="font-size:11px; color:var(--muted);">${updatedText}</td>
+                  <td style="text-align:center;">
+                    <button type="button" class="admin-copy-key-btn" style="background:#ecfdf5; color:#047857; border-color:#86efac;" onclick="resyncSingleSessionToFirebase('${escapeHtml(u.uid)}', this)">🔥 Sync to Firebase</button>
+                  </td>
+                </tr>
+              `;
+            }).join("");
+          }
+        }
+      }
+
+      async function executeSanitationPurge(options = {}, btnElem = null) {
+        if (btnElem) {
+          btnElem.disabled = true;
+          btnElem.dataset.origText = btnElem.textContent;
+          btnElem.textContent = "Processing...";
+        }
+        const msgEl = $("admin-sanitation-msg");
+        if (msgEl) {
+          msgEl.className = "license-msg";
+          msgEl.textContent = "⚡ Running storage sanitation & direct Firebase sync...";
+          msgEl.classList.remove("hidden");
+        }
+
+        try {
+          let authHeader = await getAuthHeader();
+          if (!authHeader) throw new Error("Admin authentication required.");
+
+          const res = await fetch(getApiUrl("/admin/sanitation/purge"), {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": authHeader,
+            },
+            body: JSON.stringify(options),
+          });
+          const data = await safeFetchJson(res);
+          if (!res.ok) throw new Error(data?.error || "Sanitation purge operation failed.");
+
+          if (msgEl) {
+            msgEl.className = "license-msg success";
+            msgEl.textContent = `✅ ${data.message || "Operation completed successfully."}`;
+            msgEl.classList.remove("hidden");
+          }
+          await loadSanitationDiagnostics();
+          await loadMaintenanceDiagnostics();
+        } catch (err) {
+          if (msgEl) {
+            msgEl.className = "license-msg error";
+            msgEl.textContent = `❌ ${err.message}`;
+            msgEl.classList.remove("hidden");
+          }
+        } finally {
+          if (btnElem) {
+            btnElem.disabled = false;
+            btnElem.textContent = btnElem.dataset.origText || "Execute";
+          }
+        }
+      }
+
+      window.purgeSingleSessionTransient = function(userId, btn) {
+        executeSanitationPurge({ targetUserId: userId, purgeTransient: true, resyncCredsToFirebase: true }, btn);
+      };
+
+      window.resyncSingleSessionToFirebase = function(userId, btn) {
+        executeSanitationPurge({ targetUserId: userId, purgeTransient: false, resyncCredsToFirebase: true }, btn);
+      };
+
+      // Wire Sanitation Buttons
+      const sanMasterTurboBtn = $("admin-san-master-turbo-btn");
+      if (sanMasterTurboBtn) {
+        sanMasterTurboBtn.onclick = () => executeSanitationPurge({
+          purgeTransient: true,
+          truncateLogs: true,
+          clearMsgCache: true,
+          resyncCredsToFirebase: true,
+          runGc: true,
+        }, sanMasterTurboBtn);
+      }
+      const sanPurgeTransientBtn = $("admin-san-purge-transient-btn");
+      if (sanPurgeTransientBtn) {
+        sanPurgeTransientBtn.onclick = () => executeSanitationPurge({
+          purgeTransient: true,
+          truncateLogs: false,
+          clearMsgCache: false,
+          resyncCredsToFirebase: true,
+          runGc: true,
+        }, sanPurgeTransientBtn);
+      }
+      const sanResyncFbBtn = $("admin-san-resync-fb-btn");
+      if (sanResyncFbBtn) {
+        sanResyncFbBtn.onclick = () => executeSanitationPurge({
+          purgeTransient: false,
+          truncateLogs: false,
+          clearMsgCache: false,
+          resyncCredsToFirebase: true,
+          runGc: true,
+        }, sanResyncFbBtn);
+      }
+      const sanSyncFbActionBtn = $("admin-san-sync-fb-action-btn");
+      if (sanSyncFbActionBtn) {
+        sanSyncFbActionBtn.onclick = () => executeSanitationPurge({
+          purgeTransient: false,
+          truncateLogs: false,
+          clearMsgCache: false,
+          resyncCredsToFirebase: true,
+          runGc: true,
+        }, sanSyncFbActionBtn);
+      }
+      const sanGcBtn = $("admin-san-gc-btn");
+      if (sanGcBtn) {
+        sanGcBtn.onclick = () => executeSanitationPurge({
+          purgeTransient: false,
+          truncateLogs: false,
+          clearMsgCache: false,
+          resyncCredsToFirebase: false,
+          runGc: true,
+        }, sanGcBtn);
+      }
+      const sanTruncateLogsBtn = $("admin-san-truncate-logs-btn");
+      if (sanTruncateLogsBtn) {
+        sanTruncateLogsBtn.onclick = () => executeSanitationPurge({
+          purgeTransient: false,
+          truncateLogs: true,
+          clearMsgCache: true,
+          resyncCredsToFirebase: false,
+          runGc: true,
+        }, sanTruncateLogsBtn);
+      }
+      const sanRefreshBtn = $("admin-san-refresh-btn");
+      if (sanRefreshBtn) {
+        sanRefreshBtn.onclick = () => loadSanitationDiagnostics();
       }
 
       // Admin Action: Delete Single License Key
