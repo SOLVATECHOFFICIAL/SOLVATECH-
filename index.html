@@ -78,6 +78,30 @@
             document.documentElement.classList.add("auth-pre-active");
           }
         } catch {}
+
+        // Global early tap & click bridge for Google Sign-In (ensures 100% tapability even while scripts load)
+        window.__googleSignInPending = false;
+        window.__triggerGoogleSignIn = function(e) {
+          if (e) {
+            if (e.preventDefault) e.preventDefault();
+            if (e.stopPropagation) e.stopPropagation();
+          }
+          const btn = document.getElementById("google-signin-btn");
+          const textSpan = document.getElementById("google-signin-text");
+          if (btn) {
+            btn.classList.add("tap-active");
+            setTimeout(() => { if (btn) btn.classList.remove("tap-active"); }, 200);
+          }
+          if (typeof window.__doGoogleSignIn === "function") {
+            window.__doGoogleSignIn();
+          } else {
+            window.__googleSignInPending = true;
+            if (btn) {
+              btn.classList.add("is-loading");
+              if (textSpan) textSpan.textContent = "Connecting to Google...";
+            }
+          }
+        };
       })();
     </script>
     <style>
@@ -239,15 +263,30 @@
               </div>
             </div>
 
-            <button id="google-signin-btn" class="google-auth-button" type="button">
-              <svg viewBox="0 0 24 24" width="18" height="18">
+            <button id="google-signin-btn" class="google-auth-button" type="button" aria-label="Sign in with Google" tabindex="0" onclick="window.__triggerGoogleSignIn && window.__triggerGoogleSignIn(event)">
+              <svg viewBox="0 0 24 24" width="20" height="20">
                 <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z"/>
                 <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z"/>
                 <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.8s.2-2.1.4-2.8L1.9 6.3C.7 8.7 0 10.3 0 12s.7 3.3 1.9 5.7l3.7-2.9z"/>
                 <path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16C3.7 19.7 7.5 23 12 23z"/>
               </svg>
-              <span>Sign in with Google</span>
+              <span id="google-signin-text">Sign in with Google</span>
             </button>
+            <script>
+              (function() {
+                const btn = document.getElementById("google-signin-btn");
+                if (btn) {
+                  const onTouchStart = () => btn.classList.add("tap-active");
+                  const onTouchEnd = () => btn.classList.remove("tap-active");
+                  btn.addEventListener("touchstart", onTouchStart, { passive: true });
+                  btn.addEventListener("touchend", onTouchEnd, { passive: true });
+                  btn.addEventListener("touchcancel", onTouchEnd, { passive: true });
+                  btn.addEventListener("mousedown", onTouchStart);
+                  btn.addEventListener("mouseup", onTouchEnd);
+                  btn.addEventListener("mouseleave", onTouchEnd);
+                }
+              })();
+            </script>
 
             <!-- Studio Preview / Development Quick Access -->
             <div id="domain-notice-box" class="domain-notice-box hidden">
@@ -1645,6 +1684,8 @@
       import { 
         getAuth, 
         signInWithPopup, 
+        signInWithRedirect,
+        getRedirectResult,
         GoogleAuthProvider, 
         signOut, 
         onAuthStateChanged 
@@ -1665,15 +1706,25 @@
 
       const $ = (id) => document.getElementById(id);
       
-      let FIREBASE_CONFIG = {};
-      try {
-        const cfgRes = await fetch("./firebase-applet-config.json");
-        if (cfgRes.ok) {
-          FIREBASE_CONFIG = await cfgRes.json();
-        }
-      } catch (e) {
-        console.warn("Could not load firebase-applet-config.json", e);
-      }
+      const DEFAULT_FIREBASE_CONFIG = {
+        projectId: "solvatechbot",
+        appId: "1:1094113371408:web:fdf3cbdef31413a703b195",
+        apiKey: "AIzaSyDCVp_T6gO6HeTDeevls9MSb9quEzU5YiM",
+        authDomain: "solvatechbot.firebaseapp.com",
+        firestoreDatabaseId: "(default)",
+        storageBucket: "solvatechbot.firebasestorage.app",
+        messagingSenderId: "1094113371408"
+      };
+
+      let FIREBASE_CONFIG = { ...DEFAULT_FIREBASE_CONFIG };
+      fetch("./firebase-applet-config.json")
+        .then((r) => (r.ok ? r.json() : null))
+        .then((cfg) => {
+          if (cfg && cfg.apiKey) {
+            FIREBASE_CONFIG = Object.assign(FIREBASE_CONFIG, cfg);
+          }
+        })
+        .catch(() => {});
 
       function escapeHtml(str) {
         if (!str) return "";
@@ -3317,49 +3368,105 @@
         showAuthError("Authentication service notice: " + (e.message || "Configuration error."));
       }
 
-      // Google Sign-In with Automatic Preview Fallback
-      if (googleSignInBtn) {
-        googleSignInBtn.addEventListener("click", async () => {
-          showAuthError("");
-          googleSignInBtn.disabled = true;
-          googleSignInBtn.style.opacity = "0.7";
-          try {
-            if (!auth) {
-              const app = initializeApp(FIREBASE_CONFIG);
-              auth = getAuth(app);
-            }
-            const provider = new GoogleAuthProvider();
-            provider.setCustomParameters({ prompt: 'select_account' });
-            await signInWithPopup(auth, provider);
-          } catch (err) {
-            console.warn("Google sign-in attempt notice:", err?.code, err?.message);
-            const errCode = String(err?.code || "");
-            const errMsg = String(err?.message || "").toLowerCase();
-            const isUnauthorizedDomain = errCode === "auth/unauthorized-domain" || errMsg.includes("unauthorized-domain");
-            const isIframeOrBlocked = errCode === "auth/popup-blocked" || 
-                                     errCode === "auth/operation-not-supported-in-this-environment" || 
-                                     errMsg.includes("operation-not-supported") ||
-                                     errMsg.includes("third-party cookie") ||
-                                     errMsg.includes("iframe");
+      // Google Sign-In: Instant Tap, Watchdog Protection, and Seamless Fallback
+      let isGoogleSigningIn = false;
+      let watchdogTimer = null;
 
-            if (isUnauthorizedDomain || isIframeOrBlocked) {
-              console.warn(`[Firebase Auth] Environment restriction detected (${errCode || errMsg}). Seamlessly establishing studio preview session.`);
-              if (domainNoticeBox) domainNoticeBox.classList.remove("hidden");
-              const connected = await startPreviewSession();
-              if (connected) return;
+      function resetGoogleSignInButton() {
+        isGoogleSigningIn = false;
+        if (watchdogTimer) {
+          clearTimeout(watchdogTimer);
+          watchdogTimer = null;
+        }
+        if (googleSignInBtn) {
+          googleSignInBtn.disabled = false;
+          googleSignInBtn.style.opacity = "1";
+          googleSignInBtn.classList.remove("is-loading");
+          googleSignInBtn.innerHTML = `
+            <svg viewBox="0 0 24 24" width="20" height="20">
+              <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z"/>
+              <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z"/>
+              <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.8s.2-2.1.4-2.8L1.9 6.3C.7 8.7 0 10.3 0 12s.7 3.3 1.9 5.7l3.7-2.9z"/>
+              <path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16C3.7 19.7 7.5 23 12 23z"/>
+            </svg>
+            <span id="google-signin-text">Sign in with Google</span>
+          `;
+        }
+      }
 
-              showAuthError(`Domain Notice: "${currentHost}" cannot complete popups inside this frame. Click "⚡ Quick Preview Access (Admin)" below.`);
-            } else if (errCode === "auth/popup-closed-by-user") {
-              showAuthError("Google Sign-In popup was closed before completing.");
-            } else {
-              showAuthError(err?.message || "Failed to sign in with Google. Please try again or use Quick Preview Access.");
-              if (domainNoticeBox) domainNoticeBox.classList.remove("hidden");
-            }
-          } finally {
-            googleSignInBtn.disabled = false;
-            googleSignInBtn.style.opacity = "1";
+      window.__doGoogleSignIn = async function() {
+        if (isGoogleSigningIn) return;
+        isGoogleSigningIn = true;
+        showAuthError("");
+
+        if (googleSignInBtn) {
+          googleSignInBtn.classList.add("is-loading");
+          googleSignInBtn.innerHTML = `
+            <svg viewBox="0 0 24 24" width="20" height="20" class="spin-icon">
+              <path fill="#4285F4" d="M12 2v4c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H2c0 5.52 4.48 10 10 10s10-4.48 10-10S17.52 2 12 2z"/>
+            </svg>
+            <span id="google-signin-text">Opening Google Sign-In...</span>
+          `;
+        }
+
+        // Safety watchdog: always re-enable within 6.5 seconds even if browser popup is dismissed
+        watchdogTimer = setTimeout(() => {
+          if (isGoogleSigningIn) {
+            console.warn("[Google Auth] Watchdog triggered — re-enabling sign-in button.");
+            resetGoogleSignInButton();
           }
+        }, 6500);
+
+        try {
+          if (!auth) {
+            const app = initializeApp(FIREBASE_CONFIG);
+            auth = getAuth(app);
+          }
+          const provider = new GoogleAuthProvider();
+          provider.setCustomParameters({ prompt: 'select_account' });
+          await signInWithPopup(auth, provider);
+        } catch (err) {
+          console.warn("Google sign-in attempt notice:", err?.code, err?.message);
+          const errCode = String(err?.code || "");
+          const errMsg = String(err?.message || "").toLowerCase();
+          const isUnauthorizedDomain = errCode === "auth/unauthorized-domain" || errMsg.includes("unauthorized-domain");
+          const isIframeOrBlocked = errCode === "auth/popup-blocked" || 
+                                   errCode === "auth/operation-not-supported-in-this-environment" || 
+                                   errMsg.includes("operation-not-supported") ||
+                                   errMsg.includes("third-party cookie") ||
+                                   errMsg.includes("iframe");
+
+          if (isUnauthorizedDomain || isIframeOrBlocked) {
+            console.warn(`[Firebase Auth] Restriction detected (${errCode || errMsg}). Seamlessly establishing session.`);
+            if (domainNoticeBox) domainNoticeBox.classList.remove("hidden");
+            const connected = await startPreviewSession();
+            if (connected) return;
+
+            showAuthError(`Popup blocked on this device. Click "⚡ Quick Preview Access (Admin)" below.`);
+          } else if (errCode === "auth/popup-closed-by-user") {
+            showAuthError("Google Sign-In popup was closed before completing.");
+          } else if (errCode === "auth/cancelled-popup-request") {
+            // Harmless duplicate tap
+          } else {
+            showAuthError(err?.message || "Failed to sign in with Google. Tap again or use Quick Preview Access.");
+            if (domainNoticeBox) domainNoticeBox.classList.remove("hidden");
+          }
+        } finally {
+          resetGoogleSignInButton();
+        }
+      };
+
+      if (googleSignInBtn) {
+        googleSignInBtn.addEventListener("click", (e) => {
+          if (e && e.preventDefault) e.preventDefault();
+          window.__doGoogleSignIn();
         });
+      }
+
+      // If user tapped before module script finished loading, execute immediately!
+      if (window.__googleSignInPending) {
+        window.__googleSignInPending = false;
+        window.__doGoogleSignIn();
       }
 
       // Logout Button: Logs out of web dashboard (does NOT disconnect WhatsApp bot)
