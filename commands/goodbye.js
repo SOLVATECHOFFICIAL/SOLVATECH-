@@ -17,19 +17,16 @@ export default async function goodbye({
   if (!["on", "off"].includes(value)) {
     const current = await getGroupSettings(chatId, userId);
     return reply([
-      "╭━━〔 👋 *SOLVATECH AUTO-GOODBYE* 〕━━╮",
-      "",
-      `┃ ⚙️ *Current Status:* ${current.goodbye ? "🟢 *ENABLED (ON)*" : "🔴 *DISABLED (OFF)*"}`,
-      "┃ 💬 *Action:* _Sends farewell notice automatically when members leave_",
-      "",
-      "╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯",
-      "",
-      "╭──〔 💡 *COMMAND USAGE* 〕──╮",
-      "│",
-      "│ • *.autogoodbye on* — _Activate auto-goodbye for this group_",
-      "│ • *.autogoodbye off* — _Deactivate auto-goodbye for this group_",
-      "│",
-      "╰────────────────────────────",
+      "┏━━━━━━━〔 🚪 *AUTO-GOODBYE* 🚪 〕━━━━━━━┓",
+      "┃",
+      `┃ ⚙️ *STATUS:* ${current.goodbye ? "🟢 *ENABLED (ON)*" : "🔴 *DISABLED (OFF)*"}`,
+      "┃ 💬 *ACTION:* Sends farewell notice automatically when members leave",
+      "┃",
+      "┃ 💡 *USAGE:*",
+      "┃ • *.autogoodbye on* — _Activate auto-goodbye_",
+      "┃ • *.autogoodbye off* — _Deactivate auto-goodbye_",
+      "┃",
+      "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛",
     ].join("\n"));
   }
 

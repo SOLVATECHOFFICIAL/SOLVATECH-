@@ -1,5 +1,6 @@
 import { isGroup } from "../lib/helpers.js";
 import { getGroupSettings } from "../lib/database.js";
+import { getSafeMetadata } from "../lib/command-tools.js";
 
 export default async function groupinfo({ sock, chatId, reply, userId = "default" }) {
   if (!isGroup(chatId)) {
@@ -7,7 +8,7 @@ export default async function groupinfo({ sock, chatId, reply, userId = "default
   }
 
   try {
-    const metadata = await sock.groupMetadata(chatId);
+    const metadata = await getSafeMetadata(sock, chatId);
     if (!metadata) {
       return reply("❌ Could not retrieve group metadata.");
     }
@@ -41,6 +42,13 @@ export default async function groupinfo({ sock, chatId, reply, userId = "default
       protections = await getGroupSettings(chatId, userId);
     } catch {}
 
+    // Fast timeout race helper
+    const withTimeout = (promise, ms) =>
+      Promise.race([
+        promise,
+        new Promise((resolve) => setTimeout(() => resolve(null), ms)),
+      ]);
+
     // Fetch group invite link if bot is admin
     let inviteUrl = null;
     try {
@@ -53,7 +61,7 @@ export default async function groupinfo({ sock, chatId, reply, userId = "default
         botJids.some((b) => b && a.id && b.split("@")[0].split(":")[0] === a.id.split("@")[0].split(":")[0])
       );
       if (isBotAdmin && typeof sock.groupInviteCode === "function") {
-        const code = await sock.groupInviteCode(chatId).catch(() => null);
+        const code = await withTimeout(sock.groupInviteCode(chatId).catch(() => null), 350);
         if (code) {
           inviteUrl = `https://chat.whatsapp.com/${code}`;
         }
@@ -63,9 +71,7 @@ export default async function groupinfo({ sock, chatId, reply, userId = "default
     // Fetch group profile picture
     let groupPicUrl = null;
     try {
-      if (typeof sock.profilePictureUrl === "function") {
-        groupPicUrl = await sock.profilePictureUrl(chatId, "image").catch(() => null);
-      }
+      groupPicUrl = await withTimeout(sock.profilePictureUrl(chatId, "image").catch(() => null), 350);
     } catch {}
 
     const isAnnounce = Boolean(metadata.announce);

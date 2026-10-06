@@ -17,19 +17,16 @@ export default async function welcome({
   if (!["on", "off"].includes(value)) {
     const current = await getGroupSettings(chatId, userId);
     return reply([
-      "╭━━〔 🎈 *SOLVATECH AUTO-WELCOME* 〕━━╮",
-      "",
-      `┃ ⚙️ *Current Status:* ${current.welcome ? "🟢 *ENABLED (ON)*" : "🔴 *DISABLED (OFF)*"}`,
-      "┃ 💬 *Action:* _Greets new members automatically upon joining_",
-      "",
-      "╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯",
-      "",
-      "╭──〔 💡 *COMMAND USAGE* 〕──╮",
-      "│",
-      "│ • *.autowelcome on* — _Activate auto-welcome for this group_",
-      "│ • *.autowelcome off* — _Deactivate auto-welcome for this group_",
-      "│",
-      "╰────────────────────────────",
+      "┏━━━━━━━〔 🌟 *AUTO-WELCOME* 🌟 〕━━━━━━━┓",
+      "┃",
+      `┃ ⚙️ *STATUS:* ${current.welcome ? "🟢 *ENABLED (ON)*" : "🔴 *DISABLED (OFF)*"}`,
+      "┃ 💬 *ACTION:* Auto-greets new members upon joining",
+      "┃",
+      "┃ 💡 *USAGE:*",
+      "┃ • *.autowelcome on* — _Activate auto-welcome_",
+      "┃ • *.autowelcome off* — _Deactivate auto-welcome_",
+      "┃",
+      "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛",
     ].join("\n"));
   }
 

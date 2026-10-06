@@ -35,11 +35,24 @@ export default async function profile({ sock, message, chatId, sender, args, rep
   const phoneNumber = normalizedTarget.split("@")[0].split(":")[0];
   const mentionTag = `@${phoneNumber}`;
 
-  // 2. Fetch real Baileys / WhatsApp profile data
+  // 2. Fetch real Baileys / WhatsApp profile data concurrently with fast timeout race
   let aboutStatus = "Not available or restricted by privacy";
   let statusSetAt = "";
+  let profilePicUrl = null;
+
   try {
-    const statusData = await sock.fetchStatus(normalizedTarget).catch(() => null);
+    const withTimeout = (promise, ms) =>
+      Promise.race([
+        promise,
+        new Promise((resolve) => setTimeout(() => resolve(null), ms)),
+      ]);
+
+    const [statusRes, picRes] = await Promise.allSettled([
+      withTimeout(sock.fetchStatus(normalizedTarget).catch(() => null), 400),
+      withTimeout(sock.profilePictureUrl(normalizedTarget, "image").catch(() => null), 400),
+    ]);
+
+    const statusData = statusRes.status === "fulfilled" ? statusRes.value : null;
     if (statusData && statusData.status) {
       aboutStatus = statusData.status;
       if (statusData.setAt) {
@@ -50,11 +63,8 @@ export default async function profile({ sock, message, chatId, sender, args, rep
         });
       }
     }
-  } catch {}
 
-  let profilePicUrl = null;
-  try {
-    profilePicUrl = await sock.profilePictureUrl(normalizedTarget, "image").catch(() => null);
+    profilePicUrl = picRes.status === "fulfilled" ? picRes.value : null;
   } catch {}
 
   // 3. Determine Group Role if in a group
