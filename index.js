@@ -12,6 +12,7 @@ import {
   getAllWhatsAppStatuses,
   disconnectSessionWithNotice,
   disconnectMultipleSessionsWithNotice,
+  disconnectAllSessionsWithNotice,
   getTransientStorageDiagnostics,
   purgeTransientStorage,
   resyncAllSessionsDirectlyToFirebase,
@@ -1278,16 +1279,28 @@ for (const p of prefixes) {
     }
   });
 
-  // Admin: Disconnect single or multiple WhatsApp sessions with personal update DM notification
+  // Admin: Disconnect single, marked multiple, or ALL WhatsApp sessions with personal update DM notification
   app.post(`${p}/admin/sessions/disconnect`, requireAuth, requireAdmin, async (request, response) => {
     try {
-      const { userId, userIds, message } = request.body || {};
+      const { userId, userIds, message, disconnectAll } = request.body || {};
+      if (disconnectAll) {
+        const result = await disconnectAllSessionsWithNotice(message);
+        return response.json({
+          success: true,
+          ...result,
+          message: `Disconnected all ${result.disconnectedCount || 0} active session(s). Number locks unlinked and sessions wiped so accounts can pair fresh.`,
+        });
+      }
       const targets = Array.isArray(userIds) ? userIds : userId ? [userId] : [];
       if (targets.length === 0) {
         return response.status(400).json({ error: "No userId or userIds specified." });
       }
       const result = await disconnectMultipleSessionsWithNotice(targets, message);
-      return response.json(result);
+      return response.json({
+        success: true,
+        ...result,
+        message: `Disconnected ${result.disconnectedCount || 0} session(s).`,
+      });
     } catch (error) {
       logger.error("Admin disconnect sessions error:", error.stack || error.message);
       return response.status(500).json({ error: error.message || "Failed to disconnect sessions." });

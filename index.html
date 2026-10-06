@@ -1272,6 +1272,10 @@
                   </p>
                 </div>
                 <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                  <button type="button" id="admin-san-live-pulse-btn" class="admin-preset-btn" style="padding: 8px 14px; font-size: 11.5px; background: #ecfdf5; color: #065f46; border-color: #86efac; font-weight: 800; display: inline-flex; align-items: center; gap: 6px;" title="Vault breathing live every 2s for new updates and logs">
+                    <span id="admin-san-pulse-dot" class="badge-dot" style="background:#10b981;"></span>
+                    <span id="admin-san-pulse-label">🟢 Live Pulse (2s)</span>
+                  </button>
                   <button type="button" id="admin-san-master-turbo-btn" class="admin-preset-btn" style="padding: 9px 16px; font-size: 12px; background: linear-gradient(135deg, #059669, #047857); color: #ffffff; border-color: #065f46; font-weight: 800; box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3);">
                     ⚡ Master Turbo Purge
                   </button>
@@ -1366,17 +1370,32 @@
               </div>
             </div>
 
-            <!-- TABLE 1: LIVE WHATSAPP SESSIONS & TRANSIENT FILE PURGE BREAKDOWN -->
+            <!-- TABLE 1: LIVE WHATSAPP SESSIONS & CONNECTED ACCOUNTS MANAGER -->
             <div class="admin-table-container" style="margin-bottom: 24px;">
-              <div class="admin-table-header-row">
-                <div>
-                  <h3 class="admin-table-title">⚡ Live WhatsApp Session Directories &amp; Transient Keys</h3>
-                  <p style="font-size: 11.5px; color: var(--muted); margin: 2px 0 0;">
-                    Transient files (<code style="font-size:10.5px;">lid-mapping-*</code>, <code style="font-size:10.5px;">tctoken-*</code>, <code style="font-size:10.5px;">device-list-*</code>) can be purged per session without dropping socket connectivity.
-                  </p>
-                </div>
-                <div class="admin-table-actions">
-                  <span id="san-sessions-badge" class="admin-badge badge-active">0 Sessions</span>
+              <div class="admin-table-header-row" style="flex-direction: column; align-items: stretch; gap: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px;">
+                  <div>
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                      <h3 class="admin-table-title" style="margin: 0;">⚡ Live WhatsApp Sessions &amp; Connected Accounts Manager</h3>
+                      <span id="san-connected-count-badge" class="admin-badge badge-connected" style="background:#dcfce7; color:#15803d; border-color:#86efac; font-weight:800;"><span class="badge-dot" style="background:#16a34a;"></span>0 Live Connected</span>
+                      <span id="san-sessions-badge" class="admin-badge badge-active">0 Total</span>
+                    </div>
+                    <p style="font-size: 11.5px; color: var(--muted); margin: 3px 0 0;">
+                      Active connections breathe live every 2s. Disconnect single accounts, mark checkboxes to disconnect selected, or disconnect all accounts so users can pair fresh.
+                    </p>
+                  </div>
+                  <!-- Batch Action Controls -->
+                  <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                    <button type="button" id="san-disconnect-marked-btn" class="admin-preset-btn" style="padding: 7px 13px; font-size: 11px; background: #fee2e2; color: #991b1b; border-color: #fca5a5; font-weight: 800; display: none;" title="Disconnect marked checked accounts">
+                      🔌 Disconnect Marked (<span id="san-selected-count">0</span>)
+                    </button>
+                    <button type="button" id="san-purge-marked-btn" class="admin-preset-btn" style="padding: 7px 13px; font-size: 11px; background: #fef3c7; color: #92400e; border-color: #fcd34d; font-weight: 800; display: none;" title="Purge transient junk for marked accounts">
+                      ⚡ Purge Marked Junk (<span id="san-selected-count-purge">0</span>)
+                    </button>
+                    <button type="button" id="san-disconnect-all-btn" class="admin-preset-btn" style="padding: 7px 14px; font-size: 11px; background: linear-gradient(135deg, #dc2626, #991b1b); color: #ffffff; border-color: #7f1d1d; font-weight: 800; box-shadow: 0 2px 6px rgba(185, 28, 28, 0.25);" title="Disconnect ALL accounts so all users can pair fresh">
+                      🚨 Disconnect ALL (<span id="san-disconnect-all-count">0</span>)
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -1384,14 +1403,16 @@
                 <table class="admin-master-table">
                   <thead>
                     <tr>
-                      <th style="width: 40px;">#</th>
-                      <th>Session UID / Identifier</th>
+                      <th style="width: 36px; text-align: center;">
+                        <input type="checkbox" id="san-select-all-sessions" title="Select / Deselect All Accounts" style="cursor: pointer;" />
+                      </th>
+                      <th style="width: 36px;">#</th>
                       <th>WhatsApp Number</th>
-                      <th>Socket Status</th>
-                      <th>Total Files</th>
-                      <th>Transient Files</th>
+                      <th>Session UID / Account</th>
+                      <th>Connection Status</th>
+                      <th>Files &amp; Junk</th>
                       <th>Firebase Creds (2KB)</th>
-                      <th style="text-align: center;">Actions</th>
+                      <th style="text-align: center; min-width: 250px;">Direct Management</th>
                     </tr>
                   </thead>
                   <tbody id="san-sessions-tbody">
@@ -5990,8 +6011,13 @@
       // =========================================================================
       let sanitationLoading = false;
       let sanitationData = null;
+      let selectedSessionUserIds = new Set();
+      let isLiveBreathingEnabled = true;
+      let sanitationBreathInterval = null;
 
       async function loadSanitationDiagnostics(silent = false) {
+        if (sanitationLoading && silent) return;
+        sanitationLoading = true;
         try {
           let authHeader = await getAuthHeader();
           if (!authHeader) return;
@@ -6004,9 +6030,43 @@
           sanitationData = data;
           renderSanitationUI(data);
         } catch (e) {
-          console.debug("Sanitation diagnostics fetch notice:", e.message);
+          if (!silent) console.debug("Sanitation diagnostics fetch notice:", e.message);
+        } finally {
+          sanitationLoading = false;
         }
       }
+
+      function updateMarkedSessionsToolbar() {
+        const count = selectedSessionUserIds.size;
+        const countEl = $("san-selected-count");
+        if (countEl) countEl.textContent = String(count);
+        const countPurgeEl = $("san-selected-count-purge");
+        if (countPurgeEl) countPurgeEl.textContent = String(count);
+
+        const btnDisc = $("san-disconnect-marked-btn");
+        if (btnDisc) btnDisc.style.display = count > 0 ? "inline-flex" : "none";
+        const btnPurge = $("san-purge-marked-btn");
+        if (btnPurge) btnPurge.style.display = count > 0 ? "inline-flex" : "none";
+
+        // Update select all checkbox state
+        const selectAllCb = $("san-select-all-sessions");
+        const allCbs = document.querySelectorAll(".san-session-checkbox");
+        if (selectAllCb && allCbs.length > 0) {
+          selectAllCb.checked = allCbs.length === count;
+          selectAllCb.indeterminate = count > 0 && count < allCbs.length;
+        }
+      }
+
+      window.handleSessionCheckboxChange = function(cb) {
+        const uid = cb.dataset.userid;
+        if (!uid) return;
+        if (cb.checked) {
+          selectedSessionUserIds.add(uid);
+        } else {
+          selectedSessionUserIds.delete(uid);
+        }
+        updateMarkedSessionsToolbar();
+      };
 
       function renderSanitationUI(data) {
         if (!data) return;
@@ -6025,6 +6085,17 @@
           tabBadge.style.background = count > 0 ? "#fee2e2" : "#dcfce7";
           tabBadge.style.color = count > 0 ? "#b91c1c" : "#15803d";
         }
+
+        // Live Connected Accounts Badge & Total Counts
+        const liveConnectedCount = sessions.filter(s => s.isLiveConnected || s.status === "connected").length;
+        const connBadge = $("san-connected-count-badge");
+        if (connBadge) {
+          connBadge.innerHTML = `<span class="badge-dot" style="background:#16a34a;"></span>${liveConnectedCount} Live Connected`;
+          connBadge.style.background = liveConnectedCount > 0 ? "#dcfce7" : "#f1f5f9";
+          connBadge.style.color = liveConnectedCount > 0 ? "#15803d" : "#64748b";
+        }
+        const discAllCountEl = $("san-disconnect-all-count");
+        if (discAllCountEl) discAllCountEl.textContent = String(sessions.length);
 
         // KPI 1: Transient tokens & mappings
         const elTrCount = $("san-kpi-transient-count");
@@ -6047,7 +6118,7 @@
         const elActiveKeys = $("san-kpi-active-keys");
         if (elActiveKeys) elActiveKeys.textContent = `${(tr.activeKeys || 0).toLocaleString()} keys`;
         const elSessCount = $("san-kpi-sessions-count");
-        if (elSessCount) elSessCount.textContent = `${sessions.length}`;
+        if (elSessCount) elSessCount.textContent = `${sessions.length} (${liveConnectedCount} connected)`;
 
         // KPI 3: V8 RAM & Health
         const elHeap = $("san-kpi-heap-used");
@@ -6073,42 +6144,54 @@
 
         // Table 1: Live Sessions Breakdown
         const sessBadge = $("san-sessions-badge");
-        if (sessBadge) sessBadge.textContent = `${sessions.length} Active Dir${sessions.length === 1 ? "" : "s"}`;
+        if (sessBadge) sessBadge.textContent = `${sessions.length} Total Dir${sessions.length === 1 ? "" : "s"}`;
         const sessTbody = $("san-sessions-tbody");
         if (sessTbody) {
           if (sessions.length === 0) {
-            sessTbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--muted); padding: 24px;">No session directories active on disk.</td></tr>`;
+            sessTbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--muted); padding: 24px;">No WhatsApp accounts or session directories registered.</td></tr>`;
           } else {
             sessTbody.innerHTML = sessions.map((s, idx) => {
-              const isLive = s.status === "connected";
+              const isLive = Boolean(s.isLiveConnected || s.status === "connected");
+              const isChecked = selectedSessionUserIds.has(s.userId);
+
               const connBadge = isLive 
-                ? `<span class="admin-badge badge-connected"><span class="badge-dot"></span>CONNECTED 🟢</span>`
-                : `<span class="admin-badge badge-disconnected"><span class="badge-dot"></span>${(s.status || "SAVED").toUpperCase()} ⚪</span>`;
+                ? `<span class="admin-badge badge-connected" style="background:#dcfce7; color:#15803d; border-color:#86efac; font-weight:800;"><span class="badge-dot" style="background:#16a34a;"></span>CONNECTED 🟢</span>`
+                : `<span class="admin-badge badge-disconnected" style="background:#f1f5f9; color:#64748b;"><span class="badge-dot" style="background:#94a3b8;"></span>${(s.status || "SAVED").toUpperCase()} ⚪</span>`;
 
               const credsBadge = s.hasCreds 
-                ? `<span class="code-pill" style="color:#047857; background:#dcfce7; font-weight:800;">✓ Synced (${s.credsFormatted})</span>`
+                ? `<span class="code-pill" style="color:#047857; background:#dcfce7; font-weight:800;">🔥 Synced (${s.credsFormatted})</span>`
                 : `<span class="code-pill" style="color:#b91c1c; background:#fee2e2;">Missing creds</span>`;
 
+              const phoneDisplay = s.botNumber 
+                ? `<div style="display:flex; align-items:center; gap:6px;">
+                    ${isLive ? `<span class="badge-dot" style="background:#16a34a;"></span>` : ""}
+                    <strong style="font-family:'DM Mono', monospace; font-size:12.5px; color:${isLive ? "#047857" : "var(--ink)"};">+${escapeHtml(s.botNumber)}</strong>
+                  </div>`
+                : `<span style="color:var(--muted); font-size:11px;">Not detected</span>`;
+
               return `
-                <tr>
+                <tr style="${isLive ? "background: rgba(16, 185, 129, 0.03);" : ""}">
+                  <td style="text-align: center;">
+                    <input type="checkbox" class="san-session-checkbox" data-userid="${escapeHtml(s.userId)}" ${isChecked ? "checked" : ""} onchange="handleSessionCheckboxChange(this)" style="cursor: pointer;" />
+                  </td>
                   <td>${idx + 1}</td>
+                  <td>${phoneDisplay}</td>
                   <td>
                     <strong style="color:var(--ink);">${escapeHtml(s.userId)}</strong>
-                    <div style="font-size:10px; color:var(--muted); font-family:'DM Mono', monospace;">${escapeHtml(s.verifiedUid)}</div>
+                    <div style="font-size:10px; color:var(--muted); font-family:'DM Mono', monospace;">${escapeHtml(s.verifiedUid)}${s.userEmail ? ` • ${escapeHtml(s.userEmail)}` : ""}</div>
                   </td>
-                  <td><strong style="font-family:'DM Mono', monospace;">${s.botNumber ? `+${escapeHtml(s.botNumber)}` : "—"}</strong></td>
                   <td>${connBadge}</td>
-                  <td><strong>${s.totalFiles.toLocaleString()}</strong> files</td>
                   <td>
-                    <span class="code-pill" style="background:#fee2e2; color:#b91c1c; font-weight:800;">
-                      ${s.transientFiles.toLocaleString()} (${s.transientFormatted})
+                    <span class="code-pill" style="${s.transientFiles > 0 ? "background:#fee2e2; color:#b91c1c; font-weight:800;" : "background:#f1f5f9; color:#64748b;"}">
+                      ${s.transientFiles.toLocaleString()} junk (${s.transientFormatted})
                     </span>
                   </td>
                   <td>${credsBadge}</td>
                   <td style="text-align:center;">
-                    <div style="display:flex; gap:6px; justify-content:center;">
-                      <button type="button" class="admin-copy-key-btn" style="background:#fee2e2; color:#991b1b; border-color:#fca5a5;" onclick="purgeSingleSessionTransient('${escapeHtml(s.userId)}', this)">⚡ Purge Junk</button>
-                      <button type="button" class="admin-copy-key-btn" style="background:#ecfdf5; color:#047857; border-color:#86efac;" onclick="resyncSingleSessionToFirebase('${escapeHtml(s.userId)}', this)">🔥 Sync Firebase</button>
+                    <div style="display:flex; gap:5px; justify-content:center; flex-wrap:wrap;">
+                      <button type="button" class="admin-copy-key-btn" style="background:#fee2e2; color:#991b1b; border-color:#fca5a5; font-size:10.5px; padding:3px 7px;" onclick="purgeSingleSessionTransient('${escapeHtml(s.userId)}', this)" title="Purge transient junk without disconnecting">⚡ Purge</button>
+                      <button type="button" class="admin-copy-key-btn" style="background:#ecfdf5; color:#047857; border-color:#86efac; font-size:10.5px; padding:3px 7px;" onclick="resyncSingleSessionToFirebase('${escapeHtml(s.userId)}', this)" title="Directly sync 2KB creds to Firebase Firestore">🔥 Sync FB</button>
+                      <button type="button" class="admin-copy-key-btn" style="background:#fef2f2; color:#b91c1c; border-color:#fca5a5; font-weight:800; font-size:10.5px; padding:3px 7px;" onclick="adminDisconnectSingleSession('${escapeHtml(s.userId)}', '${escapeHtml(s.botNumber || s.userId)}', this)" title="Disconnect session & unlink phone lock so user can pair fresh">🔌 Disconnect</button>
                     </div>
                   </td>
                 </tr>
@@ -6116,6 +6199,7 @@
             }).join("");
           }
         }
+        updateMarkedSessionsToolbar();
 
         // Table 2: Firebase Firestore Users & Cloud Storage
         const fbBadge = $("san-fb-storage-badge");
@@ -6218,6 +6302,132 @@
         executeSanitationPurge({ targetUserId: userId, purgeTransient: false, resyncCredsToFirebase: true }, btn);
       };
 
+      window.adminDisconnectSingleSession = async function(userId, label, btn) {
+        if (!confirm(`🔌 Disconnect WhatsApp account (${label})?\n\nThis will terminate the socket connection, unlink the phone lock, and wipe the session folder so this user can pair fresh.`)) return;
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = "Disconnecting...";
+        }
+        try {
+          let authHeader = await getAuthHeader();
+          if (!authHeader) throw new Error("Admin authentication required.");
+          const res = await fetch(getApiUrl("/admin/sessions/disconnect"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": authHeader },
+            body: JSON.stringify({ userId }),
+          });
+          const data = await safeFetchJson(res);
+          if (!res.ok) throw new Error(data?.error || "Failed to disconnect session.");
+          selectedSessionUserIds.delete(userId);
+          const msgEl = $("admin-sanitation-msg");
+          if (msgEl) {
+            msgEl.className = "license-msg success";
+            msgEl.textContent = `✅ Successfully disconnected account ${label}. Session wiped; user can now pair fresh.`;
+            msgEl.classList.remove("hidden");
+          }
+          await loadSanitationDiagnostics();
+        } catch (err) {
+          alert(`❌ Disconnect failed: ${err.message}`);
+        } finally {
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = "🔌 Disconnect";
+          }
+        }
+      };
+
+      window.adminDisconnectMarkedSessions = async function(btn) {
+        if (selectedSessionUserIds.size === 0) {
+          alert("Please mark at least one account using the checkboxes.");
+          return;
+        }
+        const count = selectedSessionUserIds.size;
+        if (!confirm(`🔌 Disconnect ${count} marked WhatsApp account(s)?\n\nThis will terminate their connections, unlink phone locks, and wipe sessions so all marked accounts can pair fresh.`)) return;
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = "Disconnecting Marked...";
+        }
+        try {
+          let authHeader = await getAuthHeader();
+          if (!authHeader) throw new Error("Admin authentication required.");
+          const res = await fetch(getApiUrl("/admin/sessions/disconnect"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": authHeader },
+            body: JSON.stringify({ userIds: [...selectedSessionUserIds] }),
+          });
+          const data = await safeFetchJson(res);
+          if (!res.ok) throw new Error(data?.error || "Failed to disconnect marked sessions.");
+          selectedSessionUserIds.clear();
+          const msgEl = $("admin-sanitation-msg");
+          if (msgEl) {
+            msgEl.className = "license-msg success";
+            msgEl.textContent = `✅ ${data.message || `Disconnected ${count} account(s). Users can now pair fresh.`}`;
+            msgEl.classList.remove("hidden");
+          }
+          await loadSanitationDiagnostics();
+        } catch (err) {
+          alert(`❌ Disconnect marked failed: ${err.message}`);
+        } finally {
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = `🔌 Disconnect Marked (${selectedSessionUserIds.size})`;
+          }
+        }
+      };
+
+      window.adminDisconnectAllSessions = async function(btn) {
+        if (!confirm("🚨 ARE YOU SURE YOU WANT TO DISCONNECT ALL WHATSAPP ACCOUNTS?\n\nThis will terminate ALL active sockets, unlink phone locks in database & Firebase, and wipe sessions so all accounts worldwide can pair fresh.\n\nProceed?")) return;
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = "Disconnecting ALL...";
+        }
+        try {
+          let authHeader = await getAuthHeader();
+          if (!authHeader) throw new Error("Admin authentication required.");
+          const res = await fetch(getApiUrl("/admin/sessions/disconnect"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": authHeader },
+            body: JSON.stringify({ disconnectAll: true }),
+          });
+          const data = await safeFetchJson(res);
+          if (!res.ok) throw new Error(data?.error || "Failed to disconnect all sessions.");
+          selectedSessionUserIds.clear();
+          const msgEl = $("admin-sanitation-msg");
+          if (msgEl) {
+            msgEl.className = "license-msg success";
+            msgEl.textContent = `✅ ${data.message || "All WhatsApp accounts have been disconnected and wiped. Users can pair fresh."}`;
+            msgEl.classList.remove("hidden");
+          }
+          await loadSanitationDiagnostics();
+        } catch (err) {
+          alert(`❌ Disconnect all failed: ${err.message}`);
+        } finally {
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = `🚨 Disconnect ALL (${sanitationData?.sessions?.length || 0})`;
+          }
+        }
+      };
+
+      window.adminPurgeMarkedJunk = async function(btn) {
+        if (selectedSessionUserIds.size === 0) return;
+        const count = selectedSessionUserIds.size;
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = "Purging...";
+        }
+        try {
+          for (const uid of [...selectedSessionUserIds]) {
+            await executeSanitationPurge({ targetUserId: uid, purgeTransient: true, resyncCredsToFirebase: true });
+          }
+        } finally {
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = `⚡ Purge Marked Junk (${count})`;
+          }
+        }
+      };
+
       // Wire Sanitation Buttons
       const sanMasterTurboBtn = $("admin-san-master-turbo-btn");
       if (sanMasterTurboBtn) {
@@ -6283,6 +6493,69 @@
       if (sanRefreshBtn) {
         sanRefreshBtn.onclick = () => loadSanitationDiagnostics();
       }
+
+      // Wire Connected Accounts Disconnect Controls
+      const sanDiscMarkedBtn = $("san-disconnect-marked-btn");
+      if (sanDiscMarkedBtn) {
+        sanDiscMarkedBtn.onclick = () => adminDisconnectMarkedSessions(sanDiscMarkedBtn);
+      }
+      const sanPurgeMarkedBtn = $("san-purge-marked-btn");
+      if (sanPurgeMarkedBtn) {
+        sanPurgeMarkedBtn.onclick = () => adminPurgeMarkedJunk(sanPurgeMarkedBtn);
+      }
+      const sanDiscAllBtn = $("san-disconnect-all-btn");
+      if (sanDiscAllBtn) {
+        sanDiscAllBtn.onclick = () => adminDisconnectAllSessions(sanDiscAllBtn);
+      }
+
+      const sanSelectAllCb = $("san-select-all-sessions");
+      if (sanSelectAllCb) {
+        sanSelectAllCb.onchange = () => {
+          const checked = sanSelectAllCb.checked;
+          const allCbs = document.querySelectorAll(".san-session-checkbox");
+          allCbs.forEach(cb => {
+            cb.checked = checked;
+            const uid = cb.dataset.userid;
+            if (uid) {
+              if (checked) selectedSessionUserIds.add(uid);
+              else selectedSessionUserIds.delete(uid);
+            }
+          });
+          updateMarkedSessionsToolbar();
+        };
+      }
+
+      // Live 2s Pulse Breathing Toggle
+      const sanLivePulseBtn = $("admin-san-live-pulse-btn");
+      if (sanLivePulseBtn) {
+        sanLivePulseBtn.onclick = () => {
+          isLiveBreathingEnabled = !isLiveBreathingEnabled;
+          const dot = $("admin-san-pulse-dot");
+          const label = $("admin-san-pulse-label");
+          if (isLiveBreathingEnabled) {
+            sanLivePulseBtn.style.background = "#ecfdf5";
+            sanLivePulseBtn.style.color = "#065f46";
+            sanLivePulseBtn.style.borderColor = "#86efac";
+            if (dot) dot.style.background = "#10b981";
+            if (label) label.textContent = "🟢 Live Pulse (2s)";
+            loadSanitationDiagnostics(true);
+          } else {
+            sanLivePulseBtn.style.background = "#f1f5f9";
+            sanLivePulseBtn.style.color = "#64748b";
+            sanLivePulseBtn.style.borderColor = "#cbd5e1";
+            if (dot) dot.style.background = "#94a3b8";
+            if (label) label.textContent = "⏸️ Live Pulse Paused";
+          }
+        };
+      }
+
+      // Vault Breathing Interval (Breaths every 2s for new updates, logs, & connections)
+      if (sanitationBreathInterval) clearInterval(sanitationBreathInterval);
+      sanitationBreathInterval = setInterval(async () => {
+        if (adminActiveSubtab === "sanitation" && isLiveBreathingEnabled && !sanitationLoading) {
+          await loadSanitationDiagnostics(true);
+        }
+      }, 2000);
 
       // Admin Action: Delete Single License Key
       window.adminDeleteKey = async function(code) {
