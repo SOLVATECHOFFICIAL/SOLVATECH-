@@ -1782,10 +1782,11 @@
       }
 
       const isSelfHosted = isBackendHost();
-      const FALLBACK_PRODUCTION_BACKEND = "https://web-production-55def.up.railway.app";
-      const DEFAULT_BACKEND_URL = FALLBACK_PRODUCTION_BACKEND;
-      let initialBackend = window.__GLOBAL_RAILWAY_URL__ || localStorage.getItem("solvatech_backend_url") || FALLBACK_PRODUCTION_BACKEND;
+      const FALLBACK_PRODUCTION_BACKEND = "";
+      const DEFAULT_BACKEND_URL = "";
+      let initialBackend = window.__GLOBAL_RAILWAY_URL__ || localStorage.getItem("solvatech_backend_url") || "";
       if (initialBackend && (
+        initialBackend.includes("55def") ||
         initialBackend.includes("1f4c4") ||
         initialBackend.includes("45c0") ||
         initialBackend.includes("3c1de8") ||
@@ -1795,14 +1796,14 @@
         initialBackend.includes("github.io")
       )) {
         try { localStorage.removeItem("solvatech_backend_url"); } catch (e) {}
-        initialBackend = FALLBACK_PRODUCTION_BACKEND;
+        initialBackend = "";
       }
       let customApiUrl = initialBackend;
       window.globalRailwayUrl = window.__GLOBAL_RAILWAY_URL__ || localStorage.getItem("solvatech_backend_url") || "";
 
       function switchGlobalRailwayUrl(remoteUrl, source = "sync") {
         const clean = String(remoteUrl || "").trim().replace(/\/+$/, "");
-        if (!clean || !clean.startsWith("http")) return;
+        if (!clean || !clean.startsWith("http") || clean.includes("55def")) return;
         const current = String(window.globalRailwayUrl || customApiUrl || "").trim().replace(/\/+$/, "");
         if (clean === current && window.globalRailwayUrl === clean) return;
 
@@ -1820,27 +1821,33 @@
       }
 
       // If server injected an active Railway URL, adopt it immediately
-      if (window.__GLOBAL_RAILWAY_URL__ && window.__GLOBAL_RAILWAY_URL__.startsWith("http")) {
+      if (window.__GLOBAL_RAILWAY_URL__ && window.__GLOBAL_RAILWAY_URL__.startsWith("http") && !window.__GLOBAL_RAILWAY_URL__.includes("55def")) {
         switchGlobalRailwayUrl(window.__GLOBAL_RAILWAY_URL__, "server-html-hydration");
       }
 
       function getActiveBackendUrl() {
-        // 1. Live global Railway URL configured by admin (awoyinfasolomon1@gmail.com)
-        const globalTarget = window.globalRailwayUrl || customApiUrl;
-        if (globalTarget && typeof globalTarget === "string" && globalTarget.startsWith("http")) {
-          return globalTarget.replace(/\/+$/, "");
-        }
-        // 2. Direct origin if accessed from a backend host without explicit railway URL
+        // 1. Direct origin if accessed from a self-hosted full-stack server
         if (isBackendHost() && window.location && window.location.origin) {
           return window.location.origin.replace(/\/+$/, "");
         }
-        // 3. Fallback
-        return FALLBACK_PRODUCTION_BACKEND.replace(/\/+$/, "");
+        // 2. Custom live Railway URL configured by admin
+        const globalTarget = window.globalRailwayUrl || customApiUrl;
+        if (globalTarget && typeof globalTarget === "string" && globalTarget.startsWith("http") && !globalTarget.includes("55def")) {
+          return globalTarget.replace(/\/+$/, "");
+        }
+        // 3. Fallback to origin
+        if (window.location && window.location.origin) {
+          return window.location.origin.replace(/\/+$/, "");
+        }
+        return "";
       }
 
       function getApiUrl(endpoint) {
         let baseUrl = getActiveBackendUrl();
         const cleanEndpoint = endpoint.startsWith("/bot-api") ? endpoint.replace(/^\/bot-api/, "") : endpoint;
+        if (!baseUrl) {
+          return `/bot-api${cleanEndpoint.startsWith("/") ? cleanEndpoint : "/" + cleanEndpoint}`;
+        }
         return `${baseUrl}/bot-api${cleanEndpoint.startsWith("/") ? cleanEndpoint : "/" + cleanEndpoint}`;
       }
 
@@ -3546,11 +3553,11 @@
 
           if (button) {
             button.disabled = true;
-            button.innerHTML = '<span class="button-loading"><i></i>Requesting pairing code from WhatsApp…</span>';
+            button.innerHTML = '<span class="button-loading"><i></i>Connecting to WhatsApp gateway & preparing notification…</span>';
           }
 
           const abortCtrl = new AbortController();
-          const abortTimer = setTimeout(() => abortCtrl.abort(), 45000);
+          const abortTimer = setTimeout(() => abortCtrl.abort(), 65000);
 
           try {
             let targetUrl = getApiUrl("/pair");
@@ -3585,24 +3592,7 @@
             try {
               data = text ? JSON.parse(text) : {};
             } catch {
-              if (text.trim().startsWith("<") && !isSelfHosted && !targetUrl.includes("railway.app")) {
-                customApiUrl = FALLBACK_PRODUCTION_BACKEND;
-                const fallbackUrl = `${FALLBACK_PRODUCTION_BACKEND}/bot-api/pair`;
-                const retryRes = await fetch(fallbackUrl, {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": authHeader,
-                  },
-                  body: JSON.stringify({ number: formattedNumber }),
-                  signal: abortCtrl.signal,
-                });
-                const retryText = await retryRes.text();
-                data = JSON.parse(retryText);
-                response = retryRes;
-              } else {
-                throw new Error("Invalid response from server. Please try again.");
-              }
+              throw new Error("Invalid response from server. Please try again.");
             }
 
             if (!response.ok) {

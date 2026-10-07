@@ -468,6 +468,7 @@ for (const p of prefixes) {
       response.json({
         code: result.code,
         pairingCode: result.code,
+        rawCode: result.rawCode,
         expiresAt: result.expiresAt,
         pairingNumber: result.phone,
         userId: verifiedUid,
