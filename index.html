@@ -2631,6 +2631,10 @@
         const tick = () => {
           const left = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
           if (timer) timer.textContent = `EXPIRES IN ${formatTime(left)}`;
+          // Real-time 1-second pairing listener so website immediately catches successful phone link
+          if (pairingActive) {
+            refresh();
+          }
           if (left <= 0) {
             pairingActive = false;
             clearInterval(timerId);
