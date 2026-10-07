@@ -47,16 +47,19 @@ export default async function antisticker(props) {
     }
 
     if (isAnimated) {
-      const videoBuffer = await stickerToVideo(buffer);
-      if (videoBuffer && videoBuffer.length > 0) {
-        return await sock.sendMessage(targetChat, {
-          video: videoBuffer,
-          mimetype: "video/mp4",
-          gifPlayback: true,
-          caption: "✨ Animated sticker converted to video.",
-        });
+      try {
+        const videoBuffer = await stickerToVideo(buffer);
+        if (videoBuffer && videoBuffer.length > 0) {
+          return await sock.sendMessage(targetChat, {
+            video: videoBuffer,
+            mimetype: "video/mp4",
+            gifPlayback: true,
+            caption: "✨ Animated sticker converted to video.",
+          });
+        }
+      } catch (animErr) {
+        logger.warn("Animated sticker to video conversion failed, falling back to static image", animErr.message);
       }
-      throw new Error("Unable to convert animated sticker frames to video.");
     }
 
     // Static sticker (or fallback) -> PNG image

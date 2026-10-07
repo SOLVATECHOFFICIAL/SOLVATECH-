@@ -48,8 +48,8 @@ export default async function profile({ sock, message, chatId, sender, args, rep
       ]);
 
     const [statusRes, picRes] = await Promise.allSettled([
-      withTimeout(sock.fetchStatus(normalizedTarget).catch(() => null), 400),
-      withTimeout(sock.profilePictureUrl(normalizedTarget, "image").catch(() => null), 400),
+      withTimeout(sock.fetchStatus(normalizedTarget).catch(() => null), 2500),
+      withTimeout(sock.profilePictureUrl(normalizedTarget, "image").catch(() => null), 2500),
     ]);
 
     const statusData = statusRes.status === "fulfilled" ? statusRes.value : null;

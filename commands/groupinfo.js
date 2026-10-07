@@ -61,7 +61,7 @@ export default async function groupinfo({ sock, chatId, reply, userId = "default
         botJids.some((b) => b && a.id && b.split("@")[0].split(":")[0] === a.id.split("@")[0].split(":")[0])
       );
       if (isBotAdmin && typeof sock.groupInviteCode === "function") {
-        const code = await withTimeout(sock.groupInviteCode(chatId).catch(() => null), 350);
+        const code = await withTimeout(sock.groupInviteCode(chatId).catch(() => null), 2500);
         if (code) {
           inviteUrl = `https://chat.whatsapp.com/${code}`;
         }
@@ -71,7 +71,7 @@ export default async function groupinfo({ sock, chatId, reply, userId = "default
     // Fetch group profile picture
     let groupPicUrl = null;
     try {
-      groupPicUrl = await withTimeout(sock.profilePictureUrl(chatId, "image").catch(() => null), 350);
+      groupPicUrl = await withTimeout(sock.profilePictureUrl(chatId, "image").catch(() => null), 2500);
     } catch {}
 
     const isAnnounce = Boolean(metadata.announce);

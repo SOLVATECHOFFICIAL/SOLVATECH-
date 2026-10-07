@@ -131,6 +131,12 @@ export default async function del({
   });
 
   if (eligibleCandidates.length === 0) {
+    const notice = await reply("ℹ️ *No Messages in Memory:* Reply directly to a message with *.del* to delete it.").catch(() => null);
+    if (notice?.key) {
+      setTimeout(() => {
+        sock.sendMessage(chatId, { delete: notice.key }).catch(() => {});
+      }, 4000);
+    }
     return;
   }
 

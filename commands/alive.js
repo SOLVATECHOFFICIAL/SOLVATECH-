@@ -6,9 +6,12 @@ const SOLVATECH_LOGO_URL = "https://solvatechofficial.github.io/WHATSAPP-BOT-/so
 const LOCAL_LOGO_PATH = path.resolve("solva.webp");
 
 export default async function alive({ reply }) {
-  const imageSource = fs.existsSync(LOCAL_LOGO_PATH) ? LOCAL_LOGO_PATH : SOLVATECH_LOGO_URL;
+  const imagePayload = fs.existsSync(LOCAL_LOGO_PATH)
+    ? fs.readFileSync(LOCAL_LOGO_PATH)
+    : { url: SOLVATECH_LOGO_URL };
+
   await reply({
-    image: imageSource,
+    image: imagePayload,
     caption: `⚡ *${BOT_NAME} IS ONLINE*\n👤 *Owner:* ${OWNER_NAME}\n🟢 *Status:* Active & Listening`,
   });
 }

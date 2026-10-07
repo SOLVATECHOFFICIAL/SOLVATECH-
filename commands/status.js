@@ -526,7 +526,7 @@ export default async function status({
         }
 
         if (targetGroups.length > 1) {
-          await new Promise((r) => setTimeout(r, 350));
+          await new Promise((r) => setTimeout(r, 800));
         }
       }
     }
@@ -608,7 +608,7 @@ export default async function status({
         }
 
         if (targetGroups.length > 1) {
-          await new Promise((r) => setTimeout(r, 350));
+          await new Promise((r) => setTimeout(r, 800));
         }
       }
     }
