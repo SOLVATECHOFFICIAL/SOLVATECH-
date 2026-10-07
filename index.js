@@ -1798,15 +1798,13 @@ setInterval(() => {
 // Periodic Garbage Collection & Memory Health Optimizer (Protects Railway from OOM)
 setInterval(() => {
   try {
-    if (typeof global.gc === "function") {
-      global.gc();
-    }
     const mem = process.memoryUsage();
     const heapUsedMb = Math.round(mem.heapUsed / 1024 / 1024);
     const rssMb = Math.round(mem.rss / 1024 / 1024);
-    if (heapUsedMb > 200) {
-      if (typeof global.gc === "function") global.gc();
+    // Only invoke GC when heap is genuinely elevated (>300MB) to avoid freezing event loop
+    if (heapUsedMb > 300 && typeof global.gc === "function") {
+      global.gc();
       logger.info(`[Memory Monitor] Heap: ${heapUsedMb}MB, RSS: ${rssMb}MB (Proactive Trim)`);
     }
   } catch {}
-}, 30000).unref();
+}, 60000).unref();
