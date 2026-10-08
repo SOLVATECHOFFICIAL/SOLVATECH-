@@ -1799,7 +1799,8 @@
           host.includes("solvatech.name.ng") ||
           host.includes("name.ng") ||
           host.includes("vercel.app") ||
-          host.includes("netlify.app")
+          host.includes("netlify.app") ||
+          host.includes("run.app")
         ) {
           return false;
         }
@@ -1807,7 +1808,6 @@
           host === "localhost" ||
           host === "127.0.0.1" ||
           host.endsWith(".railway.app") ||
-          host.endsWith(".run.app") ||
           host.endsWith(".onrender.com") ||
           host.endsWith(".render.com")
         );

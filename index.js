@@ -74,39 +74,6 @@ import {
   removePushSubscription,
   sendAdminPushNotification,
 } from "./lib/web-push.js";
-import libsignal from "libsignal";
-
-// Eliminate libsignal cryptographic session logging & memory leaks at the protocol level
-if (libsignal && libsignal.SessionRecord) {
-  const Proto = libsignal.SessionRecord.prototype;
-  if (Proto) {
-    Proto.closeSession = function(session) {
-      if (this.isClosed(session)) return;
-      session.indexInfo.closed = Date.now();
-    };
-    Proto.openSession = function(session) {
-      session.indexInfo.closed = -1;
-    };
-    Proto.removeOldSessions = function() {
-      const CLOSED_SESSIONS_MAX = 20;
-      while (Object.keys(this.sessions).length > CLOSED_SESSIONS_MAX) {
-        let oldestKey;
-        let oldestSession;
-        for (const [key, session] of Object.entries(this.sessions)) {
-          if (session.indexInfo.closed !== -1 && (!oldestSession || session.indexInfo.closed < oldestSession.indexInfo.closed)) {
-            oldestKey = key;
-            oldestSession = session;
-          }
-        }
-        if (oldestKey) {
-          delete this.sessions[oldestKey];
-        } else {
-          break;
-        }
-      }
-    };
-  }
-}
 
 const origConsoleError = console.error;
 const origConsoleWarn = console.warn;
