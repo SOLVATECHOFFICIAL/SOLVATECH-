@@ -85,19 +85,8 @@ function isNoisyInternalLog(args) {
   const first = args[0];
   if (typeof first === "string") {
     if (
-      first.includes("Closing session") ||
-      first.includes("Opening session") ||
-      first.includes("Session already") ||
-      first.includes("Removing old closed session") ||
-      first.includes("Decrypted message with closed session") ||
       first.includes("Disconnecting idle stream") ||
-      first.includes("Timed out waiting for new targets") ||
-      first.includes("Closing open session in favor of incoming prekey bundle") ||
-      first.includes("Failed to decrypt message with any known session") ||
-      first.includes("Session error:") ||
-      first.includes("Bad MAC") ||
-      first.includes("Key used already or never filled") ||
-      first.includes("MessageCounterError")
+      first.includes("Timed out waiting for new targets")
     ) {
       return true;
     }
@@ -111,18 +100,7 @@ function isNoisyInternalLog(args) {
     .join(" ");
   return (
     text.includes("Disconnecting idle stream") ||
-    text.includes("Timed out waiting for new targets") ||
-    text.includes("Closing session") ||
-    text.includes("Opening session") ||
-    text.includes("Session already") ||
-    text.includes("Removing old closed session") ||
-    text.includes("Decrypted message with closed session") ||
-    text.includes("Closing open session in favor of incoming prekey bundle") ||
-    text.includes("Failed to decrypt message with any known session") ||
-    text.includes("Session error:") ||
-    text.includes("Bad MAC") ||
-    text.includes("Key used already or never filled") ||
-    text.includes("MessageCounterError")
+    text.includes("Timed out waiting for new targets")
   );
 }
 
@@ -204,8 +182,7 @@ export const isRailwayEnvironment = Boolean(
 export const isAiStudio = Boolean(
   process.env.K_SERVICE?.includes("ais-") ||
   process.env.CLOUD_RUN_JOB ||
-  process.env.AI_STUDIO ||
-  !isRailwayEnvironment
+  process.env.AI_STUDIO
 );
 
 async function forwardRequestToRailway(req, res) {
