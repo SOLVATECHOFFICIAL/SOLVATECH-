@@ -632,16 +632,18 @@ for (const p of prefixes) {
 
       const result = await redeemLicenseCode(code, verifiedUser, request.headers.authorization);
 
-      // Auto-reconnect existing saved session if present and valid
-      const controller = getWhatsAppController(request.safeUserId, {
-        verifiedUid: request.verifiedUid,
-        userEmail: request.auth.email,
-      });
-      if (controller.hasSavedSession() && !controller.isConnected()) {
-        logger.info(`Auto-reconnecting WhatsApp session for user ${request.verifiedUid} after license redemption`);
-        controller.start().catch((err) => {
-          logger.warn("Auto-reconnect after license redemption notice", err.message);
+      // Auto-reconnect existing saved session if present and valid (Railway only)
+      if (!isAiStudio) {
+        const controller = getWhatsAppController(request.safeUserId, {
+          verifiedUid: request.verifiedUid,
+          userEmail: request.auth.email,
         });
+        if (controller.hasSavedSession() && !controller.isConnected()) {
+          logger.info(`Auto-reconnecting WhatsApp session for user ${request.verifiedUid} after license redemption`);
+          controller.start().catch((err) => {
+            logger.warn("Auto-reconnect after license redemption notice", err.message);
+          });
+        }
       }
 
       response.json(result);
@@ -1614,8 +1616,8 @@ for (const p of prefixes) {
       const ref = request.body?.paymentReference || request.body?.reference;
       const result = await approvePaymentRequest(ref, request.auth.email, request.headers.authorization);
 
-      // Auto-reconnect customer's saved WhatsApp session if present
-      if (result.payment?.userUid) {
+      // Auto-reconnect customer's saved WhatsApp session if present (Railway only)
+      if (!isAiStudio && result.payment?.userUid) {
         const safeId = "user_" + String(result.payment.userUid).replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 96);
         const controller = getWhatsAppController(safeId, {
           verifiedUid: result.payment.userUid,
