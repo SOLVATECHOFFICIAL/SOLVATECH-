@@ -1715,7 +1715,10 @@ app.use((request, response, next) => {
       let customizedHtml = rawHtml
         .replace(/https:\/\/solvatech\.name\.ng\/og-image\.png/g, `${currentOrigin}/og-image.png`)
         .replace(/https:\/\/solvatech\.name\.ng\/og-image\.jpg/g, `${currentOrigin}/og-image.jpg`)
-        .replace(/https:\/\/solvatech\.name\.ng\//g, `${currentOrigin}/`);
+        .replace(/https:\/\/solvatech\.name\.ng\//g, `${currentOrigin}/`)
+        .replace(/https:\/\/solvatech\.up\.railway\.app\/og-image\.png/g, `${currentOrigin}/og-image.png`)
+        .replace(/https:\/\/solvatech\.up\.railway\.app\/og-image\.jpg/g, `${currentOrigin}/og-image.jpg`)
+        .replace(/https:\/\/solvatech\.up\.railway\.app\//g, `${currentOrigin}/`);
 
       if (activeRailway) {
         customizedHtml = customizedHtml.replace(

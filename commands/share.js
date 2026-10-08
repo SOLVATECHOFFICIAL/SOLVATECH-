@@ -8,7 +8,7 @@ export default async function share({
   text = "",
   message,
 }) {
-  let referralLink = "https://solvatech.name.ng/";
+  let referralLink = "https://solvatech.up.railway.app/";
 
   const rawUid =
     verifiedUid && verifiedUid !== "default"
@@ -32,7 +32,7 @@ export default async function share({
         }
       }
     } catch {
-      referralLink = "https://solvatech.name.ng/";
+      referralLink = "https://solvatech.up.railway.app/";
     }
   }
 
