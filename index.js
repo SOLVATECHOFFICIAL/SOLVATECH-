@@ -193,6 +193,53 @@ try {
   logger.warn("Could not auto-hydrate Firebase environment variables", e.message);
 }
 
+export const OFFICIAL_RAILWAY_URL = "https://solvatech.up.railway.app";
+export const isRailwayEnvironment = Boolean(
+  process.env.RAILWAY_ENVIRONMENT ||
+  process.env.RAILWAY_PROJECT_ID ||
+  process.env.RAILWAY_SERVICE_ID ||
+  process.env.RAILWAY_STATIC_URL ||
+  process.env.RAILWAY_TCP_PROXY_PORT
+);
+export const isAiStudio = Boolean(
+  process.env.K_SERVICE?.includes("ais-") ||
+  process.env.CLOUD_RUN_JOB ||
+  process.env.AI_STUDIO ||
+  !isRailwayEnvironment
+);
+
+async function forwardRequestToRailway(req, res) {
+  try {
+    const targetUrl = `${OFFICIAL_RAILWAY_URL}${req.originalUrl}`;
+    const headers = {};
+    for (const [k, v] of Object.entries(req.headers)) {
+      if (k.toLowerCase() !== "host" && k.toLowerCase() !== "content-length" && k.toLowerCase() !== "connection") {
+        headers[k] = v;
+      }
+    }
+    const options = {
+      method: req.method,
+      headers,
+    };
+    if (req.method !== "GET" && req.method !== "HEAD" && req.body && Object.keys(req.body).length > 0) {
+      headers["content-type"] = "application/json";
+      options.body = JSON.stringify(req.body);
+    }
+    const response = await fetch(targetUrl, options);
+    const data = await response.text();
+    res.status(response.status);
+    const contentType = response.headers.get("content-type");
+    if (contentType) res.setHeader("content-type", contentType);
+    return res.send(data);
+  } catch (err) {
+    logger.warn("Proxy to Railway note:", err.message);
+    return res.status(502).json({
+      error: "Could not reach official Railway bot server.",
+      details: err.message,
+    });
+  }
+}
+
 const apiPrefix = String(process.env.BOT_API_PREFIX || "/bot-api").replace(/\/$/, "");
 
 // Explicit CORS configuration for Railway, GitHub Pages frontend, custom domains, and local development
@@ -326,6 +373,9 @@ for (const p of prefixes) {
   // The verified Firebase UID is authoritative and determines the WhatsApp session.
   // Any client-supplied body.userId, query.userId, or header x-user-id is strictly ignored.
   app.get(`${p}/status`, requireAuth, async (request, response) => {
+    if (isAiStudio) {
+      return forwardRequestToRailway(request, response);
+    }
     const safeUserId = request.safeUserId;
     const verifiedUid = request.verifiedUid;
     const userEmail = request.auth.email;
@@ -385,6 +435,9 @@ for (const p of prefixes) {
   });
 
   app.post(`${p}/reconnect`, requireAuth, async (request, response) => {
+    if (isAiStudio) {
+      return forwardRequestToRailway(request, response);
+    }
     const safeUserId = request.safeUserId;
     const verifiedUid = request.verifiedUid;
     const userEmail = request.auth.email;
@@ -399,6 +452,9 @@ for (const p of prefixes) {
   });
 
   app.post(`${p}/clear-cache`, requireAuth, async (request, response) => {
+    if (isAiStudio) {
+      return forwardRequestToRailway(request, response);
+    }
     const safeUserId = request.safeUserId;
     const verifiedUid = request.verifiedUid;
     const controller = getWhatsAppController(safeUserId, { verifiedUid, userEmail: request.auth.email });
@@ -420,6 +476,9 @@ for (const p of prefixes) {
   });
 
   app.post(`${p}/pair`, requireAuth, async (request, response) => {
+    if (isAiStudio) {
+      return forwardRequestToRailway(request, response);
+    }
     const safeUserId = request.safeUserId;
     const verifiedUid = request.verifiedUid;
     const userEmail = request.auth.email;
@@ -459,6 +518,9 @@ for (const p of prefixes) {
   });
 
   app.post(`${p}/disconnect`, requireAuth, async (request, response) => {
+    if (isAiStudio) {
+      return forwardRequestToRailway(request, response);
+    }
     const safeUserId = request.safeUserId;
     const verifiedUid = request.verifiedUid;
     const controller = getWhatsAppController(safeUserId, { verifiedUid, userEmail: request.auth.email });
@@ -472,6 +534,9 @@ for (const p of prefixes) {
   });
 
   app.post(`${p}/number/unlink`, requireAuth, async (request, response) => {
+    if (isAiStudio) {
+      return forwardRequestToRailway(request, response);
+    }
     try {
       const verifiedUid = request.verifiedUid;
       const targetPhone = request.body?.phoneNumber || "";
@@ -484,6 +549,9 @@ for (const p of prefixes) {
   });
 
   app.post(`${p}/number/release`, requireAuth, async (request, response) => {
+    if (isAiStudio) {
+      return forwardRequestToRailway(request, response);
+    }
     try {
       const targetPhone = request.body?.phoneNumber || request.body?.number || "";
       if (!targetPhone) {
@@ -498,6 +566,9 @@ for (const p of prefixes) {
   });
 
   app.post(`${p}/unpair`, requireAuth, async (request, response) => {
+    if (isAiStudio) {
+      return forwardRequestToRailway(request, response);
+    }
     const safeUserId = request.safeUserId;
     const verifiedUid = request.verifiedUid;
     const controller = getWhatsAppController(safeUserId, { verifiedUid, userEmail: request.auth.email });
@@ -1747,27 +1818,21 @@ getGlobalRailwayConfig().then((cfg) => {
   logger.debug("[Global Railway] Initial load notice:", err.message);
 });
 
-// Background auto-restore & license audits
-const isRailwayEnvironment = Boolean(
-  process.env.RAILWAY_ENVIRONMENT ||
-  process.env.RAILWAY_PROJECT_ID ||
-  process.env.RAILWAY_SERVICE_ID ||
-  process.env.RAILWAY_STATIC_URL ||
-  process.env.RAILWAY_TCP_PROXY_PORT
-);
-
-const runOnlyOnRailway = process.env.RUN_ONLY_ON_RAILWAY === "true" || process.env.RUN_ONLY_ON_RAILWAY === "1";
-
-restoreAllSessions().catch((error) => {
-  logger.warn("Auto-restore session error", error.message);
-});
-
-// 24/7 Universal Session Watchdog: Guarantees bots for ALL users stay connected without sleeping
-setInterval(() => {
-  auditActiveSessions().catch((err) => {
-    logger.debug("Background license audit notice", err.message);
+// Background auto-restore & license audits (Exclusively executed on Railway)
+if (isAiStudio) {
+  logger.info("[Auto-restore] WhatsApp bot engine is permanently sealed to Railway (solvatech.up.railway.app). Local socket restore and background watchdog are disabled in AI Studio to prevent 440 stream conflict.");
+} else {
+  restoreAllSessions().catch((error) => {
+    logger.warn("Auto-restore session error", error.message);
   });
-}, 25000);
+
+  // 24/7 Universal Session Watchdog: Guarantees bots for ALL users stay connected without sleeping
+  setInterval(() => {
+    auditActiveSessions().catch((err) => {
+      logger.debug("Background license audit notice", err.message);
+    });
+  }, 25000);
+}
 
 // 24/7 Persistent Self-Ping Keepalive:
 // Keeps the web container 100% active and prevents cloud hosts (Railway, Render, Koyeb, etc.)
