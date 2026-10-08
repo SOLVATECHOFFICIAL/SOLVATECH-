@@ -5902,7 +5902,7 @@
         if (elDevList) elDevList.textContent = (tr.deviceListFiles || 0).toLocaleString();
         const elPreKeys = $("san-kpi-prekeys-count");
         if (elPreKeys) {
-          const excessPk = Math.max(0, (tr.preKeys || 0) - (sessions.length * 150));
+          const excessPk = Math.max(0, (tr.preKeys || 0) - (sessions.length * 3));
           elPreKeys.textContent = excessPk.toLocaleString();
         }
 
