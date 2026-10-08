@@ -2839,8 +2839,8 @@
       }
 
       function updateStatusUI(data) {
-        const connected = data.status === "connected" || data.connected === true;
-        const pending = data.status === "pairing" || data.status === "connecting" || Boolean(data.pairingCode);
+        const connected = Boolean(data.connected === true && data.status === "connected");
+        const isExpired = Boolean(data.status === "expired" || (data.license && data.license.status === "expired" && !data.license.hasActiveLicense));
 
         // Clear stale localStorage pairing if backend explicitly timed out or reset to idle
         if (data.lastErrorCode === "PAIRING_TIMEOUT" || (data.status === "idle" && !data.pairingCode && !pairingActive)) {
@@ -2854,7 +2854,7 @@
         let activePairingNumber = data.pairingNumber || "";
         let activePairingExpires = data.pairingCodeExpiresAt || 0;
 
-        if (!activePairingCode && data.status !== "idle" && data.status !== "error") {
+        if (!activePairingCode && data.status !== "idle" && data.status !== "error" && data.status !== "disconnected") {
           try {
             const savedPairing = JSON.parse(localStorage.getItem("solvatech_active_pairing") || "null");
             if (savedPairing && (!savedPairing.expiresAt || savedPairing.expiresAt > Date.now())) {
@@ -2867,33 +2867,59 @@
           } catch {}
         }
 
-        const failed = !connected && !activePairingCode && !pending && (data.status === "disconnected" || data.status === "error" || data.failed === true);
+        const isPairing = Boolean(activePairingCode || data.status === "pairing");
+        const isConnecting = Boolean(!connected && !isExpired && !isPairing && data.status === "connecting");
+        const failed = !connected && !isPairing && !isConnecting && (data.status === "disconnected" || data.status === "error" || isExpired || data.failed === true);
 
         if (badge) {
-          const nextBadgeText = connected ? "Live Connected" : failed ? "Disconnected" : (activePairingCode || pending) ? "Pairing socket open" : "Ready to pair";
+          const nextBadgeText = connected
+            ? "Live Connected 🟢"
+            : isExpired
+            ? "License Expired 🔴"
+            : isConnecting
+            ? "Connecting... 🟡"
+            : isPairing
+            ? "Pairing socket open 🟡"
+            : failed
+            ? "Disconnected ⚪"
+            : "Ready to pair";
           if (badge.textContent !== nextBadgeText) badge.textContent = nextBadgeText;
           badge.classList.toggle("connected", connected);
-          badge.classList.toggle("failed", failed);
+          badge.classList.toggle("failed", failed || isExpired);
         }
         if (state) {
-          const nextStateText = connected ? "Active" : failed ? "Socket error" : (activePairingCode || pending) ? "Pairing..." : "Not connected";
+          const nextStateText = connected
+            ? "Connected 🟢"
+            : isExpired
+            ? "License Expired"
+            : isConnecting
+            ? "Connecting..."
+            : isPairing
+            ? "Pairing..."
+            : "Not connected";
           if (state.textContent !== nextStateText) state.textContent = nextStateText;
         }
         if (detail) {
           const nextDetailText = connected 
-            ? "Your dedicated WhatsApp socket is active and listening for owner commands." 
-            : (activePairingCode || pending)
+            ? "WhatsApp bot is online and responding live to commands on your number." 
+            : isExpired
+            ? (data.lastError || "Your activation key has expired. Please enter an active key to connect.")
+            : isConnecting
+            ? "Establishing secure WhatsApp companion handshake..."
+            : isPairing
             ? "Socket is open and waiting for WhatsApp mobile confirmation. Enter code in Linked Devices."
+            : (data.status === "disconnected")
+            ? "Bot is disconnected. Enter your phone number above to pair."
             : failed 
-            ? (data.lastError || "WhatsApp closed the pairing socket. Ready to try again.") 
+            ? (data.lastError || "WhatsApp session is disconnected. Ready to pair.") 
             : "Enter your phone number above to generate your pairing code.";
           if (detail.textContent !== nextDetailText) detail.textContent = nextDetailText;
         }
         if (number) {
-          const nextNumText = data.botNumber || data.phoneNumber || data.lockedNumber || (activePairingNumber ? `+${activePairingNumber}` : "—");
+          const nextNumText = connected ? (data.botNumber || data.phoneNumber || data.lockedNumber || "—") : (isPairing && activePairingNumber ? `+${activePairingNumber}` : "—");
           if (number.textContent !== nextNumText) number.textContent = nextNumText;
         }
-        if (disconnect) disconnect.disabled = !connected && !pending && !activePairingCode;
+        if (disconnect) disconnect.disabled = !connected && !isConnecting && !isPairing;
 
         // Update Account Number Lock banner
         if (accountLockBanner && accountLockedNumber) {

@@ -336,6 +336,12 @@ for (const p of prefixes) {
       getUserLicenseStatus(verifiedUid, userEmail),
     ]);
 
+    if (!license.hasActiveLicense || license.status === "expired") {
+      if (controller.isConnected() || controller.isConnecting()) {
+        controller.stopForExpiry();
+      }
+    }
+
     const latestStatus = controller.getStatus();
     const preferences = await getUserPreferences(safeUserId);
 
