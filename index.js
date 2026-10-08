@@ -1782,21 +1782,37 @@ const isRailwayEnvironment = Boolean(
 
 const runOnlyOnRailway = process.env.RUN_ONLY_ON_RAILWAY === "true" || process.env.RUN_ONLY_ON_RAILWAY === "1";
 
-if (runOnlyOnRailway && !isRailwayEnvironment) {
-  logger.info("ℹ️ [Deployment Policy] RUN_ONLY_ON_RAILWAY is enabled. Auto-restoring WhatsApp sockets is skipped in this environment so your bot runs exclusively on Railway without 440 conflicts.");
-} else {
-  restoreAllSessions().catch((error) => {
-    logger.warn("Auto-restore session error", error.message);
-  });
-}
+restoreAllSessions().catch((error) => {
+  logger.warn("Auto-restore session error", error.message);
+});
 
+// 24/7 Universal Session Watchdog: Guarantees bots for ALL users stay connected without sleeping
 setInterval(() => {
   auditActiveSessions().catch((err) => {
     logger.debug("Background license audit notice", err.message);
   });
-}, 30000).unref();
+}, 25000);
 
-// Periodic Garbage Collection & Memory Health Optimizer (Protects Railway from OOM)
+// 24/7 Persistent Self-Ping Keepalive:
+// Keeps the web container 100% active and prevents cloud hosts (Railway, Render, Koyeb, etc.)
+// from sleeping, idling, or suspending when no user is visiting the site.
+setInterval(async () => {
+  try {
+    const urlsToPing = [`http://127.0.0.1:${listenPort}/health`];
+    const railwayUrl = getCachedRailwayUrl() || process.env.RAILWAY_STATIC_URL;
+    if (railwayUrl) {
+      const cleanUrl = railwayUrl.startsWith("http") ? railwayUrl : `https://${railwayUrl}`;
+      urlsToPing.push(`${cleanUrl.replace(/\/$/, "")}/health`);
+    }
+    for (const url of urlsToPing) {
+      try {
+        await fetch(url, { signal: AbortSignal.timeout(5000) });
+      } catch {}
+    }
+  } catch {}
+}, 90000);
+
+// Periodic Garbage Collection & Memory Health Optimizer (Protects container from OOM)
 setInterval(() => {
   try {
     const mem = process.memoryUsage();
