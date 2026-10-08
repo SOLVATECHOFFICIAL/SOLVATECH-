@@ -2842,8 +2842,8 @@
         const connected = Boolean(data.connected === true && data.status === "connected");
         const isExpired = Boolean(data.status === "expired" || (data.license && data.license.status === "expired" && !data.license.hasActiveLicense));
 
-        // Clear stale localStorage pairing if backend explicitly timed out or reset to idle
-        if (data.lastErrorCode === "PAIRING_TIMEOUT" || (data.status === "idle" && !data.pairingCode && !pairingActive)) {
+        // Clear stale localStorage pairing if backend explicitly disconnected, timed out, or reset to idle
+        if (data.status === "disconnected" || data.lastErrorCode === "PAIRING_TIMEOUT" || (data.status === "idle" && !data.pairingCode && !pairingActive)) {
           try {
             localStorage.removeItem("solvatech_active_pairing");
           } catch {}
