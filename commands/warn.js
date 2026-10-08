@@ -53,7 +53,7 @@ export default async function warn({
 
   if (targetQuotedId) {
     removeCachedMessage(userId, targetQuotedId);
-    await Promise.allSettled([
+    Promise.allSettled([
       sock.sendMessage(chatId, {
         delete: {
           remoteJid: chatId,
@@ -84,7 +84,7 @@ export default async function warn({
       const targetRecentMsg = recent.find((m) => targetAliasSet.has(m.sender));
       if (targetRecentMsg) {
         removeCachedMessage(userId, targetRecentMsg.id);
-        await Promise.allSettled([
+        Promise.allSettled([
           sock.sendMessage(chatId, {
             delete: {
               remoteJid: chatId,
