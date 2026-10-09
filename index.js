@@ -86,7 +86,11 @@ function isNoisyInternalLog(args) {
   if (typeof first === "string") {
     if (
       first.includes("Disconnecting idle stream") ||
-      first.includes("Timed out waiting for new targets")
+      first.includes("Timed out waiting for new targets") ||
+      first.includes("Closing session") ||
+      first.includes("Closing open session in favor of incoming prekey bundle") ||
+      first.includes("Failed to decrypt message with any known session") ||
+      first.includes("Bad MAC")
     ) {
       return true;
     }
@@ -94,13 +98,18 @@ function isNoisyInternalLog(args) {
   const text = args
     .map((a) => {
       if (typeof a === "string") return a;
-      if (a && typeof a === "object") return a.message || a.name || "";
+      if (a && typeof a === "object") return a.message || a.name || a.constructor?.name || "";
       return "";
     })
     .join(" ");
   return (
     text.includes("Disconnecting idle stream") ||
-    text.includes("Timed out waiting for new targets")
+    text.includes("Timed out waiting for new targets") ||
+    text.includes("Closing session") ||
+    text.includes("Closing open session in favor of incoming prekey bundle") ||
+    text.includes("Failed to decrypt message with any known session") ||
+    text.includes("Bad MAC") ||
+    text.includes("SessionEntry")
   );
 }
 
@@ -1849,10 +1858,10 @@ setInterval(() => {
     const mem = process.memoryUsage();
     const heapUsedMb = Math.round(mem.heapUsed / 1024 / 1024);
     const rssMb = Math.round(mem.rss / 1024 / 1024);
-    // Only invoke GC when heap is genuinely elevated (>300MB) to avoid freezing event loop
-    if (heapUsedMb > 300 && typeof global.gc === "function") {
+    // Only invoke GC when heap is genuinely critical (>1000MB) to avoid freezing event loop
+    if (heapUsedMb > 1000 && typeof global.gc === "function") {
       global.gc();
-      logger.info(`[Memory Monitor] Heap: ${heapUsedMb}MB, RSS: ${rssMb}MB (Proactive Trim)`);
+      logger.info(`[Memory Monitor] Heap: ${heapUsedMb}MB, RSS: ${rssMb}MB (High Usage Trim)`);
     }
   } catch {}
 }, 60000).unref();
