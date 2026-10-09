@@ -179,11 +179,10 @@ export const isRailwayEnvironment = Boolean(
   process.env.RAILWAY_STATIC_URL ||
   process.env.RAILWAY_TCP_PROXY_PORT
 );
-export const isAiStudio = Boolean(
-  process.env.K_SERVICE?.includes("ais-") ||
-  process.env.CLOUD_RUN_JOB ||
-  process.env.AI_STUDIO
+export const isProxyToRailwayEnabled = Boolean(
+  process.env.RUN_ONLY_ON_RAILWAY === "true" && !isRailwayEnvironment
 );
+export const isAiStudio = isProxyToRailwayEnabled;
 
 async function forwardRequestToRailway(req, res) {
   try {
@@ -1797,9 +1796,9 @@ getGlobalRailwayConfig().then((cfg) => {
   logger.debug("[Global Railway] Initial load notice:", err.message);
 });
 
-// Background auto-restore & license audits (Exclusively executed on Railway)
+// Background auto-restore & license audits
 if (isAiStudio) {
-  logger.info("[Auto-restore] WhatsApp bot engine is permanently sealed to Railway (solvatech.up.railway.app). Local socket restore and background watchdog are disabled in AI Studio to prevent 440 stream conflict.");
+  logger.info("[Auto-restore] WhatsApp bot engine is routed to Railway (RUN_ONLY_ON_RAILWAY=true). Local socket restore disabled.");
 } else {
   restoreAllSessions().catch((error) => {
     logger.warn("Auto-restore session error", error.message);
