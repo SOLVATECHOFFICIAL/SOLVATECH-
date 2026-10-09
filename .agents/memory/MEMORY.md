@@ -1,1 +1,2 @@
 - [Availability and scale expectations](availability-and-scale.md) — the bot is expected to serve about 5,000 simultaneous users and stay online 24/7 through license expiry.
+- [Command-only behavior](command-only-behavior.md) — handle explicit commands in groups and DMs without automatic conversational AI replies; preserve per-command access checks.
