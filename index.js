@@ -179,10 +179,13 @@ export const isRailwayEnvironment = Boolean(
   process.env.RAILWAY_STATIC_URL ||
   process.env.RAILWAY_TCP_PROXY_PORT
 );
-export const isProxyToRailwayEnabled = Boolean(
-  process.env.RUN_ONLY_ON_RAILWAY === "true" && !isRailwayEnvironment
+export const isAiStudio = Boolean(
+  process.env.K_SERVICE ||
+  process.env.CLOUD_RUN_JOB ||
+  process.env.AI_STUDIO ||
+  !isRailwayEnvironment
 );
-export const isAiStudio = isProxyToRailwayEnabled;
+export const isProxyToRailwayEnabled = isAiStudio;
 
 async function forwardRequestToRailway(req, res) {
   try {
@@ -1152,7 +1155,10 @@ for (const p of prefixes) {
   });
 
   // Admin System Sanitation, Transient Tokens (70,000+ files purge) & Direct Firebase Sync
-  app.get(`${p}/admin/sanitation/diagnostics`, requireAuth, requireAdmin, async (_request, response) => {
+  app.get(`${p}/admin/sanitation/diagnostics`, requireAuth, requireAdmin, async (request, response) => {
+    if (isAiStudio) {
+      return forwardRequestToRailway(request, response);
+    }
     try {
       const diag = await getTransientStorageDiagnostics();
       response.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
@@ -1164,6 +1170,9 @@ for (const p of prefixes) {
   });
 
   app.post(`${p}/admin/sanitation/purge`, requireAuth, requireAdmin, async (request, response) => {
+    if (isAiStudio) {
+      return forwardRequestToRailway(request, response);
+    }
     try {
       const res = await purgeTransientStorage(request.body || {});
       response.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
@@ -1294,6 +1303,9 @@ for (const p of prefixes) {
 
   // Admin: Disconnect single, marked multiple, or ALL WhatsApp sessions with personal update DM notification
   app.post(`${p}/admin/sessions/disconnect`, requireAuth, requireAdmin, async (request, response) => {
+    if (isAiStudio) {
+      return forwardRequestToRailway(request, response);
+    }
     try {
       const { userId, userIds, message, disconnectAll } = request.body || {};
       if (disconnectAll) {
@@ -1798,7 +1810,7 @@ getGlobalRailwayConfig().then((cfg) => {
 
 // Background auto-restore & license audits
 if (isAiStudio) {
-  logger.info("[Auto-restore] WhatsApp bot engine is routed to Railway (RUN_ONLY_ON_RAILWAY=true). Local socket restore disabled.");
+  logger.info("[Auto-restore] WhatsApp bot engine is permanently sealed to Railway (solvatech.up.railway.app). Local socket restore and background watchdog are disabled in AI Studio to prevent 440 stream conflict.");
 } else {
   restoreAllSessions().catch((error) => {
     logger.warn("Auto-restore session error", error.message);
